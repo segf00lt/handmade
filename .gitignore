@@ -32,3 +32,8 @@ sounds/*.mp3
 test
 test_lexer_results
 test_output_old
+*.obj*
+*.pdb*
+*.rdi*
+*.ilk*
+*.exe*
