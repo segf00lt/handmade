@@ -1,4 +1,4 @@
-#if defined(OS_MAC)
+#if OS_MAC
 
 #error macos not supported yet
 

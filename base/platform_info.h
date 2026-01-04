@@ -244,4 +244,8 @@
 # error You tried to build with an unsupported architecture. Currently, only building in x64 mode is supported.
 #endif
 
+#if OS_WINDOWS
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #endif

@@ -60,7 +60,7 @@ s64 arr_dict_put_(__Arr_Header *dict_array, u64 stride, u64 key_offset, Str8 new
         Str8 *key = (Str8*)elem_addr;
 
         if(key->s) {
-          s64 hash = hash_key(*key);
+          hash = hash_key(*key);
           s64 pos = hash % dict_array->cap;
           s64 pos_byte_offset = pos * stride;
 
@@ -112,11 +112,11 @@ s64 arr_dict_put_(__Arr_Header *dict_array, u64 stride, u64 key_offset, Str8 new
 
 s64 arr_dict_get_(__Arr_Header *dict_array, u64 stride, u64 key_offset, Str8 key) {
   u64 hash = hash_key(key);
-  u64 pos = hash % dict_array->cap;
-  u64 pos_byte_offset = pos * stride;
+  s64 pos = hash % dict_array->cap;
+  s64 pos_byte_offset = pos * stride;
 
   Str8 *key_at_pos = (Str8*)((u8*)dict_array->d + pos_byte_offset + key_offset);
-  u64 start_search_pos = pos;
+  s64 start_search_pos = pos;
   while(!str8_match(*key_at_pos, key)) {
     pos++;
     pos %= dict_array->cap;

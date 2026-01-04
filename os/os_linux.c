@@ -1,4 +1,4 @@
-#if defined(OS_LINUX)
+#if OS_LINUX
 
 #include <limits.h>
 #include <unistd.h>

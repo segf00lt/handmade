@@ -1,4 +1,4 @@
-#if defined(OS_WEB)
+#if OS_WEB
 
 #error web support not implemented
 

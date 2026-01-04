@@ -1,15 +1,36 @@
-#if defined(OS_WINDOWS)
+#if OS_WINDOWS
 
-#error "windows support not implemented"
+#include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
+#include <errno.h>
+#include <ctype.h>
+#include <limits.h>
 
-#define OS_PATH_LEN MAX_PATH
+#include <windows.h>
+#include <direct.h>
+#include <shellapi.h>
+
+void* os_alloc(u64 bytes) {
+  void *result = (void*)VirtualAlloc(
+    0,
+    (SIZE_T)bytes,
+    MEM_COMMIT,
+    PAGE_READWRITE
+  );
+  return result;
+}
+
+void os_free(void *ptr) {
+  VirtualFree(ptr, 0, MEM_RELEASE);
+}
 
 Str8 os_read_entire_file(Arena *a, Str8 path) {
   Str8 result = {0};
 
-  FILE *f;
+  FILE *f = 0;
   arena_scope(a) {
-    f = fopen(push_cstr_copy_str8(a, path), "rb");
+    f = fopen(cstr_copy_str8(a, path), "rb");
   }
 
   if(f == NULL) {
@@ -50,22 +71,26 @@ end:
   return result;
 }
 
-b32 os_file_exists(char *path) {
+b32 os_file_exists(Arena *a, Str8 path) {
   b32 result = 0;
 
-  if (_access(path, 0) != -1) result = 1;
+  arena_scope(a) {
+    char *cstr_path = cstr_copy_str8(a, path);
+    DWORD dwAttrib = GetFileAttributesA(cstr_path);
+    result = dwAttrib != INVALID_FILE_ATTRIBUTES;
+  }
 
   return result;
 }
 
-Str8 os_get_current_dir(void) {
+Str8 os_get_current_dir(Arena *a) {
   DWORD buf_size = GetCurrentDirectory(0, NULL);
   ASSERT(buf_size > 0);
 
-  char *buf = scratch_push_array_no_zero(char, buf_size);
+  char *buf = push_array_no_zero(a, char, buf_size);
   ASSERT(GetCurrentDirectory(buf_size, buf) != 0);
 
-  Str8 result = { .s = buf, .s = buf_size - 1 };
+  Str8 result = { .s = (u8*)buf, .len = buf_size - 1 };
 
   return result;
 }
@@ -82,8 +107,8 @@ b32 os_move_file(Arena *a, Str8 old_path, Str8 new_path) {
   b32 result = 0;
 
   arena_scope(a) {
-    const char *old_path_cstr = push_cstr_copy_str8(a, old_path); 
-    const char *new_path_cstr = push_cstr_copy_str8(a, new_path); 
+    const char *old_path_cstr = cstr_copy_str8(a, old_path);
+    const char *new_path_cstr = cstr_copy_str8(a, new_path);
 
     result = MoveFileEx(old_path_cstr, new_path_cstr, MOVEFILE_REPLACE_EXISTING);
   }
@@ -92,11 +117,10 @@ b32 os_move_file(Arena *a, Str8 old_path, Str8 new_path) {
 }
 
 b32 os_remove_file(Arena *a, Str8 path) {
-  u8 path_buf[OS_PATH_LEN+1];
   b32 result = 1;
 
   arena_scope(a) {
-    const char *path_cstr = push_cstr_copy_str8(a, path);
+    const char *path_cstr = cstr_copy_str8(a, path);
     if(!DeleteFileA(path_cstr)) {
       result = 0;
     }
@@ -105,8 +129,11 @@ b32 os_remove_file(Arena *a, Str8 path) {
   return result;
 }
 
-func b32 os_make_dir(char *path) {
-  int result = mkdir(path);
+b32 os_make_dir(Arena *a, Str8 path) {
+  b32 result = 0;
+  arena_scope(a) {
+    result = _mkdir(cstr_copy_str8(a, path));
+  }
 
   if(result < 0) {
     if(errno == EEXIST) {

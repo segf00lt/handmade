@@ -421,10 +421,12 @@ u64 str8_parse_int_decimal(Str8 str) {
 
 u64 str8_parse_int_binary(Str8 str) {
   UNIMPLEMENTED;
+  return 0;
 }
 
 u64 str8_parse_int_hex(Str8 str) {
   UNIMPLEMENTED;
+  return 0;
 }
 
 
