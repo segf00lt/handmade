@@ -6,7 +6,7 @@
 
 LRESULT CALLBACK os_win32_main_window_callback(HWND window, UINT message, WPARAM w_param, LPARAM l_param);
 void os_win32_resize_dib_section(int width, int height);
-void os_win32_update_window(HDC device_context, int x, int y, int width, int height);
+void os_win32_update_window(HDC device_context, RECT *window_rect, int x, int y, int width, int height);
 
 /*
  * globals
@@ -15,8 +15,8 @@ void os_win32_update_window(HDC device_context, int x, int y, int width, int hei
 global b32 app_is_running;
 global BITMAPINFO bitmap_info;
 global void *bitmap_memory;
-global HBITMAP bitmap_handle;
-global HDC bitmap_device_context;
+global int bitmap_width;
+global int bitmap_height;
 
 /*
  * functions
@@ -28,37 +28,59 @@ void os_win32_resize_dib_section(int width, int height) {
 
   // TODO jfd: free our DIBSection
 
-  if(bitmap_handle) {
-    DeleteObject((HGDIOBJ)bitmap_handle);
-  } else {
-    bitmap_device_context = CreateCompatibleDC(0);
+  if(bitmap_memory) {
+    os_free(bitmap_memory);
   }
 
+  bitmap_width = width;
+  bitmap_height = height;
+
   bitmap_info.bmiHeader.biSize = sizeof(bitmap_info.bmiHeader);
-  bitmap_info.bmiHeader.biWidth = width;
-  bitmap_info.bmiHeader.biHeight = height;
+  bitmap_info.bmiHeader.biWidth = bitmap_width;
+  bitmap_info.bmiHeader.biHeight = -bitmap_height;
   bitmap_info.bmiHeader.biPlanes = 1;
   bitmap_info.bmiHeader.biBitCount = 32;
   bitmap_info.bmiHeader.biCompression = BI_RGB; // pixel format
 
-  bitmap_handle = CreateDIBSection(
-    bitmap_device_context,
-    &bitmap_info,
-    DIB_RGB_COLORS,
-    &bitmap_memory,
-    0,
-    0
-  );
+  u64 bytes_per_pixel = 4;
+  u64 bitmap_memory_size = bitmap_width*bitmap_height * bytes_per_pixel;
+  bitmap_memory = os_alloc(bitmap_memory_size);
+
+  u64 stride = bitmap_width * bytes_per_pixel;
+
+  u8 *row = (u8*)bitmap_memory;
+  for(int y = 0; y < bitmap_height; y++) {
+    u8 *pixel = row;
+
+    for(int x = 0; x < bitmap_width; x++) {
+      //
+      // pixel in memory
+      //  0  1  2  3
+      //  B  G  R  x
+      // 00 00 00 00
+      // pixel[0] = 0;
+      // pixel[1] = 0;
+      pixel[0] = (u8)x;
+      pixel[1] = (u8)y;
+      pixel[2] = (u8)x*y;
+      pixel[3] = 0;
+      pixel += 4;
+    }
+
+    row += stride;
+  }
 
 }
 
-void os_win32_update_window(HDC device_context, int x, int y, int width, int height) {
+void os_win32_update_window(HDC device_context, RECT *window_rect, int x, int y, int width, int height) {
 
+  int window_width = window_rect->right - window_rect->left;
+  int window_height = window_rect->bottom - window_rect->top;
   StretchDIBits(
     device_context,
-    x, y, width, height,
-    x, y, width, height,
-    &bitmap_memory,
+    0, 0, bitmap_width, bitmap_height,
+    0, 0, window_width, window_height, // destination coordinates
+    bitmap_memory,
     &bitmap_info,
     DIB_RGB_COLORS,
     SRCCOPY
@@ -99,18 +121,25 @@ LRESULT CALLBACK os_win32_main_window_callback(
     } break;
     case WM_PAINT: {
       PAINTSTRUCT paint;
+
       HDC device_context = BeginPaint(window, &paint);
+
       int x = paint.rcPaint.left;
       int y = paint.rcPaint.top;
       int width = paint.rcPaint.right - x;
       int height = paint.rcPaint.bottom - y;
+
       static int color = WHITENESS;
       if(color == WHITENESS) {
         color = BLACKNESS;
       } else {
         color = WHITENESS;
       }
-      PatBlt(device_context, x, y, width, height, color);
+
+      RECT client_rect;
+      GetClientRect(window, &client_rect);
+
+      os_win32_update_window(device_context, &client_rect, x, y, width, height);
       EndPaint(window, &paint);
     } break;
     default: {
