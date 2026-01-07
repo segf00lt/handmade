@@ -17,10 +17,37 @@ global BITMAPINFO bitmap_info;
 global void *bitmap_memory;
 global int bitmap_width;
 global int bitmap_height;
+global const u64 bytes_per_pixel = 4;
 
 /*
  * functions
  */
+
+void render_weird_gradient(int x_offset, int y_offset) {
+  u64 stride = bitmap_width * bytes_per_pixel;
+
+  u8 *row = (u8*)bitmap_memory;
+  for(int y = 0; y < bitmap_height; y++) {
+    u32 *pixel = (u32*)row;
+
+    for(int x = 0; x < bitmap_width; x++) {
+      //
+      // pixel in memory
+      //  0  1  2  3
+      //  B  G  R  x
+      // 00 00 00 00
+
+      u8 r = (x + x_offset);
+      u8 g = 0;
+      u8 b = (y + y_offset);
+
+      *pixel++ = (r << 16) | (g << 8) | b;
+    }
+
+    row += stride;
+  }
+
+}
 
 void os_win32_resize_dib_section(int width, int height) {
   // TODO jfd: bulletproof this
@@ -42,33 +69,8 @@ void os_win32_resize_dib_section(int width, int height) {
   bitmap_info.bmiHeader.biBitCount = 32;
   bitmap_info.bmiHeader.biCompression = BI_RGB; // pixel format
 
-  u64 bytes_per_pixel = 4;
   u64 bitmap_memory_size = bitmap_width*bitmap_height * bytes_per_pixel;
   bitmap_memory = os_alloc(bitmap_memory_size);
-
-  u64 stride = bitmap_width * bytes_per_pixel;
-
-  u8 *row = (u8*)bitmap_memory;
-  for(int y = 0; y < bitmap_height; y++) {
-    u8 *pixel = row;
-
-    for(int x = 0; x < bitmap_width; x++) {
-      //
-      // pixel in memory
-      //  0  1  2  3
-      //  B  G  R  x
-      // 00 00 00 00
-      // pixel[0] = 0;
-      // pixel[1] = 0;
-      pixel[0] = (u8)x;
-      pixel[1] = (u8)y;
-      pixel[2] = (u8)x*y;
-      pixel[3] = 0;
-      pixel += 4;
-    }
-
-    row += stride;
-  }
 
 }
 
@@ -182,17 +184,37 @@ int CALLBACK WinMain(
 
       app_is_running = true;
 
-      MSG msg;
-      while(app_is_running) {
-        BOOL message_result = GetMessage(&msg, NULL, 0, 0);
+      MSG message;
+      int x_offset = 0;
+      int y_offset = 0;
 
-        if(message_result > 0) {
-          TranslateMessage(&msg); // NOTE jfd: has to do with keyboard messages
-          DispatchMessage(&msg);
-        } else {
-          break;
+      while(app_is_running) {
+        // NOTE jfd: get input messages
+        while(PeekMessageA(&message, window_handle, 0, 0, PM_REMOVE)) {
+          if(message.message == WM_QUIT) {
+            app_is_running = false;
+          }
+          TranslateMessage(&message); // NOTE jfd: has to do with keyboard messages
+          DispatchMessage(&message);
+
         }
 
+        { // draw
+          render_weird_gradient(x_offset, y_offset);
+
+          ++x_offset;
+        } // draw
+
+        // NOTE jfd: blit to screen
+        HDC device_context;
+        defer_loop(device_context = GetDC(window_handle), ReleaseDC(window_handle, device_context)) {
+          RECT client_rect;
+          GetClientRect(window_handle, &client_rect);
+          int window_width = client_rect.right - client_rect.left;
+          int window_height = client_rect.bottom - client_rect.top;
+
+          os_win32_update_window(device_context, &client_rect, 0, 0, window_width, window_height);
+        }
       }
 
     } else {
