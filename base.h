@@ -7,6 +7,8 @@
 
 #ifndef BASE_CORE_ONLY
 
+#include "base/math.h"
+
 #include "base/arena.h"
 #include "base/str.h"
 #include "base/array.h"

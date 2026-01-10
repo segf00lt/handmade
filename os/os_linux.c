@@ -14,19 +14,19 @@
  * function headers
  */
 
-b32 os_sleep_ms(u32 ms);
-Str8 os_file_name_from_path(Str8 path);
-void* os_alloc(u64 size);
-void os_free(void *ptr);
-Str8 os_get_current_dir(Arena *a);
-b32 os_move_file(Arena *a, Str8 old_path, Str8 new_path);
-b32 os_remove_file(Arena *a, Str8 path);
-b32 os_file_exists(Arena *a, Str8 path);
-Str8 os_read_entire_file(Arena *a, Str8 path);
-b32 os_make_dir(Arena *a, Str8 path);
-void* os_library_open(Arena *a, Str8 path);
-void os_library_close(void *lib);
-Void_Func* os_library_load_func(Arena *a, void *lib, Str8 name);
+// b32 os_sleep_ms(u32 ms);
+// Str8 os_file_name_from_path(Str8 path);
+// void* os_alloc(u64 size);
+// void os_free(void *ptr);
+// Str8 os_get_current_dir(Arena *a);
+// b32 os_move_file(Arena *a, Str8 old_path, Str8 new_path);
+// b32 os_remove_file(Arena *a, Str8 path);
+// b32 os_file_exists(Arena *a, Str8 path);
+// Str8 os_read_entire_file(Arena *a, Str8 path);
+// b32 os_make_dir(Arena *a, Str8 path);
+// void* os_library_open(Arena *a, Str8 path);
+// void os_library_close(void *lib);
+// Void_Func* os_library_load_func(Arena *a, void *lib, Str8 name);
 
 /*
  * function bodies

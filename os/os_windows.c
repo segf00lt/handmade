@@ -10,6 +10,7 @@
 #include <windows.h>
 #include <direct.h>
 #include <shellapi.h>
+#include <Xinput.h>
 
 void* os_alloc(u64 bytes) {
   void *result = (void*)VirtualAlloc(
@@ -127,6 +128,34 @@ b32 os_remove_file(Arena *a, Str8 path) {
   }
 
   return result;
+}
+
+void* os_library_open(Arena *a, Str8 path) {
+  void *lib = 0;
+
+  arena_scope(a) {
+    LPCSTR path_cstr = (LPCSTR)cstr_copy_str8(a, path);
+    HMODULE dll = LoadLibraryA(path_cstr);
+    lib = (void*)dll;
+  }
+
+  return lib;
+}
+
+void os_library_close(void* lib) {
+  FreeLibrary((HMODULE)lib);
+}
+
+Void_Func* os_library_load_func(Arena *a, void* lib, Str8 name) {
+  Void_Func *fn = 0;
+
+  arena_scope(a) {
+    HMODULE dll_handle = (HMODULE)lib;
+    LPCSTR func_name = (LPCSTR)cstr_copy_str8(a, name);
+    fn = (Void_Func*)GetProcAddress(dll_handle, func_name);
+  }
+
+  return fn;
 }
 
 b32 os_make_dir(Arena *a, Str8 path) {
