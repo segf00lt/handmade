@@ -201,7 +201,7 @@ b32 os_make_dir(Arena *a, Str8 path) {
   return 1;
 }
 
-void* os_library_open(Arena *a, Str8 path) {
+void* os_library_load(Arena *a, Str8 path) {
   void *lib = 0;
 
   arena_scope(a) {
@@ -213,7 +213,7 @@ void* os_library_open(Arena *a, Str8 path) {
   return lib;
 }
 
-void os_library_close(void *lib) {
+void os_library_unload(void *lib) {
   dlclose(lib);
 }
 

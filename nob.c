@@ -21,6 +21,10 @@ int main(int argc, char **argv) {
     "win32_handmade.c",
     "user32.lib",
     "gdi32.lib",
+    "Dsound.lib",
+    "dxguid.lib",
+    "winmm.lib",
+    "ole32.lib",
     "/link",
     "/incremental:no",
     ""

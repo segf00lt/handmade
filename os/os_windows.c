@@ -10,7 +10,6 @@
 #include <windows.h>
 #include <direct.h>
 #include <shellapi.h>
-#include <Xinput.h>
 
 void* os_alloc(u64 bytes) {
   void *result = (void*)VirtualAlloc(
@@ -130,7 +129,7 @@ b32 os_remove_file(Arena *a, Str8 path) {
   return result;
 }
 
-void* os_library_open(Arena *a, Str8 path) {
+void* os_library_load(Arena *a, Str8 path) {
   void *lib = 0;
 
   arena_scope(a) {
@@ -142,7 +141,7 @@ void* os_library_open(Arena *a, Str8 path) {
   return lib;
 }
 
-void os_library_close(void* lib) {
+void os_library_unload(void* lib) {
   FreeLibrary((HMODULE)lib);
 }
 

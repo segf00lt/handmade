@@ -14,6 +14,7 @@
 #include "base/array.h"
 
 #include "os/os.h"
+#include "os/os_gfx.h"
 
 #endif
 
@@ -31,6 +32,7 @@
 #include "base/array.c"
 
 #include "os/os.c"
+#include "os/os_gfx.c"
 
 #endif
 

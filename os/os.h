@@ -24,8 +24,8 @@ b32 os_make_dir(Arena *a, Str8 path);
 
 b32 os_sleep_ms(u32 ms);
 
-void*      os_library_open(Arena *a, Str8 path);
-void       os_library_close(void* lib);
+void*      os_library_load(Arena *a, Str8 path);
+void       os_library_unload(void* lib);
 Void_Func* os_library_load_func(Arena *a, void* lib, Str8 name);
 
 #endif
