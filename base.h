@@ -14,7 +14,10 @@
 #include "base/array.h"
 
 #include "os/os.h"
+
+#ifndef OS_GFX_DISABLED
 #include "os/os_gfx.h"
+#endif
 
 #endif
 
@@ -32,7 +35,10 @@
 #include "base/array.c"
 
 #include "os/os.c"
+
+#ifndef OS_GFX_DISABLED
 #include "os/os_gfx.c"
+#endif
 
 #endif
 

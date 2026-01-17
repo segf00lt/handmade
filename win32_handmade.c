@@ -89,6 +89,8 @@ global OS_Win32_Backbuffer global_backbuffer = {
   .bytes_per_pixel = 4,
 };
 
+global LPDIRECTSOUNDBUFFER app_sound_buffer; // this is what we write to
+
 global Game _game_state_stub;
 global Game *game_state = &_game_state_stub;
 global OS_EventList _app_event_list_stub;
@@ -180,7 +182,9 @@ void poll_events(Game *gp, OS_EventList *event_list) {
 
       } break;
       case OS_EVENT_MOUSE_MOVE: {
-        UNIMPLEMENTED;
+        gp->mouse_pos = event->mouse_pos;
+        gp->mouse_delta.x = event->mouse_pos.x - gp->mouse_pos.x;
+        gp->mouse_delta.y = event->mouse_pos.y - gp->mouse_pos.y;
       } break;
     }
   }
@@ -366,7 +370,7 @@ LRESULT CALLBACK os_win32_main_window_callback(
         is_repeat = 1;
       }
 
-      OS_Event *event = os_event_push(app_event_arena, app_event_list, release ? OS_EVENT_KEY_RELEASE : OS_EVENT_KEY_PRESS);
+      OS_Event *event = os_win32_event_push(app_event_arena, app_event_list, release ? OS_EVENT_KEY_RELEASE : OS_EVENT_KEY_PRESS);
 
 
       // TODO jfd: distinguish right and left modifiers with is_right_sided (???)
@@ -392,6 +396,34 @@ LRESULT CALLBACK os_win32_main_window_callback(
     } break;
 
     case WM_CHAR: {
+    } break;
+
+    case WM_MOUSEMOVE: {
+      s16 x_pos = (s16)LOWORD(l_param);
+      s16 y_pos = (s16)HIWORD(l_param);
+
+      OS_Event *event = os_win32_event_push(app_event_arena, app_event_list, OS_EVENT_MOUSE_MOVE);
+      event->mouse_pos.x = (f32)x_pos;
+      event->mouse_pos.y = (f32)y_pos;
+
+      #if 0
+      arena_scope(scratch) {
+        OutputDebugStringA(cstrf(scratch, "x: %i    y: %i\n", x_pos, y_pos));
+      }
+      #endif
+
+    } break;
+
+    case WM_MOUSEWHEEL: {
+      s16 wheel_delta = HIWORD(w_param);
+      OS_Event *event = os_win32_event_push(app_event_arena, app_event_list, OS_EVENT_MOUSE_SCROLL);
+      POINT p;
+      p.x = (s32)(s16)LOWORD(l_param);
+      p.y = (s32)(s16)HIWORD(l_param);
+      ScreenToClient(window, &p);
+      event->mouse_pos.x = (f32)p.x;
+      event->mouse_pos.y = (f32)p.y;
+      event->scroll_delta.y = -(f32)wheel_delta;
     } break;
 
     case WM_PAINT: {
@@ -439,7 +471,7 @@ void os_win32_init_dsound(HWND window_handle, s32 sound_buffer_size, s32 samples
   if(lib) {
     // NOTE jfd: get a direct sound object
     OS_Win32_DirectSound_CreateFunc *direct_sound_create =
-    (OS_Win32_DirectSound_CreateFunc*)os_library_load_func(scratch, lib, str8_lit("DirectSoundCreate"));
+    (OS_Win32_DirectSound_CreateFunc*)os_library_load_func(scratch, lib, str8_lit("DirectSoundCreate8"));
 
     LPDIRECTSOUND direct_sound;
 
@@ -492,9 +524,7 @@ void os_win32_init_dsound(HWND window_handle, s32 sound_buffer_size, s32 samples
       buffer_description.dwBufferBytes = sound_buffer_size;
       buffer_description.lpwfxFormat = &wave_format;
 
-      LPDIRECTSOUNDBUFFER secondary_buffer;
-
-      HRESULT hr = direct_sound->lpVtbl->CreateSoundBuffer(direct_sound, &buffer_description, &secondary_buffer, 0);
+      HRESULT hr = direct_sound->lpVtbl->CreateSoundBuffer(direct_sound, &buffer_description, &app_sound_buffer, 0);
       if(SUCCEEDED(hr)) {
         OutputDebugStringA("created secondary buffer\n");
       } else {
@@ -549,13 +579,32 @@ int CALLBACK WinMain(
 
       ASSERT(SUCCEEDED(CoInitializeEx(NULL, COINIT_MULTITHREADED)));
 
-      os_win32_init_dsound(window_handle, THOUSAND(48), THOUSAND(48) * sizeof(s16) * 2);
-
       app_is_running = true;
 
+      // NOTE jfd: graphics test
       MSG message;
       int x_offset = 0;
       int y_offset = 0;
+
+      // NOTE jfd: sound test
+      int samples_per_second         = THOUSAND(48);
+      int sound_buffer_size          = samples_per_second * sizeof(s16) * 2;
+      s16 tone_volume                = 500;
+      int tone_hz                    = 256; // about middle C
+      u32 sound_running_sample_index = 0;
+      int square_wave_counter        = 0;
+      int square_wave_period         = samples_per_second / tone_hz;
+      int half_square_wave_period    = (square_wave_period / 2);
+      int bytes_per_sample           = sizeof(s16)*2;
+
+      os_win32_init_dsound(window_handle, sound_buffer_size, samples_per_second);
+
+      app_sound_buffer->lpVtbl->Play(
+        app_sound_buffer,
+        0,
+        0,
+        DSBPLAY_LOOPING
+      );
 
       while(app_is_running) {
         // NOTE jfd: get input messages
@@ -636,6 +685,80 @@ int CALLBACK WinMain(
 
         } /* draw */
 
+        { /* NOTE jfd: test direct sound */
+
+          DWORD sound_play_cursor;
+          DWORD sound_write_cursor;
+
+          if(SUCCEEDED(app_sound_buffer->lpVtbl->GetCurrentPosition(
+            app_sound_buffer,
+            &sound_play_cursor,
+            &sound_write_cursor
+          )))
+          {
+
+            DWORD byte_to_lock_at = (sound_running_sample_index * bytes_per_sample) % sound_buffer_size;
+            DWORD bytes_to_write;
+            /*
+             *
+             */
+            if(byte_to_lock_at > sound_play_cursor) {
+              bytes_to_write = (sound_buffer_size - byte_to_lock_at);
+              bytes_to_write += sound_play_cursor;
+            } else {
+              bytes_to_write = sound_play_cursor - byte_to_lock_at;
+            }
+
+            void *region1;
+            DWORD region1_size;
+            void *region2;
+            DWORD region2_size;
+
+            if(SUCCEEDED(app_sound_buffer->lpVtbl->Lock(
+              app_sound_buffer,
+              byte_to_lock_at,
+              bytes_to_write,
+              &region1,
+              &region1_size,
+              &region2,
+              &region2_size,
+              0
+            )))
+            {
+
+              s16 *sample_out1 = (s16*)region1;
+              int region1_sample_count = region1_size / bytes_per_sample;
+              int region2_sample_count = region2_size / bytes_per_sample;
+
+              for(s32 sample_index = 0; sample_index < region1_sample_count; sample_index++) {
+                if(square_wave_counter) {
+                  square_wave_counter = square_wave_period;
+                }
+                s16 sample_value = ((sound_running_sample_index / half_square_wave_period) % 2) ? tone_volume : -tone_volume;
+                *sample_out1++ = sample_value;
+                *sample_out1++ = sample_value;
+                ++sound_running_sample_index;
+              }
+
+              s16 *sample_out2 = (s16*)region2;
+              for(s32 sample_index = 0; sample_index < region2_sample_count; sample_index++) {
+                if(square_wave_counter) {
+                  square_wave_counter = square_wave_period;
+                }
+                s16 sample_value = ((sound_running_sample_index / half_square_wave_period) % 2) ? tone_volume : -tone_volume;
+                *sample_out2++ = sample_value;
+                *sample_out2++ = sample_value;
+                ++sound_running_sample_index;
+              }
+
+              app_sound_buffer->lpVtbl->Unlock(app_sound_buffer, region1, region1_size, region2, region2_size);
+
+            } /* if(Lock()) */
+
+          } /* if(GetCurrentPosision()) */
+
+        } /* NOTE jfd: test direct sound */
+
         // NOTE jfd: blit to screen
         HDC device_context;
         defer_loop(device_context = GetDC(window_handle), ReleaseDC(window_handle, device_context)) {
@@ -643,6 +766,7 @@ int CALLBACK WinMain(
 
           os_win32_display_buffer_in_window(&global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, 0, 0, window_dimensions.width, window_dimensions.height);
         }
+
       }
 
     } else {

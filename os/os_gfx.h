@@ -1,12 +1,6 @@
 #ifndef OS_GFX_H
 #define OS_GFX_H
 
-#include <objbase.h>
-#include <Xinput.h>
-#include <Dsound.h>
-
-typedef struct OS_Win32_WindowDimensions OS_Win32_WindowDimensions;
-
 typedef struct OS_EventList OS_EventList;
 typedef struct OS_Event OS_Event;
 
@@ -15,6 +9,7 @@ typedef enum OS_EventKind {
   OS_EVENT_KEY_PRESS,
   OS_EVENT_KEY_RELEASE,
   OS_EVENT_MOUSE_MOVE,
+  OS_EVENT_MOUSE_SCROLL,
 } OS_EventKind;
 
 typedef enum OS_ModifierIndex {
@@ -124,11 +119,30 @@ typedef enum OS_Key {
 } OS_Key;
 
 
-OS_Event* os_event_push(Arena *a, OS_EventList *event_list, OS_EventKind event_kind);
-OS_Event* os_event_pop(OS_EventList *event_list);
+struct OS_EventList {
+  s64 count;
+  OS_Event *first;
+  OS_Event *last;
+};
+
+struct OS_Event {
+  OS_Event *next;
+  OS_Event *prev;
+  OS_EventKind kind;
+  OS_Modifier modifier_mask;
+  OS_Key key;
+  b32 is_repeat;
+  u32 repeat_count;
+  u32 character;
+  Vec2 mouse_pos;
+  Vec2 scroll_delta;
+};
+
+
+OS_Event* os_win32_event_push(Arena *a, OS_EventList *event_list, OS_EventKind event_kind);
+OS_Event* os_win32_event_pop(OS_EventList *event_list);
 
 OS_Modifier os_get_modifiers(void);
-OS_Key os_win32_key_from_virtual_keycode(WPARAM virtual_keycode);
 b32 os_is_modifier_key(OS_Key key);
 
 #endif

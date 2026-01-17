@@ -1,32 +1,25 @@
 #ifndef OS_GFX_C
 #define OS_GFX_C
 
+#include <windowsx.h>
+#include <objbase.h>
+#include <Xinput.h>
+#include <Dsound.h>
+
+
+typedef struct OS_Win32_WindowDimensions OS_Win32_WindowDimensions;
 struct OS_Win32_WindowDimensions {
   s32 width;
   s32 height;
 };
 
-struct OS_EventList {
-  s64 count;
-  OS_Event *first;
-  OS_Event *last;
-};
 
-struct OS_Event {
-  OS_Event *next;
-  OS_Event *prev;
-  OS_EventKind kind;
-  OS_Modifier modifier_mask;
-  OS_Key key;
-  b32 is_repeat;
-  u32 repeat_count;
-  u32 character;
-  Vec2 mouse_pos;
-  Vec2 mouse_delta;
-};
+b32 os_is_modifier_key(OS_Key key) {
+  b32 result = (key >= OS_KEY_LEFT_SHIFT && key <= OS_KEY_LEFT_META);
+  return result;
+}
 
-
-OS_Event* os_event_push(Arena *a, OS_EventList *event_list, OS_EventKind event_kind) {
+OS_Event* os_win32_event_push(Arena *a, OS_EventList *event_list, OS_EventKind event_kind) {
   OS_Event *event = push_struct_no_zero(a, OS_Event);
   event->kind = event_kind;
   event->modifier_mask = os_get_modifiers();
@@ -35,16 +28,11 @@ OS_Event* os_event_push(Arena *a, OS_EventList *event_list, OS_EventKind event_k
   return event;
 }
 
-OS_Event* os_event_pop(OS_EventList *event_list) {
+OS_Event* os_win32event_pop(OS_EventList *event_list) {
   OS_Event *event = event_list->last;
   sll_queue_pop(event_list->first, event_list->last);
   event_list->count--;
   return event;
-}
-
-b32 os_is_modifier_key(OS_Key key) {
-  b32 result = (key >= OS_KEY_LEFT_SHIFT && key <= OS_KEY_LEFT_META);
-  return result;
 }
 
 OS_Key os_win32_key_from_virtual_keycode(WPARAM virtual_keycode) {
