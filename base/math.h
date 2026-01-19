@@ -34,5 +34,6 @@ DECL_VEC3(f64);
 
 typedef Vec3_f32 Vec3;
 
+f32 lerp_f32(f32 t, f32 begin, f32 end);
 
 #endif

@@ -26,6 +26,18 @@ struct OS_Win32_Backbuffer {
   u32 stride;
 };
 
+typedef struct OS_Win32_SoundOutput OS_Win32_SoundOutput;
+struct OS_Win32_SoundOutput {
+  int samples_per_second;
+  int buffer_size;
+  s16 tone_volume;
+  int tone_hz;
+  u32 running_sample_index;
+  int wave_period;
+  int half_wave_period;
+  int bytes_per_sample;
+};
+
 struct Game {
   OS_Modifier modifier_mask;
   u32 key_pressed[OS_KEY_MAX];
@@ -88,6 +100,9 @@ global b32 app_is_running;
 global OS_Win32_Backbuffer global_backbuffer = {
   .bytes_per_pixel = 4,
 };
+
+global OS_Win32_SoundOutput _app_sound_output_stub;
+global OS_Win32_SoundOutput *app_sound_output = &_app_sound_output_stub;
 
 global LPDIRECTSOUNDBUFFER app_sound_buffer; // this is what we write to
 
@@ -540,6 +555,56 @@ void os_win32_init_dsound(HWND window_handle, s32 sound_buffer_size, s32 samples
   }
 }
 
+void os_win32_fill_sound_buffer(OS_Win32_SoundOutput *sound_output, DWORD byte_to_lock_at, DWORD bytes_to_write) {
+
+  void *region1;
+  DWORD region1_size;
+  void *region2;
+  DWORD region2_size;
+
+  if(SUCCEEDED(app_sound_buffer->lpVtbl->Lock(
+    app_sound_buffer,
+    byte_to_lock_at,
+    bytes_to_write,
+    &region1,
+    &region1_size,
+    &region2,
+    &region2_size,
+    0
+  )))
+  {
+
+    s16 *sample_out1 = (s16*)region1;
+    int region1_sample_count = region1_size / sound_output->bytes_per_sample;
+    int region2_sample_count = region2_size / sound_output->bytes_per_sample;
+
+    for(s32 sample_index = 0; sample_index < region1_sample_count; sample_index++) {
+      f32 t = ((f32)sound_output->running_sample_index / (f32)sound_output->wave_period) * 2*PI;
+      f32 sine_value = sinf(t);
+      s16 sample_value = (s16)(sine_value * sound_output->tone_volume);
+
+      *sample_out1++ = sample_value;
+      *sample_out1++ = sample_value;
+      ++sound_output->running_sample_index;
+    }
+
+    s16 *sample_out2 = (s16*)region2;
+    for(s32 sample_index = 0; sample_index < region2_sample_count; sample_index++) {
+      f32 t = ((f32)sound_output->running_sample_index / (f32)sound_output->wave_period) * 2*PI;
+      f32 sine_value = sinf(t);
+      s16 sample_value = (s16)(sine_value * sound_output->tone_volume);
+
+      *sample_out2++ = sample_value;
+      *sample_out2++ = sample_value;
+      ++sound_output->running_sample_index;
+    }
+
+    app_sound_buffer->lpVtbl->Unlock(app_sound_buffer, region1, region1_size, region2, region2_size);
+
+  } /* if(Lock()) */
+
+}
+
 int CALLBACK WinMain(
   HINSTANCE instance,
   HINSTANCE prev_instance,
@@ -587,17 +652,16 @@ int CALLBACK WinMain(
       int y_offset = 0;
 
       // NOTE jfd: sound test
-      int samples_per_second         = THOUSAND(48);
-      int sound_buffer_size          = samples_per_second * sizeof(s16) * 2;
-      s16 tone_volume                = 500;
-      int tone_hz                    = 256; // about middle C
-      u32 sound_running_sample_index = 0;
-      int square_wave_counter        = 0;
-      int square_wave_period         = samples_per_second / tone_hz;
-      int half_square_wave_period    = (square_wave_period / 2);
-      int bytes_per_sample           = sizeof(s16)*2;
+      app_sound_output->samples_per_second    = THOUSAND(48);
+      app_sound_output->buffer_size           = app_sound_output->samples_per_second * sizeof(s16) * 2;
+      app_sound_output->tone_volume           = 500;
+      app_sound_output->tone_hz               = 256; // about middle C
+      app_sound_output->running_sample_index  = 0;
+      app_sound_output->wave_period           = app_sound_output->samples_per_second / app_sound_output->tone_hz;
+      app_sound_output->half_wave_period      = (app_sound_output->wave_period / 2);
+      app_sound_output->bytes_per_sample      = sizeof(s16)*2;
 
-      os_win32_init_dsound(window_handle, sound_buffer_size, samples_per_second);
+      os_win32_init_dsound(window_handle, app_sound_output->buffer_size, app_sound_output->samples_per_second);
 
       app_sound_buffer->lpVtbl->Play(
         app_sound_buffer,
@@ -685,7 +749,7 @@ int CALLBACK WinMain(
 
         } /* draw */
 
-        { /* NOTE jfd: test direct sound */
+        { /* test direct sound */
 
           DWORD sound_play_cursor;
           DWORD sound_write_cursor;
@@ -697,67 +761,24 @@ int CALLBACK WinMain(
           )))
           {
 
-            DWORD byte_to_lock_at = (sound_running_sample_index * bytes_per_sample) % sound_buffer_size;
-            DWORD bytes_to_write;
-            /*
-             *
-             */
-            if(byte_to_lock_at > sound_play_cursor) {
-              bytes_to_write = (sound_buffer_size - byte_to_lock_at);
+            DWORD byte_to_lock_at = (app_sound_output->running_sample_index * app_sound_output->bytes_per_sample) % app_sound_output->buffer_size;
+            DWORD bytes_to_write = 0;
+
+            // NOTE jfd: this check is innacurate
+            if(byte_to_lock_at == sound_play_cursor) {
+              bytes_to_write = app_sound_output->buffer_size;
+            } else if(byte_to_lock_at > sound_play_cursor) {
+              bytes_to_write = (app_sound_output->buffer_size - byte_to_lock_at);
               bytes_to_write += sound_play_cursor;
             } else {
               bytes_to_write = sound_play_cursor - byte_to_lock_at;
             }
 
-            void *region1;
-            DWORD region1_size;
-            void *region2;
-            DWORD region2_size;
-
-            if(SUCCEEDED(app_sound_buffer->lpVtbl->Lock(
-              app_sound_buffer,
-              byte_to_lock_at,
-              bytes_to_write,
-              &region1,
-              &region1_size,
-              &region2,
-              &region2_size,
-              0
-            )))
-            {
-
-              s16 *sample_out1 = (s16*)region1;
-              int region1_sample_count = region1_size / bytes_per_sample;
-              int region2_sample_count = region2_size / bytes_per_sample;
-
-              for(s32 sample_index = 0; sample_index < region1_sample_count; sample_index++) {
-                if(square_wave_counter) {
-                  square_wave_counter = square_wave_period;
-                }
-                s16 sample_value = ((sound_running_sample_index / half_square_wave_period) % 2) ? tone_volume : -tone_volume;
-                *sample_out1++ = sample_value;
-                *sample_out1++ = sample_value;
-                ++sound_running_sample_index;
-              }
-
-              s16 *sample_out2 = (s16*)region2;
-              for(s32 sample_index = 0; sample_index < region2_sample_count; sample_index++) {
-                if(square_wave_counter) {
-                  square_wave_counter = square_wave_period;
-                }
-                s16 sample_value = ((sound_running_sample_index / half_square_wave_period) % 2) ? tone_volume : -tone_volume;
-                *sample_out2++ = sample_value;
-                *sample_out2++ = sample_value;
-                ++sound_running_sample_index;
-              }
-
-              app_sound_buffer->lpVtbl->Unlock(app_sound_buffer, region1, region1_size, region2, region2_size);
-
-            } /* if(Lock()) */
+            os_win32_fill_sound_buffer(app_sound_output, byte_to_lock_at, bytes_to_write);
 
           } /* if(GetCurrentPosision()) */
 
-        } /* NOTE jfd: test direct sound */
+        } /* test direct sound */
 
         // NOTE jfd: blit to screen
         HDC device_context;
