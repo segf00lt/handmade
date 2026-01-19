@@ -663,12 +663,7 @@ int CALLBACK WinMain(
 
       os_win32_init_dsound(window_handle, app_sound_output->buffer_size, app_sound_output->samples_per_second);
 
-      app_sound_buffer->lpVtbl->Play(
-        app_sound_buffer,
-        0,
-        0,
-        DSBPLAY_LOOPING
-      );
+      b32 sound_is_playing = false;
 
       while(app_is_running) {
         // NOTE jfd: get input messages
@@ -762,11 +757,15 @@ int CALLBACK WinMain(
           {
 
             DWORD byte_to_lock_at = (app_sound_output->running_sample_index * app_sound_output->bytes_per_sample) % app_sound_output->buffer_size;
-            DWORD bytes_to_write = 0;
+            DWORD bytes_to_write;
 
             // NOTE jfd: this check is innacurate
             if(byte_to_lock_at == sound_play_cursor) {
-              bytes_to_write = app_sound_output->buffer_size;
+              if(sound_is_playing) {
+                bytes_to_write = 0;
+              } else {
+                bytes_to_write = app_sound_output->buffer_size;
+              }
             } else if(byte_to_lock_at > sound_play_cursor) {
               bytes_to_write = (app_sound_output->buffer_size - byte_to_lock_at);
               bytes_to_write += sound_play_cursor;
@@ -777,6 +776,16 @@ int CALLBACK WinMain(
             os_win32_fill_sound_buffer(app_sound_output, byte_to_lock_at, bytes_to_write);
 
           } /* if(GetCurrentPosision()) */
+
+          if(!sound_is_playing) {
+            app_sound_buffer->lpVtbl->Play(
+              app_sound_buffer,
+              0,
+              0,
+              DSBPLAY_LOOPING
+            );
+            sound_is_playing = true;
+          }
 
         } /* test direct sound */
 
