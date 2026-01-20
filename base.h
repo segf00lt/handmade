@@ -15,10 +15,6 @@
 
 #include "os/os.h"
 
-#ifndef OS_GFX_DISABLED
-#include "os/os_gfx.h"
-#endif
-
 #endif
 
 #endif
@@ -37,10 +33,6 @@
 #include "base/math.c"
 
 #include "os/os.c"
-
-#ifndef OS_GFX_DISABLED
-#include "os/os_gfx.c"
-#endif
 
 #endif
 

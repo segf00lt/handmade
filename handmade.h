@@ -20,11 +20,7 @@ struct Game {
   int x_offset;
   int y_offset;
 
-  OS_Modifier modifier_mask;
-  u32 key_pressed[OS_KEY_MAX];
-  b32 key_released[OS_KEY_MAX];
-  Vec2 mouse_pos;
-  Vec2 mouse_delta;
+  OS_Input input;
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
 #define GAME_STATE_SIZE ((u64)MB(1))

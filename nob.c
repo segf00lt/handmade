@@ -13,11 +13,12 @@ int main(int argc, char **argv) {
   Nob_Cmd cmd = {0};
   nob_cmd_append(&cmd,
     CC,
-    "-W4",
-    "-wd4100",
-    "-Zi",
-    "-Od",
-    "-Fe:handmade.exe",
+    "/nologo",
+    "/W4",
+    "/wd4100",
+    "/Zi",
+    "/Od",
+    "/Fe:handmade.exe",
     "win32_handmade.c",
     "user32.lib",
     "gdi32.lib",
@@ -26,7 +27,7 @@ int main(int argc, char **argv) {
     "winmm.lib",
     "ole32.lib",
     "/link",
-    "/incremental:no",
+    "/INCREMENTAL:NO",
     ""
   );
 

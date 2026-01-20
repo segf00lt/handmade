@@ -2,15 +2,15 @@
 #define HANDMADE_C
 
 b32 was_key_pressed_once(Game *gp, OS_Key key) {
-  return !!(gp->key_pressed[key] == 1);
+  return !!(gp->input.key_pressed[key] == 1);
 }
 
 b32 is_key_pressed(Game *gp, OS_Key key) {
-  return !!(gp->key_pressed[key] > 0);
+  return !!(gp->input.key_pressed[key] > 0);
 }
 
 b32 was_key_released(Game *gp, OS_Key key) {
-  return (gp->key_released[key] == true);
+  return (gp->input.key_released[key] == true);
 }
 
 
