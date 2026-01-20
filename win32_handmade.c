@@ -143,16 +143,7 @@ void os_win32_resize_backbuffer(OS_Win32_Backbuffer *backbuffer, int window_widt
   backbuffer->stride = backbuffer->bitmap_width * backbuffer->bytes_per_pixel;
 }
 
-void os_win32_display_buffer_in_window(
-  OS_Win32_Backbuffer *backbuffer,
-  HDC device_context,
-  int window_width,
-  int window_height,
-  int x,
-  int y,
-  int width,
-  int height
-) {
+void os_win32_display_buffer_in_window(OS_Win32_Backbuffer *backbuffer, HDC device_context, int window_width, int window_height, int x, int y, int width, int height ) {
 
   StretchDIBits(
     device_context,
@@ -166,12 +157,7 @@ void os_win32_display_buffer_in_window(
 
 }
 
-LRESULT CALLBACK os_win32_main_window_callback(
-  HWND window,
-  UINT message,
-  WPARAM wParam,
-  LPARAM lParam
-) {
+LRESULT CALLBACK os_win32_main_window_callback(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
   LRESULT result = 0;
 
   switch(message) {
@@ -392,7 +378,31 @@ void os_win32_init_dsound(HWND window_handle, s32 sound_buffer_size, s32 samples
   }
 }
 
-void os_win32_fill_sound_buffer(OS_Win32_SoundOutput *sound_output, DWORD byte_to_lock_at, DWORD bytes_to_write) {
+void os_win32_clear_sound_buffer(OS_Win32_SoundOutput *sound_output) {
+  void *region1;
+  DWORD region1_size;
+  void *region2;
+  DWORD region2_size;
+
+  if(SUCCEEDED(app_sound_buffer->lpVtbl->Lock(
+    app_sound_buffer,
+    0,
+    sound_output->buffer_size,
+    &region1,
+    &region1_size,
+    &region2,
+    &region2_size,
+    0
+  )))
+  {
+    memory_zero(region1, region1_size);
+    memory_zero(region2, region2_size);
+
+    app_sound_buffer->lpVtbl->Unlock(app_sound_buffer, region1, region1_size, region2, region2_size);
+  }
+}
+
+void os_win32_fill_sound_buffer(OS_Win32_SoundOutput *sound_output, DWORD byte_to_lock_at, DWORD bytes_to_write, Game_SoundBuffer *source_buffer) {
 
   void *region1;
   DWORD region1_size;
@@ -415,24 +425,18 @@ void os_win32_fill_sound_buffer(OS_Win32_SoundOutput *sound_output, DWORD byte_t
     int region1_sample_count = region1_size / sound_output->bytes_per_sample;
     int region2_sample_count = region2_size / sound_output->bytes_per_sample;
 
-    for(s32 sample_index = 0; sample_index < region1_sample_count; sample_index++) {
-      f32 t = ((f32)sound_output->running_sample_index / (f32)sound_output->wave_period) * 2*PI;
-      f32 sine_value = sinf(t);
-      s16 sample_value = (s16)(sine_value * sound_output->tone_volume);
+    s16 *source_sample = source_buffer->samples;
 
-      *sample_out1++ = sample_value;
-      *sample_out1++ = sample_value;
+    for(s32 sample_index = 0; sample_index < region1_sample_count; sample_index++) {
+      *sample_out1++ = *source_sample++;
+      *sample_out1++ = *source_sample++;
       ++sound_output->running_sample_index;
     }
 
     s16 *sample_out2 = (s16*)region2;
     for(s32 sample_index = 0; sample_index < region2_sample_count; sample_index++) {
-      f32 t = ((f32)sound_output->running_sample_index / (f32)sound_output->wave_period) * 2*PI;
-      f32 sine_value = sinf(t);
-      s16 sample_value = (s16)(sine_value * sound_output->tone_volume);
-
-      *sample_out2++ = sample_value;
-      *sample_out2++ = sample_value;
+      *sample_out2++ = *source_sample++;
+      *sample_out2++ = *source_sample++;
       ++sound_output->running_sample_index;
     }
 
@@ -533,24 +537,23 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
 
       ASSERT(SUCCEEDED(CoInitializeEx(NULL, COINIT_MULTITHREADED)));
 
-      app_is_running = true;
-
       // NOTE jfd: graphics test
       MSG message;
 
       // NOTE jfd: sound test
       app_sound_output->samples_per_second    = THOUSAND(48);
       app_sound_output->buffer_size           = app_sound_output->samples_per_second * sizeof(s16) * 2;
-      app_sound_output->tone_volume           = 500;
-      app_sound_output->tone_hz               = 256; // about middle C
       app_sound_output->running_sample_index  = 0;
-      app_sound_output->wave_period           = app_sound_output->samples_per_second / app_sound_output->tone_hz;
-      app_sound_output->half_wave_period      = (app_sound_output->wave_period / 2);
       app_sound_output->bytes_per_sample      = sizeof(s16)*2;
+      app_sound_output->latency_sample_count  = app_sound_output->samples_per_second / 15;
 
       os_win32_init_dsound(window_handle, app_sound_output->buffer_size, app_sound_output->samples_per_second);
+      os_win32_clear_sound_buffer(app_sound_output);
+      app_sound_buffer->lpVtbl->Play(app_sound_buffer, 0, 0, DSBPLAY_LOOPING);
 
-      b32 sound_is_playing = false;
+      s16 *samples = (s16*)push_array_no_zero(scratch, u8, app_sound_output->buffer_size);
+
+      app_is_running = true;
 
       LARGE_INTEGER last_counter;
       QueryPerformanceCounter(&last_counter);
@@ -617,58 +620,56 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
         os_win32_poll_input_events(&game_state->input, app_event_list);
 
 
-        game_state->render_buffer = global_backbuffer.bitmap_memory;
-        game_state->render_width  = global_backbuffer.bitmap_width;
-        game_state->render_height = global_backbuffer.bitmap_height;
-        game_state->render_stride = global_backbuffer.stride;
+        DWORD byte_to_lock_at;
+        DWORD bytes_to_write;
+        DWORD sound_play_cursor;
+        DWORD sound_target_cursor;
+        DWORD sound_write_cursor;
+        b32 sound_is_valid = false;
+
+        if(SUCCEEDED(app_sound_buffer->lpVtbl->GetCurrentPosition(
+          app_sound_buffer,
+          &sound_play_cursor,
+          &sound_write_cursor
+        )))
+        {
+
+          byte_to_lock_at =
+          (app_sound_output->running_sample_index * app_sound_output->bytes_per_sample) % app_sound_output->buffer_size;
+
+          sound_target_cursor =
+          (sound_play_cursor + (app_sound_output->latency_sample_count * app_sound_output->bytes_per_sample)) % app_sound_output->buffer_size;
+
+          if(byte_to_lock_at > sound_target_cursor) {
+            bytes_to_write = (app_sound_output->buffer_size - byte_to_lock_at);
+            bytes_to_write += sound_target_cursor;
+          } else {
+            bytes_to_write = sound_target_cursor - byte_to_lock_at;
+          }
+
+          sound_is_valid = true;
+
+        } else {
+          byte_to_lock_at = 0;
+          bytes_to_write = 0;
+        }
+
+        // TODO jfd: move to 60 fps
+        game_state->sound = (Game_SoundBuffer){0};
+        game_state->sound.samples_per_second = app_sound_output->samples_per_second;
+        game_state->sound.sample_count = bytes_to_write / app_sound_output->bytes_per_sample;
+        game_state->sound.samples = samples;
+
+        game_state->render.pixels = global_backbuffer.bitmap_memory;
+        game_state->render.width  = global_backbuffer.bitmap_width;
+        game_state->render.height = global_backbuffer.bitmap_height;
+        game_state->render.stride = global_backbuffer.stride;
 
         game_update_and_render(game_state);
 
-
-        { /* test direct sound */
-
-          DWORD sound_play_cursor;
-          DWORD sound_write_cursor;
-
-          if(SUCCEEDED(app_sound_buffer->lpVtbl->GetCurrentPosition(
-            app_sound_buffer,
-            &sound_play_cursor,
-            &sound_write_cursor
-          )))
-          {
-
-            DWORD byte_to_lock_at = (app_sound_output->running_sample_index * app_sound_output->bytes_per_sample) % app_sound_output->buffer_size;
-            DWORD bytes_to_write;
-
-            // NOTE jfd: this check is innacurate
-            if(byte_to_lock_at == sound_play_cursor) {
-              if(sound_is_playing) {
-                bytes_to_write = 0;
-              } else {
-                bytes_to_write = app_sound_output->buffer_size;
-              }
-            } else if(byte_to_lock_at > sound_play_cursor) {
-              bytes_to_write = (app_sound_output->buffer_size - byte_to_lock_at);
-              bytes_to_write += sound_play_cursor;
-            } else {
-              bytes_to_write = sound_play_cursor - byte_to_lock_at;
-            }
-
-            os_win32_fill_sound_buffer(app_sound_output, byte_to_lock_at, bytes_to_write);
-
-          } /* if(GetCurrentPosision()) */
-
-          if(!sound_is_playing) {
-            app_sound_buffer->lpVtbl->Play(
-              app_sound_buffer,
-              0,
-              0,
-              DSBPLAY_LOOPING
-            );
-            sound_is_playing = true;
-          }
-
-        } /* test direct sound */
+        if(sound_is_valid) {
+          os_win32_fill_sound_buffer(app_sound_output, byte_to_lock_at, bytes_to_write, &game_state->sound);
+        }
 
         // NOTE jfd: blit to screen
         HDC device_context;

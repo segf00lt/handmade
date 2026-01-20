@@ -2,6 +2,21 @@
 #define HANDMADE_H
 
 
+typedef struct Game_SoundBuffer Game_SoundBuffer;
+struct Game_SoundBuffer {
+  int samples_per_second;
+  int sample_count;
+  s16 *samples;
+};
+
+typedef struct Game_RenderBuffer Game_RenderBuffer;
+struct Game_RenderBuffer {
+  u8 *pixels;
+  s32 width;
+  s32 height;
+  u32 stride; // NOTE jfd: This comes from the backbuffer thing
+};
+
 typedef struct Game Game;
 struct Game {
   f32 t;
@@ -10,10 +25,8 @@ struct Game {
   Arena *frame_arena;
   Arena *temp_arena;
 
-  u8 *render_buffer;
-  s32 render_width;
-  s32 render_height;
-  u32 render_stride; // NOTE jfd: This comes from the backbuffer thing
+  Game_RenderBuffer render;
+  Game_SoundBuffer sound;
 
   s32 test_sound_pitch;
 

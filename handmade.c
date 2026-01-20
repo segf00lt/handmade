@@ -1,6 +1,7 @@
 #ifndef HANDMADE_C
 #define HANDMADE_C
 
+
 b32 was_key_pressed_once(Game *gp, OS_Key key) {
   return !!(gp->input.key_pressed[key] == 1);
 }
@@ -15,11 +16,11 @@ b32 was_key_released(Game *gp, OS_Key key) {
 
 
 void render_weird_gradient(Game *gp, int x_offset, int y_offset) {
-  u8 *row = gp->render_buffer;
-  for(int y = 0; y < gp->render_height; y++) {
+  u8 *row = gp->render.pixels;
+  for(int y = 0; y < gp->render.height; y++) {
     u32 *pixel = (u32*)row;
 
-    for(int x = 0; x < gp->render_width; x++) {
+    for(int x = 0; x < gp->render.width; x++) {
       //
       // pixel in memory
       //  0  1  2  3
@@ -33,16 +34,37 @@ void render_weird_gradient(Game *gp, int x_offset, int y_offset) {
       *pixel++ = (r << 16) | (g << 8) | b;
     }
 
-    row += gp->render_stride;
+    row += gp->render.stride;
+  }
+
+}
+
+void game_output_sound(Game *gp) {
+  Game_SoundBuffer *sound_buffer = &gp->sound;
+
+  local_persist f32 t_sine;
+  s16 tone_volume = 600;
+  int tone_hz = 256;
+  int wave_period = sound_buffer->samples_per_second / tone_hz;
+
+  s16 *sample_out = sound_buffer->samples;
+  for(s32 sample_index = 0; sample_index < sound_buffer->sample_count; sample_index++) {
+    f32 sine_value = sinf(t_sine);
+    s16 sample_value = (s16)(sine_value * tone_volume);
+
+    *sample_out++ = sample_value;
+    *sample_out++ = sample_value;
+
+    t_sine += 2.0f*PI*1.0f/((f32)wave_period);
   }
 
 }
 
 void game_update_and_render(Game *gp) {
 
-  // TODO jfd: mouse movement and clicks
   { /* get keyboard and mouse input */
 
+    // TODO jfd: mouse movement and clicks
     int step_pixels = 1;
 
     if(is_key_pressed(gp, OS_KEY_W)) {
@@ -60,6 +82,13 @@ void game_update_and_render(Game *gp) {
 
   } /* get keyboard and mouse input */
 
+
+  { /* play sound */
+
+    // TODO jfd: allow sample offsets here for more robust platform options
+    game_output_sound(gp);
+
+  } /* play sound */
 
   { /* draw */
 

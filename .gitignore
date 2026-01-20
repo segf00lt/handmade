@@ -37,3 +37,6 @@ test_output_old
 *.rdi*
 *.ilk*
 *.exe*
+semaphore_exercise
+main
+job_system_example

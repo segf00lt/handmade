@@ -167,12 +167,9 @@ typedef struct OS_Win32_SoundOutput OS_Win32_SoundOutput;
 struct OS_Win32_SoundOutput {
   int samples_per_second;
   int buffer_size;
-  s16 tone_volume;
-  int tone_hz;
   u32 running_sample_index;
-  int wave_period;
-  int half_wave_period;
   int bytes_per_sample;
+  int latency_sample_count;
 };
 
 
@@ -190,6 +187,8 @@ void os_win32_resize_backbuffer(OS_Win32_Backbuffer *backbuffer, int window_widt
 void os_win32_display_buffer_in_window(OS_Win32_Backbuffer *backbuffer, HDC device_context, int window_width, int window_height, int x, int y, int width, int height);
 
 OS_Win32_WindowDimensions os_win32_get_window_dimensions(HWND window_handle);
+
+OS_Key os_win32_key_from_virtual_keycode(WPARAM virtual_keycode);
 
 void os_win32_poll_input_events(OS_Input *input, OS_EventList *event_list);
 
