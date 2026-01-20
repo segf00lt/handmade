@@ -2,6 +2,9 @@
 #define WIN32_HANDMADE_H
 
 
+// TODO jfd: Some of these things really should be moved in to a separate file that is platform independent
+//           but is between the game and the platform cradle.
+
 typedef enum OS_EventKind {
   OS_EVENT_NULL = 0,
   OS_EVENT_KEY_PRESS,
