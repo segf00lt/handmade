@@ -627,12 +627,9 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
         DWORD sound_write_cursor;
         b32 sound_is_valid = false;
 
-        if(SUCCEEDED(app_sound_buffer->lpVtbl->GetCurrentPosition(
-          app_sound_buffer,
-          &sound_play_cursor,
-          &sound_write_cursor
-        )))
-        {
+        // TODO jfd: Tighten up sound logic so that we know where we should be writing to and can anticipate the time
+        //           spent in game_update_and_render()
+        if(SUCCEEDED(app_sound_buffer->lpVtbl->GetCurrentPosition(app_sound_buffer, &sound_play_cursor, &sound_write_cursor))) {
 
           byte_to_lock_at =
           (app_sound_output->running_sample_index * app_sound_output->bytes_per_sample) % app_sound_output->buffer_size;
