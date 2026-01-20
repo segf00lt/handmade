@@ -2,6 +2,12 @@
 
 #include <intrin.h>
 
+
+#include "handmade.h"
+
+#include "handmade.c"
+
+
 /*
  * tables
  */
@@ -9,8 +15,6 @@
 /*
  * types
  */
-
-typedef struct Game Game;
 
 typedef struct OS_Win32_Backbuffer OS_Win32_Backbuffer;
 
@@ -40,13 +44,6 @@ struct OS_Win32_SoundOutput {
   int bytes_per_sample;
 };
 
-struct Game {
-  OS_Modifier modifier_mask;
-  u32 key_pressed[OS_KEY_MAX];
-  b32 key_released[OS_KEY_MAX];
-  Vec2 mouse_pos;
-  Vec2 mouse_delta;
-};
 
 /*
  * headers
@@ -61,10 +58,7 @@ void os_win32_display_buffer_in_window(OS_Win32_Backbuffer *backbuffer, HDC devi
 
 OS_Win32_WindowDimensions os_win32_get_window_dimensions(HWND window_handle);
 
-void poll_events(Game *gp, OS_EventList *event_list);
-b32  is_key_pressed(Game *gp, OS_Key key);
-b32  was_key_pressed_once(Game *gp, OS_Key key);
-b32  was_key_released(Game *gp, OS_Key key);
+void os_win32_poll_input_events(Game *gp, OS_EventList *event_list);
 
 void os_win32_load_xinput(void);
 
@@ -109,8 +103,8 @@ global OS_Win32_SoundOutput *app_sound_output = &_app_sound_output_stub;
 
 global LPDIRECTSOUNDBUFFER app_sound_buffer; // this is what we write to
 
-global Game _game_state_stub;
-global Game *game_state = &_game_state_stub;
+// global Game _game_state_stub;
+global Game *game_state;
 global OS_EventList _app_event_list_stub;
 global OS_EventList *app_event_list = &_app_event_list_stub;
 
@@ -118,45 +112,7 @@ global OS_EventList *app_event_list = &_app_event_list_stub;
  * functions
  */
 
-void render_weird_gradient(OS_Win32_Backbuffer *backbuffer, int x_offset, int y_offset) {
-  u8 *row = (u8*)backbuffer->bitmap_memory;
-  for(int y = 0; y < backbuffer->bitmap_height; y++) {
-    u32 *pixel = (u32*)row;
-
-    for(int x = 0; x < backbuffer->bitmap_width; x++) {
-      //
-      // pixel in memory
-      //  0  1  2  3
-      //  B  G  R  x
-      // 00 00 00 00
-
-      u8 r = (u8)(x + x_offset);
-      u8 g = 0;
-      u8 b = (u8)(y + y_offset);
-
-      *pixel++ = (r << 16) | (g << 8) | b;
-    }
-
-    row += backbuffer->stride;
-  }
-
-}
-
-
-
-b32 was_key_pressed_once(Game *gp, OS_Key key) {
-  return !!(gp->key_pressed[key] == 1);
-}
-
-b32 is_key_pressed(Game *gp, OS_Key key) {
-  return !!(gp->key_pressed[key] > 0);
-}
-
-b32 was_key_released(Game *gp, OS_Key key) {
-  return (gp->key_released[key] == true);
-}
-
-void poll_events(Game *gp, OS_EventList *event_list) {
+void os_win32_poll_input_events(Game *gp, OS_EventList *event_list) {
   memory_zero(gp->key_released, sizeof(gp->key_released));
 
   for(OS_Event *event = event_list->first; event; event = event->next) {
@@ -618,11 +574,10 @@ int CALLBACK WinMain(
   LARGE_INTEGER performance_counter_frequency;
   QueryPerformanceFrequency(&performance_counter_frequency);
 
-  frame_arena     = arena_create(KB(2));
   scratch         = arena_create(MB(5));
+  frame_arena     = arena_create(KB(5));
   app_event_arena = arena_create(KB(50));
 
-  OutputDebugStringA("cowabunga\n");
   // os_win32_load_xinput();
 
   WNDCLASSA window_class = {0};
@@ -630,6 +585,15 @@ int CALLBACK WinMain(
   window_class.lpfnWndProc = os_win32_main_window_callback;
   window_class.hInstance = instance;
   window_class.lpszClassName = "Handmade Hero Window Class";
+
+  { /* game_init */
+    game_state = os_alloc(GAME_STATE_SIZE);
+
+    game_state->main_arena = arena_create(MB(5));
+    game_state->frame_arena = arena_create(MB(1));
+    game_state->temp_arena = arena_create(KB(5));
+
+  } /* game_init */
 
   if(RegisterClass(&window_class)) {
     HWND window_handle =
@@ -655,8 +619,6 @@ int CALLBACK WinMain(
 
       // NOTE jfd: graphics test
       MSG message;
-      int x_offset = 0;
-      int y_offset = 0;
 
       // NOTE jfd: sound test
       app_sound_output->samples_per_second    = THOUSAND(48);
@@ -675,9 +637,13 @@ int CALLBACK WinMain(
       LARGE_INTEGER last_counter;
       QueryPerformanceCounter(&last_counter);
 
+      f32 frame_time = 0;
+
       u64 last_cycle_count = __rdtsc(); // NOTE jfd: get timestamp in cycles
 
       while(app_is_running) {
+
+        game_state->t = frame_time;
 
         // NOTE jfd: get input messages
         while(PeekMessageA(&message, window_handle, 0, 0, PM_REMOVE)) {
@@ -729,33 +695,17 @@ int CALLBACK WinMain(
         } /* get gamepad input */
         #endif
 
-        // TODO jfd: mouse movement and clicks
-        { /* get keyboard and mouse input */
 
-          poll_events(game_state, app_event_list);
+        os_win32_poll_input_events(game_state, app_event_list);
 
-          int step_pixels = 1;
 
-          if(is_key_pressed(game_state, OS_KEY_W)) {
-            y_offset -= step_pixels;
-          }
-          if(is_key_pressed(game_state, OS_KEY_A)) {
-            x_offset -= step_pixels;
-          }
-          if(is_key_pressed(game_state, OS_KEY_S)) {
-            y_offset += step_pixels;
-          }
-          if(is_key_pressed(game_state, OS_KEY_D)) {
-            x_offset += step_pixels;
-          }
+        game_state->render_buffer = global_backbuffer.bitmap_memory;
+        game_state->render_width  = global_backbuffer.bitmap_width;
+        game_state->render_height = global_backbuffer.bitmap_height;
+        game_state->render_stride = global_backbuffer.stride;
 
-        } /* get keyboard and mouse input */
+        game_update_and_render(game_state);
 
-        { /* draw */
-
-          render_weird_gradient(&global_backbuffer, x_offset, y_offset);
-
-        } /* draw */
 
         { /* test direct sound */
 
@@ -821,6 +771,8 @@ int CALLBACK WinMain(
 
         f64 elapsed_time = (f64)(end_counter.QuadPart - last_counter.QuadPart);
         f64 frame_time_ms = THOUSAND(elapsed_time) / (f64)performance_counter_frequency.QuadPart;
+
+        frame_time = (f32)frame_time_ms * 1.0e-3f;
 
         f64 fps = (f64)performance_counter_frequency.QuadPart / elapsed_time;
 
