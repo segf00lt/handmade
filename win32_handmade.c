@@ -1,5 +1,7 @@
 #include "base.h"
 
+#include <intrin.h>
+
 /*
  * tables
  */
@@ -91,6 +93,7 @@ OS_WIN32_DIRECT_SOUND_CREATE(_os_win32_direct_sound_create_stub) {
  */
 
 global Arena *scratch;
+global Arena *frame_arena;
 global Arena *app_event_arena;
 
 global OS_Win32_XInput_GetStateFunc *os_win32_xinput_get_state = _os_win32_xinput_get_state_stub;
@@ -611,11 +614,15 @@ int CALLBACK WinMain(
   LPSTR cmd_line,
   int show_code
 ) {
-  scratch = arena_create(MB(5));
+
+  LARGE_INTEGER performance_counter_frequency;
+  QueryPerformanceFrequency(&performance_counter_frequency);
+
+  frame_arena     = arena_create(KB(2));
+  scratch         = arena_create(MB(5));
   app_event_arena = arena_create(KB(50));
 
   OutputDebugStringA("cowabunga\n");
-
   // os_win32_load_xinput();
 
   WNDCLASSA window_class = {0};
@@ -665,7 +672,13 @@ int CALLBACK WinMain(
 
       b32 sound_is_playing = false;
 
+      LARGE_INTEGER last_counter;
+      QueryPerformanceCounter(&last_counter);
+
+      u64 last_cycle_count = __rdtsc(); // NOTE jfd: get timestamp in cycles
+
       while(app_is_running) {
+
         // NOTE jfd: get input messages
         while(PeekMessageA(&message, window_handle, 0, 0, PM_REMOVE)) {
           if(message.message == WM_QUIT) {
@@ -796,6 +809,30 @@ int CALLBACK WinMain(
 
           os_win32_display_buffer_in_window(&global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, 0, 0, window_dimensions.width, window_dimensions.height);
         }
+
+        s64 end_cycle_count = __rdtsc();
+
+        s64 elapsed_cycles = end_cycle_count - last_cycle_count;
+
+        last_cycle_count = end_cycle_count;
+
+        LARGE_INTEGER end_counter;
+        QueryPerformanceCounter(&end_counter);
+
+        f64 elapsed_time = (f64)(end_counter.QuadPart - last_counter.QuadPart);
+        f64 frame_time_ms = THOUSAND(elapsed_time) / (f64)performance_counter_frequency.QuadPart;
+
+        f64 fps = (f64)performance_counter_frequency.QuadPart / elapsed_time;
+
+        last_counter = end_counter;
+
+        OutputDebugStringA(
+          cstrf(frame_arena,
+            "frame time (ms):  %g    fps:  %g    mega cycles: %d\n",
+            frame_time_ms, fps, elapsed_cycles / MILLION(1))
+        );
+
+        arena_clear(frame_arena);
 
       }
 
