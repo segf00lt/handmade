@@ -1,15 +1,15 @@
-#ifndef GFX_H
-#define GFX_H
+#ifndef PLATFORM_H
+#define PLATFORM_H
 
 
-typedef enum OS_EventKind {
-  OS_EVENT_NULL = 0,
-  OS_EVENT_KEY_PRESS,
-  OS_EVENT_KEY_RELEASE,
-  OS_EVENT_MOUSE_MOVE,
-  OS_EVENT_MOUSE_CLICK,
-  OS_EVENT_MOUSE_SCROLL,
-} OS_EventKind;
+typedef enum PLTFM_EventKind {
+  EVENT_NULL = 0,
+  EVENT_KEY_PRESS,
+  EVENT_KEY_RELEASE,
+  EVENT_MOUSE_MOVE,
+  EVENT_MOUSE_CLICK,
+  EVENT_MOUSE_SCROLL,
+} PLTFM_EventKind;
 
 typedef enum KeyboardModifierIndex {
   KBD_MOD_INDEX_NONE = -1,
@@ -120,11 +120,11 @@ typedef enum KeyboardKey {
 } KeyboardKey;
 
 
-typedef struct OS_Event OS_Event;
-struct OS_Event {
-  OS_Event *next;
-  OS_Event *prev;
-  OS_EventKind kind;
+typedef struct PLTFM_Event PLTFM_Event;
+struct PLTFM_Event {
+  PLTFM_Event *next;
+  PLTFM_Event *prev;
+  PLTFM_EventKind kind;
   KeyboardModifier modifier_mask;
   KeyboardKey key;
   MouseButton mouse_button;
@@ -135,14 +135,15 @@ struct OS_Event {
   Vec2 scroll_delta;
 };
 
-typedef struct OS_EventList OS_EventList;
-struct OS_EventList {
+typedef struct PLTFM_EventList PLTFM_EventList;
+struct PLTFM_EventList {
   s64 count;
-  OS_Event *first;
-  OS_Event *last;
+  PLTFM_Event *first;
+  PLTFM_Event *last;
 };
 
-KeyboardModifier os_get_keyboard_modifiers(void);
-b32              os_is_modifier_key(KeyboardKey key);
+KeyboardModifier platform_get_keyboard_modifiers(void);
+b32              platform_is_modifier_key(KeyboardKey key);
+
 
 #endif

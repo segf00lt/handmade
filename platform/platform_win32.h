@@ -2,8 +2,11 @@
 #define PLATFORM_WIN32_H
 
 
-// TODO jfd: Some of these things really should be moved in to a separate file that is platform independent
-//           but is between the game and the platform cradle.
+#include <Xinput.h>
+#include <Dsound.h>
+#include <intrin.h>
+#include <objbase.h>
+
 
 typedef struct PLTFM_WIN32_WindowDimensions PLTFM_WIN32_WindowDimensions;
 struct PLTFM_WIN32_WindowDimensions {
@@ -61,6 +64,11 @@ PLTFM_WIN32_DIRECT_SOUND_CREATE(_platform_win32_direct_sound_create_stub) {
   return 0;
 }
 
-void platform_get_game_input_from_events(OS_EventList *event_list, Game *gp);
+PLTFM_Event* platform_win32_event_push(Arena *a, PLTFM_EventList *event_list, PLTFM_EventKind event_kind);
+PLTFM_Event* platform_win32_event_pop(PLTFM_EventList *event_list);
+
+KeyboardKey platform_win32_keyboard_key_from_virtual_keycode(WPARAM virtual_keycode);
+
+void platform_get_game_input_from_events(PLTFM_EventList *event_list, Game *gp);
 
 #endif
