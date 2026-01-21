@@ -227,7 +227,7 @@ s64 str8_find_first_whitespace(Str8 haystack) {
 Str8_Find_Results str8_find_all_chars(Arena *scratch, Str8 haystack, u8 needle, Arena *output_arena) {
   Str8_Find_Results results = {0};
 
-  Arena_Scope scope = arena_scope_begin(scratch);
+  ArenaScope scope = arena_scope_begin(scratch);
 
   Arr(s64) begin_indexes;
   Arr(s64) end_indexes;
@@ -263,7 +263,7 @@ Str8_Find_Results str8_find_all_chars(Arena *scratch, Str8 haystack, u8 needle, 
 Str8_Find_Results str8_find_all(Arena *scratch, Str8 haystack, Str8 needle, Arena *output_arena) {
   Str8_Find_Results results = {0};
 
-  Arena_Scope scope = arena_scope_begin(scratch);
+  ArenaScope scope = arena_scope_begin(scratch);
 
   Arr(s64) begin_indexes;
   Arr(s64) end_indexes;

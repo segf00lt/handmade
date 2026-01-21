@@ -15,6 +15,12 @@
 
 #include "os/os.h"
 
+#ifdef GFX_ENABLED
+
+#include "gfx/gfx_inc.h"
+
+#endif
+
 #endif
 
 #endif
@@ -33,6 +39,12 @@
 #include "base/math.c"
 
 #include "os/os.c"
+
+#ifdef GFX_ENABLED
+
+#include "gfx/gfx_inc.c"
+
+#endif
 
 #endif
 

@@ -2,18 +2,6 @@
 #define HANDMADE_C
 
 
-b32 was_key_pressed_once(Game *gp, OS_Key key) {
-  return !!(gp->input.key_pressed[key] == 1);
-}
-
-b32 is_key_pressed(Game *gp, OS_Key key) {
-  return !!(gp->input.key_pressed[key] > 0);
-}
-
-b32 was_key_released(Game *gp, OS_Key key) {
-  return (gp->input.key_released[key] == true);
-}
-
 
 void render_weird_gradient(Game *gp, int x_offset, int y_offset) {
   u8 *row = gp->render.pixels;
@@ -67,16 +55,16 @@ void game_update_and_render(Game *gp) {
     // TODO jfd: mouse movement and clicks
     int step_pixels = 1;
 
-    if(is_key_pressed(gp, OS_KEY_W)) {
+    if(gfx_is_key_pressed(&gp->input, GFX_KEY_W)) {
       gp->y_offset -= step_pixels;
     }
-    if(is_key_pressed(gp, OS_KEY_A)) {
+    if(gfx_is_key_pressed(&gp->input, GFX_KEY_A)) {
       gp->x_offset -= step_pixels;
     }
-    if(is_key_pressed(gp, OS_KEY_S)) {
+    if(gfx_is_key_pressed(&gp->input, GFX_KEY_S)) {
       gp->y_offset += step_pixels;
     }
-    if(is_key_pressed(gp, OS_KEY_D)) {
+    if(gfx_is_key_pressed(&gp->input, GFX_KEY_D)) {
       gp->x_offset += step_pixels;
     }
 

@@ -137,13 +137,13 @@ void arena_pop(Arena *arena, u64 amount) {
   arena_pop_to(arena, new_pos);
 }
 
-Arena_Scope arena_scope_begin(Arena *arena) {
+ArenaScope arena_scope_begin(Arena *arena) {
   u64 pos = arena_pos(arena);
-  Arena_Scope scope = { arena, pos };
+  ArenaScope scope = { arena, pos };
   return scope;
 }
 
-void arena_scope_end(Arena_Scope scope) {
+void arena_scope_end(ArenaScope scope) {
   arena_pop_to(scope.arena, scope.pos);
 }
 
