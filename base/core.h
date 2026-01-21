@@ -314,8 +314,8 @@ typedef enum Month {
 } Month;
 STATIC_ASSERT(sizeof(Month) <= sizeof(u32), Month__is__right__size);
 
-typedef struct Date_time Date_time;
-struct Date_time {
+typedef struct DateTime DateTime;
+struct DateTime {
   u16 micro_sec; // [0,999]
   u16 msec; // [0,999]
   u16 sec;  // [0,60]
@@ -327,27 +327,27 @@ struct Date_time {
   u32 year; // 1 = 1 CE, 0 = 1 BC
 };
 
-typedef u64 Dense_time;
+typedef u64 DenseTime;
 
-typedef u32 File_property_flags;
+typedef u32 FilePropertyFlag;
 enum {
   FILE_PROPERTY_IS_DIR   =   (1<<0),
   FILE_PROPERTY_READONLY =   (1<<1),
 };
 
-typedef struct File_properties File_properties;
-struct File_properties {
+typedef struct FileProperties FileProperties;
+struct FileProperties {
   u64 size;
-  Dense_time modified;
-  Dense_time created;
-  File_property_flags flags;
+  DenseTime modified;
+  DenseTime created;
+  FilePropertyFlag flags;
 };
 
-// Dense_time dense_time_from_date_time(Date_time date_time);
-// Date_time date_time_from_dense_time(Dense_time time);
-// Date_time date_time_from_micro_seconds(u64 time);
-// Date_time date_time_from_unix_time(u64 unix_time);
-// Dense_time dense_time_from_unix_time(u64 unix_time);
+// DenseTime dense_time_from_date_time(DateTime date_time);
+// DateTime date_time_from_dense_time(DenseTime time);
+// DateTime date_time_from_micro_seconds(u64 time);
+// DateTime date_time_from_unix_time(u64 unix_time);
+// DenseTime dense_time_from_unix_time(u64 unix_time);
 
 
 #endif

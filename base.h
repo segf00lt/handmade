@@ -17,7 +17,7 @@
 
 #ifdef GFX_ENABLED
 
-#include "gfx/gfx_inc.h"
+#include "os/gfx/gfx_inc.h"
 
 #endif
 
@@ -42,7 +42,7 @@
 
 #ifdef GFX_ENABLED
 
-#include "gfx/gfx_inc.c"
+#include "os/gfx/gfx_inc.c"
 
 #endif
 

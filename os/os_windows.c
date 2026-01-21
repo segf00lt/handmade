@@ -15,7 +15,7 @@ void* os_alloc(u64 bytes) {
   void *result = (void*)VirtualAlloc(
     0,
     (SIZE_T)bytes,
-    MEM_COMMIT,
+    MEM_RESERVE | MEM_COMMIT,
     PAGE_READWRITE
   );
   return result;

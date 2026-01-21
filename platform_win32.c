@@ -1,42 +1,46 @@
+#ifndef PLATFORM_WIN32_C
+#define PLATFORM_WIN32_C
+
 #include "base.h"
 
 
-#include "handmade.h"
-#include "handmade.c"
+#include "game.h"
 
 
 #include <Xinput.h>
 #include <Dsound.h>
 #include <intrin.h>
 
-#include "win32_handmade.h"
+#include "platform_win32.h"
 
+
+#include "game.c"
 
 
 /*
  * globals
  */
 
-global Arena *scratch;
-global Arena *frame_arena;
-global Arena *hmh_event_arena;
+global Arena *platform_main_arena;
+global Arena *platform_frame_arena;
+global Arena *platform_event_arena;
 
-global HMH_Win32_XInput_GetStateFunc *hmh_win32_xinput_get_state = _hmh_win32_xinput_get_state_stub;
-global HMH_Win32_XInput_SetStateFunc *hmh_win32_xinput_set_state = _hmh_win32_xinput_set_state_stub;
+global PLTFM_WIN32_XInputGetStateFunc *platform_win32_xinput_get_state = _platform_win32_xinput_get_state_stub;
+global PLTFM_WIN32_XInputSetStateFunc *platform_win32_xinput_set_state = _platform_win32_xinput_set_state_stub;
 
-global b32 hmh_is_running;
-global HMH_Win32_Backbuffer global_backbuffer = {
+global b32 platform_is_running;
+global PLTFM_WIN32_Backbuffer global_backbuffer = {
   .bytes_per_pixel = 4,
 };
 
-global HMH_Win32_SoundOutput _hmh_sound_output_stub;
-global HMH_Win32_SoundOutput *hmh_sound_output = &_hmh_sound_output_stub;
+global PLTFM_WIN32_SoundOutput _platform_sound_output_stub;
+global PLTFM_WIN32_SoundOutput *platform_sound_output = &_platform_sound_output_stub;
 
-global LPDIRECTSOUNDBUFFER hmh_sound_buffer; // this is what we write to
+global LPDIRECTSOUNDBUFFER platform_sound_buffer; // this is what we write to
 
 global Game *game_state;
-global GFX_EventList _hmh_event_list_stub;
-global GFX_EventList *hmh_event_list = &_hmh_event_list_stub;
+global OS_EventList _platform_event_list_stub;
+global OS_EventList *platform_event_list = &_platform_event_list_stub;
 
 
 /*
@@ -44,11 +48,11 @@ global GFX_EventList *hmh_event_list = &_hmh_event_list_stub;
  */
 
 
-HMH_Win32_WindowDimensions hmh_win32_get_window_dimensions(HWND window_handle) {
+PLTFM_WIN32_WindowDimensions platform_win32_get_window_dimensions(HWND window_handle) {
   RECT client_rect;
   GetClientRect(window_handle, &client_rect);
 
-  HMH_Win32_WindowDimensions window_dimensions = {
+  PLTFM_WIN32_WindowDimensions window_dimensions = {
     .width = client_rect.right - client_rect.left,
     .height = client_rect.bottom - client_rect.top,
   };
@@ -56,7 +60,7 @@ HMH_Win32_WindowDimensions hmh_win32_get_window_dimensions(HWND window_handle) {
   return window_dimensions;
 }
 
-void hmh_win32_resize_backbuffer(HMH_Win32_Backbuffer *backbuffer, int window_width, int window_height) {
+void platform_win32_resize_backbuffer(PLTFM_WIN32_Backbuffer *backbuffer, int window_width, int window_height) {
   int width = window_width;
   int height = window_height;
   // TODO jfd: bulletproof this
@@ -84,7 +88,7 @@ void hmh_win32_resize_backbuffer(HMH_Win32_Backbuffer *backbuffer, int window_wi
   backbuffer->stride = backbuffer->bitmap_width * backbuffer->bytes_per_pixel;
 }
 
-void hmh_win32_display_buffer_in_window(HMH_Win32_Backbuffer *backbuffer, HDC device_context, int window_width, int window_height, int x, int y, int width, int height ) {
+void platform_win32_display_buffer_in_window(PLTFM_WIN32_Backbuffer *backbuffer, HDC device_context, int window_width, int window_height, int x, int y, int width, int height ) {
 
   StretchDIBits(
     device_context,
@@ -98,22 +102,83 @@ void hmh_win32_display_buffer_in_window(HMH_Win32_Backbuffer *backbuffer, HDC de
 
 }
 
+// TODO jfd: mouse clicks and scroll wheel
+void platform_get_game_input_from_events(OS_EventList *event_list, Game *gp) {
+  Game_Input *input = &gp->input;
+
+  memory_zero(input->key_released, sizeof(input->key_released));
+
+  for(OS_Event *event = event_list->first; event; event = event->next) {
+
+    switch(event->kind) {
+      case OS_EVENT_KEY_PRESS: {
+
+        switch(event->key) {
+          case KBD_KEY_LEFT_CONTROL: case KBD_KEY_RIGHT_CONTROL: {
+            input->modifier_mask |= KBD_MOD_CONTROL;
+          } break;
+          case KBD_KEY_LEFT_SHIFT: case KBD_KEY_RIGHT_SHIFT: {
+            input->modifier_mask |= KBD_MOD_SHIFT;
+          } break;
+          case KBD_KEY_LEFT_ALT: case KBD_KEY_RIGHT_ALT: {
+            input->modifier_mask |= KBD_MOD_ALT;
+          } break;
+          default: {
+            input->key_pressed[event->key] += 1 + event->repeat_count;
+          } break;
+        }
+
+      } break;
+      case OS_EVENT_KEY_RELEASE: {
+
+        switch(event->key) {
+          case KBD_KEY_LEFT_CONTROL: case KBD_KEY_RIGHT_CONTROL: {
+            input->modifier_mask &= ~KBD_MOD_CONTROL;
+          } break;
+          case KBD_KEY_LEFT_SHIFT: case KBD_KEY_RIGHT_SHIFT: {
+            input->modifier_mask &= ~KBD_MOD_SHIFT;
+          } break;
+          case KBD_KEY_LEFT_ALT: case KBD_KEY_RIGHT_ALT: {
+            input->modifier_mask &= ~KBD_MOD_ALT;
+          } break;
+          default: {
+            input->key_pressed[event->key] = 0;
+            input->key_released[event->key] = true;
+          } break;
+        }
+
+      } break;
+      case OS_EVENT_MOUSE_MOVE: {
+        input->mouse_pos = event->mouse_pos;
+        input->mouse_delta.x = event->mouse_pos.x - input->mouse_pos.x;
+        input->mouse_delta.y = event->mouse_pos.y - input->mouse_pos.y;
+      } break;
+    }
+  }
+
+  // TODO jfd: remove this
+  event_list->count = 0;
+  event_list->first = event_list->last = 0;
+  // arena_clear(a);
+
+}
+
 // TODO jfd: Eventually we'll move this in to the gfx layer
-LRESULT CALLBACK hmh_win32_main_window_callback(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK platform_win32_main_window_callback(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
   LRESULT result = 0;
 
   switch(message) {
     case WM_SIZE: {
 
-      HMH_Win32_WindowDimensions window_dimensions = hmh_win32_get_window_dimensions(window);
+      PLTFM_WIN32_WindowDimensions window_dimensions = platform_win32_get_window_dimensions(window);
 
-      hmh_win32_resize_backbuffer(&global_backbuffer, window_dimensions.width, window_dimensions.height);
+      platform_win32_resize_backbuffer(&global_backbuffer, window_dimensions.width, window_dimensions.height);
     } break;
     case WM_DESTROY: {
-      hmh_is_running = false;
+      platform_is_running = false;
     } break;
     case WM_CLOSE: {
-      hmh_is_running = false;
+      platform_is_running = false;
     } break;
     case WM_ACTIVATEAPP: {
     } break;
@@ -131,14 +196,14 @@ LRESULT CALLBACK hmh_win32_main_window_callback(HWND window, UINT message, WPARA
     case WM_KEYUP: {
       u32 virtual_keycode = (u32)wParam;
 
-      GFX_Key key = gfx_win32_key_from_virtual_keycode(virtual_keycode);
+      KeyboardKey key = os_win32_keyboard_key_from_virtual_keycode(virtual_keycode);
 
-      u32 key_repeat_count = (u32)lParam & 0x7fff;
+      u16 key_repeat_count = (u16)lParam & 0x7fff;
       b32 was_down = ((u32)lParam & (1 << 30)) != 0;
       b32 is_down = ((u32)lParam & (1 << 31)) == 0;
 
       b32 release = 0;
-      b32 is_repeat = 0;
+      b16 is_repeat = 0;
 
       if(!is_down) {
         release = 1;
@@ -146,7 +211,7 @@ LRESULT CALLBACK hmh_win32_main_window_callback(HWND window, UINT message, WPARA
         is_repeat = 1;
       }
 
-      GFX_Event *event = gfx_win32_event_push(hmh_event_arena, hmh_event_list, release ? GFX_EVENT_KEY_RELEASE : GFX_EVENT_KEY_PRESS);
+      OS_Event *event = os_win32_event_push(platform_event_arena, platform_event_list, release ? OS_EVENT_KEY_RELEASE : OS_EVENT_KEY_PRESS);
 
       // TODO jfd: distinguish right and left modifiers with is_right_sided (???)
 
@@ -154,16 +219,16 @@ LRESULT CALLBACK hmh_win32_main_window_callback(HWND window, UINT message, WPARA
       event->is_repeat = is_repeat;
       event->repeat_count = key_repeat_count;
 
-      if((event->key == GFX_KEY_LEFT_ALT || event->key == GFX_KEY_RIGHT_ALT) && event->modifier_mask & GFX_MOD_ALT) {
-        event->modifier_mask &= ~GFX_MOD_ALT;
+      if((event->key == KBD_KEY_LEFT_ALT || event->key == KBD_KEY_RIGHT_ALT) && event->modifier_mask & KBD_MOD_ALT) {
+        event->modifier_mask &= ~KBD_MOD_ALT;
       }
 
-      if((event->key == GFX_KEY_LEFT_CONTROL || event->key == GFX_KEY_RIGHT_CONTROL) && event->modifier_mask & GFX_MOD_CONTROL) {
-        event->modifier_mask &= ~GFX_MOD_CONTROL;
+      if((event->key == KBD_KEY_LEFT_CONTROL || event->key == KBD_KEY_RIGHT_CONTROL) && event->modifier_mask & KBD_MOD_CONTROL) {
+        event->modifier_mask &= ~KBD_MOD_CONTROL;
       }
 
-      if((event->key == GFX_KEY_LEFT_SHIFT || event->key == GFX_KEY_RIGHT_SHIFT) && event->modifier_mask & GFX_MOD_SHIFT) {
-        event->modifier_mask &= ~GFX_MOD_SHIFT;
+      if((event->key == KBD_KEY_LEFT_SHIFT || event->key == KBD_KEY_RIGHT_SHIFT) && event->modifier_mask & KBD_MOD_SHIFT) {
+        event->modifier_mask &= ~KBD_MOD_SHIFT;
       }
 
       // TODO jfd: fill in the other fields
@@ -177,7 +242,7 @@ LRESULT CALLBACK hmh_win32_main_window_callback(HWND window, UINT message, WPARA
       s16 x_pos = (s16)LOWORD(lParam);
       s16 y_pos = (s16)HIWORD(lParam);
 
-      GFX_Event *event = gfx_win32_event_push(hmh_event_arena, hmh_event_list, GFX_EVENT_MOUSE_MOVE);
+      OS_Event *event = os_win32_event_push(platform_event_arena, platform_event_list, OS_EVENT_MOUSE_MOVE);
       event->mouse_pos.x = (f32)x_pos;
       event->mouse_pos.y = (f32)y_pos;
 
@@ -185,7 +250,7 @@ LRESULT CALLBACK hmh_win32_main_window_callback(HWND window, UINT message, WPARA
 
     case WM_MOUSEWHEEL: {
       s16 wheel_delta = HIWORD(wParam);
-      GFX_Event *event = gfx_win32_event_push(hmh_event_arena, hmh_event_list, GFX_EVENT_MOUSE_SCROLL);
+      OS_Event *event = os_win32_event_push(platform_event_arena, platform_event_list, OS_EVENT_MOUSE_SCROLL);
       POINT p;
       p.x = (s32)(s16)LOWORD(lParam);
       p.y = (s32)(s16)HIWORD(lParam);
@@ -212,8 +277,8 @@ LRESULT CALLBACK hmh_win32_main_window_callback(HWND window, UINT message, WPARA
         color = WHITENESS;
       }
 
-      HMH_Win32_WindowDimensions window_dimensions = hmh_win32_get_window_dimensions(window);
-      hmh_win32_display_buffer_in_window(&global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, x, y, width, height);
+      PLTFM_WIN32_WindowDimensions window_dimensions = platform_win32_get_window_dimensions(window);
+      platform_win32_display_buffer_in_window(&global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, x, y, width, height);
       EndPaint(window, &paint);
     } break;
     default: {
@@ -224,23 +289,23 @@ LRESULT CALLBACK hmh_win32_main_window_callback(HWND window, UINT message, WPARA
   return result;
 }
 
-void hmh_win32_load_xinput(void) {
-  void *lib = os_library_load(scratch, str8_lit("Xinput1_4.dll"));
+void platform_win32_load_xinput(void) {
+  void *lib = os_library_load(platform_main_arena, str8_lit("Xinput1_4.dll"));
   if(lib) {
-    hmh_win32_xinput_get_state = (HMH_Win32_XInput_GetStateFunc*)os_library_load_func(scratch, lib, str8_lit("XInputGetState"));
-    hmh_win32_xinput_set_state = (HMH_Win32_XInput_SetStateFunc*)os_library_load_func(scratch, lib, str8_lit("XInputSetState"));
+    platform_win32_xinput_get_state = (PLTFM_WIN32_XInputGetStateFunc*)os_library_load_func(platform_main_arena, lib, str8_lit("XInputGetState"));
+    platform_win32_xinput_set_state = (PLTFM_WIN32_XInputSetStateFunc*)os_library_load_func(platform_main_arena, lib, str8_lit("XInputSetState"));
   }
 }
 
-void hmh_win32_init_dsound(HWND window_handle, s32 sound_buffer_size, s32 samples_per_second) {
+void platform_win32_init_dsound(HWND window_handle, s32 sound_buffer_size, s32 samples_per_second) {
   // NOTE jfd: load the library
 
-  void *lib = os_library_load(scratch, str8_lit("dsound.dll"));
+  void *lib = os_library_load(platform_main_arena, str8_lit("dsound.dll"));
 
   if(lib) {
     // NOTE jfd: get a direct sound object
-    HMH_Win32_DirectSound_CreateFunc *direct_sound_create =
-    (HMH_Win32_DirectSound_CreateFunc*)os_library_load_func(scratch, lib, str8_lit("DirectSoundCreate8"));
+    PLTFM_WIN32_DirectSoundCreateFunc *direct_sound_create =
+    (PLTFM_WIN32_DirectSoundCreateFunc*)os_library_load_func(platform_main_arena, lib, str8_lit("DirectSoundCreate8"));
 
     LPDIRECTSOUND direct_sound;
 
@@ -293,7 +358,7 @@ void hmh_win32_init_dsound(HWND window_handle, s32 sound_buffer_size, s32 sample
       buffer_description.dwBufferBytes = sound_buffer_size;
       buffer_description.lpwfxFormat = &wave_format;
 
-      HRESULT hr = direct_sound->lpVtbl->CreateSoundBuffer(direct_sound, &buffer_description, &hmh_sound_buffer, 0);
+      HRESULT hr = direct_sound->lpVtbl->CreateSoundBuffer(direct_sound, &buffer_description, &platform_sound_buffer, 0);
       if(SUCCEEDED(hr)) {
         OutputDebugStringA("created secondary buffer\n");
       } else {
@@ -309,14 +374,14 @@ void hmh_win32_init_dsound(HWND window_handle, s32 sound_buffer_size, s32 sample
   }
 }
 
-void hmh_win32_clear_sound_buffer(HMH_Win32_SoundOutput *sound_output) {
+void platform_win32_clear_sound_buffer(PLTFM_WIN32_SoundOutput *sound_output) {
   void *region1;
   DWORD region1_size;
   void *region2;
   DWORD region2_size;
 
-  if(SUCCEEDED(hmh_sound_buffer->lpVtbl->Lock(
-    hmh_sound_buffer,
+  if(SUCCEEDED(platform_sound_buffer->lpVtbl->Lock(
+    platform_sound_buffer,
     0,
     sound_output->buffer_size,
     &region1,
@@ -329,19 +394,19 @@ void hmh_win32_clear_sound_buffer(HMH_Win32_SoundOutput *sound_output) {
     memory_zero(region1, region1_size);
     memory_zero(region2, region2_size);
 
-    hmh_sound_buffer->lpVtbl->Unlock(hmh_sound_buffer, region1, region1_size, region2, region2_size);
+    platform_sound_buffer->lpVtbl->Unlock(platform_sound_buffer, region1, region1_size, region2, region2_size);
   }
 }
 
-void hmh_win32_fill_sound_buffer(HMH_Win32_SoundOutput *sound_output, DWORD byte_to_lock_at, DWORD bytes_to_write, Game_SoundBuffer *source_buffer) {
+void platform_win32_fill_sound_buffer(PLTFM_WIN32_SoundOutput *sound_output, DWORD byte_to_lock_at, DWORD bytes_to_write, Game_SoundBuffer *source_buffer) {
 
   void *region1;
   DWORD region1_size;
   void *region2;
   DWORD region2_size;
 
-  if(SUCCEEDED(hmh_sound_buffer->lpVtbl->Lock(
-    hmh_sound_buffer,
+  if(SUCCEEDED(platform_sound_buffer->lpVtbl->Lock(
+    platform_sound_buffer,
     byte_to_lock_at,
     bytes_to_write,
     &region1,
@@ -371,13 +436,11 @@ void hmh_win32_fill_sound_buffer(HMH_Win32_SoundOutput *sound_output, DWORD byte
       ++sound_output->running_sample_index;
     }
 
-    hmh_sound_buffer->lpVtbl->Unlock(hmh_sound_buffer, region1, region1_size, region2, region2_size);
+    platform_sound_buffer->lpVtbl->Unlock(platform_sound_buffer, region1, region1_size, region2, region2_size);
 
   } /* if(Lock()) */
 
 }
-
-
 
 
 int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode) {
@@ -385,24 +448,25 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, 
   LARGE_INTEGER performance_counter_frequency;
   QueryPerformanceFrequency(&performance_counter_frequency);
 
-  scratch         = arena_create(MB(5));
-  frame_arena     = arena_create(KB(5));
-  hmh_event_arena = arena_create(KB(50));
+  platform_main_arena  = arena_create(MB(5));
+  platform_frame_arena = arena_create(KB(5));
+  platform_event_arena = arena_create(KB(50));
 
-  // gfx_win32_load_xinput();
+  // os_win32_load_xinput();
 
   WNDCLASSA window_class = {0};
   window_class.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
-  window_class.lpfnWndProc = hmh_win32_main_window_callback;
+  window_class.lpfnWndProc = platform_win32_main_window_callback;
   window_class.hInstance = instance;
   window_class.lpszClassName = "Handmade Hero Window Class";
 
   { /* game_init */
+
     game_state = os_alloc(GAME_STATE_SIZE);
 
-    game_state->main_arena = arena_create(MB(5));
+    game_state->main_arena  = arena_create(MB(5));
     game_state->frame_arena = arena_create(MB(1));
-    game_state->temp_arena = arena_create(KB(5));
+    game_state->temp_arena  = arena_create(KB(5));
 
   } /* game_init */
 
@@ -430,19 +494,19 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, 
       MSG message;
 
       // NOTE jfd: sound test
-      hmh_sound_output->samples_per_second    = THOUSAND(48);
-      hmh_sound_output->buffer_size           = hmh_sound_output->samples_per_second * sizeof(s16) * 2;
-      hmh_sound_output->running_sample_index  = 0;
-      hmh_sound_output->bytes_per_sample      = sizeof(s16)*2;
-      hmh_sound_output->latency_sample_count  = hmh_sound_output->samples_per_second / 15;
+      platform_sound_output->samples_per_second    = THOUSAND(48);
+      platform_sound_output->buffer_size           = platform_sound_output->samples_per_second * sizeof(s16) * 2;
+      platform_sound_output->running_sample_index  = 0;
+      platform_sound_output->bytes_per_sample      = sizeof(s16)*2;
+      platform_sound_output->latency_sample_count  = platform_sound_output->samples_per_second / 15;
 
-      hmh_win32_init_dsound(window_handle, hmh_sound_output->buffer_size, hmh_sound_output->samples_per_second);
-      hmh_win32_clear_sound_buffer(hmh_sound_output);
-      hmh_sound_buffer->lpVtbl->Play(hmh_sound_buffer, 0, 0, DSBPLAY_LOOPING);
+      platform_win32_init_dsound(window_handle, platform_sound_output->buffer_size, platform_sound_output->samples_per_second);
+      platform_win32_clear_sound_buffer(platform_sound_output);
+      platform_sound_buffer->lpVtbl->Play(platform_sound_buffer, 0, 0, DSBPLAY_LOOPING);
 
-      s16 *samples = (s16*)push_array_no_zero(scratch, u8, hmh_sound_output->buffer_size);
+      s16 *samples = (s16*)push_array_no_zero(platform_main_arena, u8, platform_sound_output->buffer_size);
 
-      hmh_is_running = true;
+      platform_is_running = true;
 
       LARGE_INTEGER last_counter;
       QueryPerformanceCounter(&last_counter);
@@ -451,14 +515,14 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, 
 
       u64 last_cycle_count = __rdtsc(); // NOTE jfd: get timestamp in cycles
 
-      while(hmh_is_running) {
+      while(platform_is_running) {
 
         game_state->t = frame_time;
 
         // NOTE jfd: get input messages
         while(PeekMessageA(&message, window_handle, 0, 0, PM_REMOVE)) {
           if(message.message == WM_QUIT) {
-            hmh_is_running = false;
+            platform_is_running = false;
           }
           TranslateMessage(&message); // NOTE jfd: has to do with keyboard messages
           DispatchMessage(&message);
@@ -471,7 +535,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, 
 
           for(DWORD controller_index = 0; controller_index < XUSER_MAX_COUNT; controller_index++) {
             XINPUT_STATE controller_state;
-            if(gfx_win32_xinput_get_state(controller_index, &controller_state) == ERROR_SUCCESS) {
+            if(os_win32_xinput_get_state(controller_index, &controller_state) == ERROR_SUCCESS) {
               // NOTE jfd: this controller is plugged in
               XINPUT_GAMEPAD *gamepad = &controller_state.Gamepad;
 
@@ -507,8 +571,8 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, 
         #endif
 
 
-        gfx_poll_input_events(hmh_event_list, &game_state->input);
-        arena_clear(hmh_event_arena);
+        platform_get_game_input_from_events(platform_event_list, game_state);
+        arena_clear(platform_event_arena);
 
 
         DWORD byte_to_lock_at;
@@ -520,16 +584,16 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, 
 
         // TODO jfd: Tighten up sound logic so that we know where we should be writing to and can anticipate the time
         //           spent in game_update_and_render()
-        if(SUCCEEDED(hmh_sound_buffer->lpVtbl->GetCurrentPosition(hmh_sound_buffer, &sound_play_cursor, &sound_write_cursor))) {
+        if(SUCCEEDED(platform_sound_buffer->lpVtbl->GetCurrentPosition(platform_sound_buffer, &sound_play_cursor, &sound_write_cursor))) {
 
           byte_to_lock_at =
-          (hmh_sound_output->running_sample_index * hmh_sound_output->bytes_per_sample) % hmh_sound_output->buffer_size;
+          (platform_sound_output->running_sample_index * platform_sound_output->bytes_per_sample) % platform_sound_output->buffer_size;
 
           sound_target_cursor =
-          (sound_play_cursor + (hmh_sound_output->latency_sample_count * hmh_sound_output->bytes_per_sample)) % hmh_sound_output->buffer_size;
+          (sound_play_cursor + (platform_sound_output->latency_sample_count * platform_sound_output->bytes_per_sample)) % platform_sound_output->buffer_size;
 
           if(byte_to_lock_at > sound_target_cursor) {
-            bytes_to_write = (hmh_sound_output->buffer_size - byte_to_lock_at);
+            bytes_to_write = (platform_sound_output->buffer_size - byte_to_lock_at);
             bytes_to_write += sound_target_cursor;
           } else {
             bytes_to_write = sound_target_cursor - byte_to_lock_at;
@@ -544,8 +608,8 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, 
 
         // TODO jfd: move to 60 fps
         game_state->sound = (Game_SoundBuffer){0};
-        game_state->sound.samples_per_second = hmh_sound_output->samples_per_second;
-        game_state->sound.sample_count = bytes_to_write / hmh_sound_output->bytes_per_sample;
+        game_state->sound.samples_per_second = platform_sound_output->samples_per_second;
+        game_state->sound.sample_count = bytes_to_write / platform_sound_output->bytes_per_sample;
         game_state->sound.samples = samples;
 
         game_state->render.pixels = global_backbuffer.bitmap_memory;
@@ -556,15 +620,15 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, 
         game_update_and_render(game_state);
 
         if(sound_is_valid) {
-          hmh_win32_fill_sound_buffer(hmh_sound_output, byte_to_lock_at, bytes_to_write, &game_state->sound);
+          platform_win32_fill_sound_buffer(platform_sound_output, byte_to_lock_at, bytes_to_write, &game_state->sound);
         }
 
         // NOTE jfd: blit to screen
         HDC device_context;
         defer_loop(device_context = GetDC(window_handle), ReleaseDC(window_handle, device_context)) {
-          HMH_Win32_WindowDimensions window_dimensions = hmh_win32_get_window_dimensions(window_handle);
+          PLTFM_WIN32_WindowDimensions window_dimensions = platform_win32_get_window_dimensions(window_handle);
 
-          hmh_win32_display_buffer_in_window(&global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, 0, 0, window_dimensions.width, window_dimensions.height);
+          platform_win32_display_buffer_in_window(&global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, 0, 0, window_dimensions.width, window_dimensions.height);
         }
 
         s64 end_cycle_count = __rdtsc();
@@ -586,12 +650,12 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, 
         last_counter = end_counter;
 
         OutputDebugStringA(
-          cstrf(frame_arena,
+          cstrf(platform_frame_arena,
             "frame time (ms):  %g    fps:  %g    mega cycles: %d\n",
             frame_time_ms, fps, elapsed_cycles / MILLION(1))
         );
 
-        arena_clear(frame_arena);
+        arena_clear(platform_frame_arena);
 
       }
 
@@ -604,3 +668,6 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, 
 
   return 0;
 }
+
+
+#endif

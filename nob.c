@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
     "/Od",
     "/DGFX_ENABLED",
     "/Fe:handmade.exe",
-    "win32_handmade.c",
+    "platform_win32.c",
     "user32.lib",
     "gdi32.lib",
     "Dsound.lib",

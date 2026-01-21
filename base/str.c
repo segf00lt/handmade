@@ -77,10 +77,10 @@ Str8 str8_list_join(Arena *a, Str8_List list, Str8 sep) {
   s64 len = ((sep.len > 0) ? (list.count - 1) : (0)) * sep.len + list.total_len;
 
   result =
-    (Str8) {
-      .s = push_array_no_zero(a, u8, len),
-      .len = len,
-    };
+  (Str8) {
+    .s = push_array_no_zero(a, u8, len),
+    .len = len,
+  };
 
   s64 len_copied = 0;
 
@@ -185,11 +185,11 @@ s64 str8_find(Str8 haystack, Str8 needle) {
     found = i;
     goto end;
 
-continue_outer:
+    continue_outer:
     ;
   }
 
-end:
+  end:
 
   return found;
 }
@@ -224,15 +224,17 @@ s64 str8_find_first_whitespace(Str8 haystack) {
   return found;
 }
 
-Str8_Find_Results str8_find_all_chars(Arena *scratch, Str8 haystack, u8 needle, Arena *output_arena) {
+Str8_Find_Results str8_find_all_chars(Arena *a, Str8 haystack, u8 needle, Arena *output_arena) {
   Str8_Find_Results results = {0};
 
-  ArenaScope scope = arena_scope_begin(scratch);
+  ASSERT(a != output_arena);
+
+  Scope scope = arena_scope_begin(a);
 
   Arr(s64) begin_indexes;
   Arr(s64) end_indexes;
-  arr_init_ex(begin_indexes, scratch, 64);
-  arr_init_ex(end_indexes, scratch, 64);
+  arr_init_ex(begin_indexes, a, 64);
+  arr_init_ex(end_indexes, a, 64);
 
   for(s64 i = 0; i < haystack.len; i++) {
     if(haystack.s[i] != needle) {
@@ -260,15 +262,17 @@ Str8_Find_Results str8_find_all_chars(Arena *scratch, Str8 haystack, u8 needle, 
   return results;
 }
 
-Str8_Find_Results str8_find_all(Arena *scratch, Str8 haystack, Str8 needle, Arena *output_arena) {
+Str8_Find_Results str8_find_all(Arena *a, Str8 haystack, Str8 needle, Arena *output_arena) {
   Str8_Find_Results results = {0};
 
-  ArenaScope scope = arena_scope_begin(scratch);
+  ASSERT(a != output_arena);
+
+  Scope scope = arena_scope_begin(a);
 
   Arr(s64) begin_indexes;
   Arr(s64) end_indexes;
-  arr_init_ex(begin_indexes, scratch, 64);
-  arr_init_ex(end_indexes, scratch, 64);
+  arr_init_ex(begin_indexes, a, 64);
+  arr_init_ex(end_indexes, a, 64);
 
   for(s64 i = 0; i < haystack.len - needle.len; i++) {
     for(s64 j = 0; j < needle.len; j++) {
@@ -280,7 +284,7 @@ Str8_Find_Results str8_find_all(Arena *scratch, Str8 haystack, Str8 needle, Aren
     arr_push(begin_indexes, i);
     arr_push(end_indexes, i + needle.len);
 
-continue_outer:
+    continue_outer:
     ;
   }
 
@@ -366,19 +370,19 @@ Str8 str8_match_begin_int(Str8 str, int base) {
 
   switch(base) {
     default:
-      break;
+    break;
     case 10:
-      {
-        for(; i < str.len && is_decimal(str.s[i]); i++);
-      } break;
+    {
+      for(; i < str.len && is_decimal(str.s[i]); i++);
+    } break;
     case 2:
-      {
-        for(; i < str.len && is_binary(str.s[i]); i++);
-      } break;
+    {
+      for(; i < str.len && is_binary(str.s[i]); i++);
+    } break;
     case 16:
-      {
-        for(; i < str.len && is_hex(str.s[i]); i++);
-      } break;
+    {
+      for(; i < str.len && is_hex(str.s[i]); i++);
+    } break;
   }
 
   if(i > 0) {
@@ -393,17 +397,17 @@ u64 str8_parse_int(Str8 str, int base) {
   u64 result;
   switch(base) {
     default:
-      result = 0;
-      break;
+    result = 0;
+    break;
     case 10:
-      result = str8_parse_int_decimal(str);
-      break;
+    result = str8_parse_int_decimal(str);
+    break;
     case 2:
-      result = str8_parse_int_binary(str);
-      break;
+    result = str8_parse_int_binary(str);
+    break;
     case 16:
-      result = str8_parse_int_hex(str);
-      break;
+    result = str8_parse_int_hex(str);
+    break;
   }
   return result;
 }
