@@ -10,7 +10,7 @@
 // globals
 
 global Arena *platform_main_arena;
-global Arena *platform_frame_arena;
+global Arena *platform_temp_arena;
 global Arena *platform_event_arena;
 global Arena *platform_file_arena;
 
@@ -29,6 +29,8 @@ global LPDIRECTSOUNDBUFFER platform_sound_buffer; // this is what we write to
 
 global PLTFM_EventList _platform_event_list_stub;
 global PLTFM_EventList *platform_event_list = &_platform_event_list_stub;
+
+global s64 platform_win32_perf_counter_frequency;
 
 
 /////////////////////////////////
@@ -593,7 +595,7 @@ func platform_get_game_input_from_events(PLTFM_EventList *event_list, Game *gp) 
   // TODO jfd: remove this
   event_list->count = 0;
   event_list->first = event_list->last = 0;
-  // arena_clear(a);
+  arena_clear(platform_event_arena);
 
 }
 
@@ -930,14 +932,38 @@ func DEBUG_platform_write_entire_file(Str8 data, Str8 path) {
 }
 
 
+force_inline void
+func platform_win32_sleep_ms(DWORD ms) {
+  Sleep(ms);
+}
+
+force_inline LARGE_INTEGER
+func platform_win32_get_wall_clock(void) {
+  LARGE_INTEGER result;
+  QueryPerformanceCounter(&result);
+  return result;
+}
+
+force_inline f32
+func platform_win32_get_seconds_elapsed(LARGE_INTEGER begin, LARGE_INTEGER end) {
+  f32 result =
+  (f32)(end.QuadPart - begin.QuadPart) / (f32)platform_win32_perf_counter_frequency;
+
+  return result;
+}
+
 int CALLBACK
 WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode) {
 
-  LARGE_INTEGER performance_counter_frequency;
-  QueryPerformanceFrequency(&performance_counter_frequency);
+  LARGE_INTEGER performance_counter_frequency_result;
+  QueryPerformanceFrequency(&performance_counter_frequency_result);
+  platform_win32_perf_counter_frequency = performance_counter_frequency_result.QuadPart;
+
+  UINT scheduler_granularity_ms = 1;
+  b32 sleep_is_granular = timeBeginPeriod(scheduler_granularity_ms);
 
   platform_main_arena  = arena_create(MB(5));
-  platform_frame_arena = arena_create(KB(5));
+  platform_temp_arena = arena_create(KB(5));
   platform_event_arena = arena_create(KB(50));
   platform_file_arena  = arena_create(GB(1));
 
@@ -949,16 +975,22 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
   window_class.hInstance = instance;
   window_class.lpszClassName = "Handmade Hero Window Class";
 
+  // TODO jfd 22/01/2026: Redesign arena allocator to be recursive, and allocate from a fixed backing buffer provided by the OS
   Game *gp;
   { /* game_init */
 
-    gp = os_alloc(GAME_STATE_SIZE);
+    gp = push_struct(platform_main_arena, Game);
 
     gp->main_arena  = arena_create(MB(5));
     gp->frame_arena = arena_create(MB(1));
     gp->temp_arena  = arena_create(KB(5));
 
   } /* game_init */
+
+  // TODO jfd: how do we reliably get this on windows?
+  int monitor_refresh_hz = 60;
+  int game_update_hz = monitor_refresh_hz / 2;
+  f32 target_seconds_per_frame = 1.0f/(f32)game_update_hz;
 
   if(RegisterClass(&window_class)) {
     HWND window_handle =
@@ -978,7 +1010,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
     if(window_handle) {
 
-      ASSERT(SUCCEEDED(CoInitializeEx(NULL, COINIT_MULTITHREADED)));
+      ASSERT(SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED)));
 
       // NOTE jfd: graphics test
       MSG message;
@@ -998,16 +1030,11 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
       platform_is_running = true;
 
-      LARGE_INTEGER last_counter;
-      QueryPerformanceCounter(&last_counter);
-
-      f32 frame_time = 0;
+      LARGE_INTEGER last_counter = platform_win32_get_wall_clock();
 
       u64 last_cycle_count = __rdtsc(); // NOTE jfd: get timestamp in cycles
 
       while(platform_is_running) {
-
-        gp->t = frame_time;
 
         // NOTE jfd: get input messages
         while(PeekMessageA(&message, window_handle, 0, 0, PM_REMOVE)) {
@@ -1062,7 +1089,6 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
 
         platform_get_game_input_from_events(platform_event_list, gp);
-        arena_clear(platform_event_arena);
 
 
         DWORD byte_to_lock_at;
@@ -1121,31 +1147,44 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
           platform_win32_display_buffer_in_window(&global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, 0, 0, window_dimensions.width, window_dimensions.height);
         }
 
+        LARGE_INTEGER work_counter = platform_win32_get_wall_clock();
+        f32 work_seconds_elapsed = platform_win32_get_seconds_elapsed(last_counter, work_counter);
+
+        f32 seconds_elapsed_for_frame = work_seconds_elapsed;
+        if(seconds_elapsed_for_frame > target_seconds_per_frame) {
+          // TODO jfd: MISSED FRAME RATE!!!!!
+          // TODO jfd: logging
+        } else {
+          while(seconds_elapsed_for_frame < target_seconds_per_frame) {
+            if(sleep_is_granular) {
+              DWORD sleep_for_ms = (DWORD)(1000.0f * (target_seconds_per_frame - seconds_elapsed_for_frame));
+              platform_win32_sleep_ms(sleep_for_ms);
+            }
+            LARGE_INTEGER check_counter = platform_win32_get_wall_clock();
+            seconds_elapsed_for_frame = platform_win32_get_seconds_elapsed(last_counter, check_counter);
+          }
+        }
+
+        LARGE_INTEGER end_counter = platform_win32_get_wall_clock();
+
+        #if 1
         s64 end_cycle_count = __rdtsc();
-
         s64 elapsed_cycles = end_cycle_count - last_cycle_count;
-
         last_cycle_count = end_cycle_count;
 
-        LARGE_INTEGER end_counter;
-        QueryPerformanceCounter(&end_counter);
-
-        f64 elapsed_time = (f64)(end_counter.QuadPart - last_counter.QuadPart);
-        f64 frame_time_ms = THOUSAND(elapsed_time) / (f64)performance_counter_frequency.QuadPart;
-
-        frame_time = (f32)frame_time_ms * 1.0e-3f;
-
-        f64 fps = (f64)performance_counter_frequency.QuadPart / elapsed_time;
-
-        last_counter = end_counter;
+        f32 elapsed_time = platform_win32_get_seconds_elapsed(last_counter, end_counter);
+        f32 ms_per_frame = THOUSAND(elapsed_time);
+        f32 fps = 1.0f / elapsed_time;
 
         OutputDebugStringA(
-          cstrf(platform_frame_arena,
-            "frame time (ms):  %g    fps:  %g    mega cycles: %d\n",
-            frame_time_ms, fps, elapsed_cycles / MILLION(1))
+          cstrf(platform_temp_arena,
+            "frame time (ms):  %f    fps:  %f    mega cycles: %d\n",
+            ms_per_frame, fps, elapsed_cycles / MILLION(1))
         );
+        arena_clear(platform_temp_arena);
+        #endif
 
-        arena_clear(platform_frame_arena);
+        last_counter = end_counter;
 
       }
 

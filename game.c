@@ -2,6 +2,17 @@
 #define GAME_C
 
 
+
+/////////////////////////////////
+// globals
+
+
+
+
+
+/////////////////////////////////
+// functions
+
 internal void
 func render_weird_gradient(Game *gp, int x_offset, int y_offset) {
   u8 *row = gp->render.pixels;

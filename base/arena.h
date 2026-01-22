@@ -1,7 +1,7 @@
 #ifndef ARENA_H
 #define ARENA_H
 
-#define ARENA_HEADER_SIZE 128
+#define ARENA_HEADER_SIZE ((u64)64)
 
 typedef struct Arena Arena;
 struct Arena {

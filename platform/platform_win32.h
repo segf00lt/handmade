@@ -79,5 +79,11 @@ internal void platform_get_game_input_from_events(PLTFM_EventList *event_list, G
 internal Str8 DEBUG_platform_read_entire_file(Str8 path);
 internal b32  DEBUG_platform_write_entire_file(Str8 data, Str8 path);
 
+force_inline void platform_win32_sleep_ms(DWORD ms);
+
+force_inline LARGE_INTEGER platform_win32_get_wall_clock(void);
+
+force_inline f32 platform_win32_get_seconds_elapsed(LARGE_INTEGER begin, LARGE_INTEGER end);
+
 
 #endif
