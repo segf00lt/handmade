@@ -2,6 +2,11 @@
 #define PLATFORM_H
 
 
+// NOTE jfd 22/01/2026:
+// This file contains interfaces that the game (or application) can call the platform from.
+// It serves as a platform abstraction layer that contains only those things that the game
+// absolutely must be able to ask the platform for.
+
 typedef enum PLTFM_EventKind {
   EVENT_NULL = 0,
   EVENT_KEY_PRESS,
@@ -142,8 +147,11 @@ struct PLTFM_EventList {
   PLTFM_Event *last;
 };
 
-KeyboardModifier platform_get_keyboard_modifiers(void);
-b32              platform_is_modifier_key(KeyboardKey key);
+internal KeyboardModifier platform_get_keyboard_modifiers(void);
+internal b32              platform_is_modifier_key(KeyboardKey key);
+
+internal Str8 DEBUG_platform_read_entire_file(Str8 path);
+internal b32  DEBUG_platform_write_entire_file(Str8 data, Str8 path);
 
 
 #endif

@@ -77,7 +77,7 @@
 #include <string.h>
 #include <stdarg.h>
 
-// #define func
+#define func
 #define SQUARE(x) ((x)*(x))
 #define TIMES2(x) ((x)+(x))
 #define HALF(x) ((x)*0.5f)

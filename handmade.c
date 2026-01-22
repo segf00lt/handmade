@@ -3,32 +3,16 @@
 
 #include "platform/platform.h"
 
+
+
 #include "game.h"
+#include "game.c"
+
 
 
 #if OS_WINDOWS
 
 #include "platform/platform_win32.h"
-
-#elif OS_LINUX
-#error platform not supported yet
-
-#elif OS_MAC
-#error platform not supported yet
-
-#elif OS_WEB
-#error platform not supported yet
-
-#else
-#error platform not supported
-#endif
-
-
-#include "game.c"
-
-
-#if OS_WINDOWS
-
 #include "platform/platform_win32.c"
 
 #elif OS_LINUX

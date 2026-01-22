@@ -32,7 +32,8 @@
  * function bodies
  */
 
-b32 os_sleep_ms(u32 ms) {
+internal b32
+func os_sleep_ms(u32 ms) {
   b32 result = 1;
   struct timespec ts = {0};
   ts.tv_nsec = MILLION(1)*ms;
@@ -43,7 +44,8 @@ b32 os_sleep_ms(u32 ms) {
   return result;
 }
 
-Str8 os_file_name_from_path(Str8 path) {
+internal Str8
+func os_file_name_from_path(Str8 path) {
   Str8 result;
 
   s64 i;
@@ -57,15 +59,18 @@ Str8 os_file_name_from_path(Str8 path) {
   return result;
 }
 
-void* os_alloc(u64 size) {
+internal void*
+func os_alloc(u64 size) {
   return malloc(size);
 }
 
-void os_free(void *ptr) {
+internal void
+func os_free(void *ptr) {
   free(ptr);
 }
 
-Str8 os_get_current_dir(Arena *a) {
+internal Str8
+func os_get_current_dir(Arena *a) {
   size_t buf_size = 4096;
 
   Str8 result = {0};
@@ -90,7 +95,8 @@ Str8 os_get_current_dir(Arena *a) {
   return result;
 }
 
-b32 os_set_current_dir(Arena *a, Str8 path) {
+internal b32
+func os_set_current_dir(Arena *a, Str8 path) {
   b32 result = 0;
 
   arena_scope(a) {
@@ -101,7 +107,8 @@ b32 os_set_current_dir(Arena *a, Str8 path) {
   return result;
 }
 
-b32 os_move_file(Arena *a, Str8 old_path, Str8 new_path) {
+internal b32
+func os_move_file(Arena *a, Str8 old_path, Str8 new_path) {
   b32 result = 0;
 
   arena_scope(a) {
@@ -114,7 +121,8 @@ b32 os_move_file(Arena *a, Str8 old_path, Str8 new_path) {
   return result;
 }
 
-b32 os_remove_file(Arena *a, Str8 path) {
+internal b32
+func os_remove_file(Arena *a, Str8 path) {
   b32 result = 1;
 
   arena_scope(a) {
@@ -127,7 +135,8 @@ b32 os_remove_file(Arena *a, Str8 path) {
   return result;
 }
 
-b32 os_file_exists(Arena *a, Str8 path) {
+internal b32
+func os_file_exists(Arena *a, Str8 path) {
   b32 result = 0;
 
   arena_scope(a) {
@@ -138,7 +147,8 @@ b32 os_file_exists(Arena *a, Str8 path) {
   return result;
 }
 
-Str8 os_read_entire_file(Arena *a, Str8 path) {
+internal Str8
+func os_read_entire_file(Arena *a, Str8 path) {
   Str8 result = {0};
 
   FILE *f;
@@ -184,7 +194,8 @@ end:
   return result;
 }
 
-b32 os_make_dir(Arena *a, Str8 path) {
+internal b32
+func os_make_dir(Arena *a, Str8 path) {
   int result;
   arena_scope(a) {
     result = mkdir(cstr_copy_str8(a, path), 0755);
@@ -201,7 +212,8 @@ b32 os_make_dir(Arena *a, Str8 path) {
   return 1;
 }
 
-void* os_library_load(Arena *a, Str8 path) {
+internal void*
+func os_library_load(Arena *a, Str8 path) {
   void *lib = 0;
 
   arena_scope(a) {
@@ -213,11 +225,13 @@ void* os_library_load(Arena *a, Str8 path) {
   return lib;
 }
 
-void os_library_unload(void *lib) {
+internal void
+func os_library_unload(void *lib) {
   dlclose(lib);
 }
 
-Void_Func* os_library_load_func(Arena *a, void *lib, Str8 name) {
+internal Void_Func*
+func os_library_load_func(Arena *a, void *lib, Str8 name) {
   Void_Func *fn = 0;
   arena_scope(a) {
     char *name_cstr = cstr_copy_str8(a, name);

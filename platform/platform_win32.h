@@ -2,6 +2,11 @@
 #define PLATFORM_WIN32_H
 
 
+// NOTE jfd 22/01/2026:
+// This file contains the types and function headers for platform specific code.
+// DO NOT CALL THESE FROM GAME OR APP CODE
+
+#include <windows.h>
 #include <Xinput.h>
 #include <Dsound.h>
 #include <intrin.h>
@@ -34,15 +39,15 @@ struct PLTFM_WIN32_SoundOutput {
 };
 
 
-LRESULT CALLBACK platform_win32_main_window_callback(HWND window, UINT message, WPARAM w_param, LPARAM l_param);
+internal LRESULT CALLBACK platform_win32_main_window_callback(HWND window, UINT message, WPARAM w_param, LPARAM l_param);
 
-void platform_win32_resize_backbuffer(PLTFM_WIN32_Backbuffer *backbuffer, int window_width, int window_height);
+internal void platform_win32_resize_backbuffer(PLTFM_WIN32_Backbuffer *backbuffer, int window_width, int window_height);
 
-void platform_win32_display_buffer_in_window(PLTFM_WIN32_Backbuffer *backbuffer, HDC device_context, int window_width, int window_height, int x, int y, int width, int height);
+internal void platform_win32_display_buffer_in_window(PLTFM_WIN32_Backbuffer *backbuffer, HDC device_context, int window_width, int window_height, int x, int y, int width, int height);
 
-PLTFM_WIN32_WindowDimensions platform_win32_get_window_dimensions(HWND window_handle);
+internal PLTFM_WIN32_WindowDimensions platform_win32_get_window_dimensions(HWND window_handle);
 
-void platform_win32_load_xinput(void);
+internal void platform_win32_load_xinput(void);
 
 #define PLTFM_WIN32_XINPUT_SET_STATE(name) DWORD name(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
 typedef PLTFM_WIN32_XINPUT_SET_STATE(PLTFM_WIN32_XInputSetStateFunc);
@@ -64,11 +69,15 @@ PLTFM_WIN32_DIRECT_SOUND_CREATE(_platform_win32_direct_sound_create_stub) {
   return 0;
 }
 
-PLTFM_Event* platform_win32_event_push(Arena *a, PLTFM_EventList *event_list, PLTFM_EventKind event_kind);
-PLTFM_Event* platform_win32_event_pop(PLTFM_EventList *event_list);
+internal PLTFM_Event* platform_win32_event_push(Arena *a, PLTFM_EventList *event_list, PLTFM_EventKind event_kind);
+internal PLTFM_Event* platform_win32_event_pop(PLTFM_EventList *event_list);
 
-KeyboardKey platform_win32_keyboard_key_from_virtual_keycode(WPARAM virtual_keycode);
+internal KeyboardKey platform_win32_keyboard_key_from_virtual_keycode(WPARAM virtual_keycode);
 
-void platform_get_game_input_from_events(PLTFM_EventList *event_list, Game *gp);
+internal void platform_get_game_input_from_events(PLTFM_EventList *event_list, Game *gp);
+
+internal Str8 DEBUG_platform_read_entire_file(Str8 path);
+internal b32  DEBUG_platform_write_entire_file(Str8 data, Str8 path);
+
 
 #endif

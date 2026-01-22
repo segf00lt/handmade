@@ -13,13 +13,15 @@
 //#endif
 
 
-force_inline void str8_list_append_node_(Str8_List *list, Str8_Node *node) {
+internal force_inline void
+func str8_list_append_node_(Str8_List *list, Str8_Node *node) {
   sll_queue_push(list->first, list->last, node);
   list->count++;
   list->total_len += node->str.len;
 }
 
-Str8 str8_cat(Arena *a, Str8 str1, Str8 str2) {
+internal Str8
+func str8_cat(Arena *a, Str8 str1, Str8 str2) {
   Str8 result = {0};
   s64 len = str1.len + str2.len;
 
@@ -37,7 +39,8 @@ Str8 str8_cat(Arena *a, Str8 str1, Str8 str2) {
   return result;
 }
 
-void str8_list_insert_first_str_(Arena *a, Str8_List *list, Str8 str) {
+internal void
+func str8_list_insert_first_str_(Arena *a, Str8_List *list, Str8 str) {
   Str8_Node *node = push_struct(a, Str8_Node);
   node->str = str;
   sll_queue_push_front(list->first, list->last, node);
@@ -45,7 +48,8 @@ void str8_list_insert_first_str_(Arena *a, Str8_List *list, Str8 str) {
   list->total_len += str.len;
 }
 
-void str8_list_append_str_(Arena *a, Str8_List *list, Str8 str) {
+internal void
+func str8_list_append_str_(Arena *a, Str8_List *list, Str8 str) {
   Str8_Node *node = push_struct(a, Str8_Node);
   node->str = str;
   sll_queue_push(list->first, list->last, node);
@@ -53,7 +57,8 @@ void str8_list_append_str_(Arena *a, Str8_List *list, Str8 str) {
   list->total_len += str.len;
 }
 
-Str8_List str8_list_copy(Arena *a, Str8_List list) {
+internal Str8_List
+func str8_list_copy(Arena *a, Str8_List list) {
   Str8_List result = {0};
 
   for(Str8_Node *node = list.first; node; node = node->next) {
@@ -66,7 +71,8 @@ Str8_List str8_list_copy(Arena *a, Str8_List list) {
   return result;
 }
 
-Str8 str8_list_join(Arena *a, Str8_List list, Str8 sep) {
+internal Str8
+func str8_list_join(Arena *a, Str8_List list, Str8 sep) {
   Str8 result = {0};
 
   Str8_Node *node = list.first;
@@ -115,7 +121,8 @@ Str8 str8_list_join(Arena *a, Str8_List list, Str8 sep) {
   return result;
 }
 
-Str8 str8_slice(Str8 str, s64 begin, s64 end) {
+internal Str8
+func str8_slice(Str8 str, s64 begin, s64 end) {
   /* NOTE slice end is exclusive */
 
   if(end < 0) {
@@ -131,7 +138,8 @@ Str8 str8_slice(Str8 str, s64 begin, s64 end) {
   return result;
 }
 
-Str8 str8_strip_whitespace(Str8 str) {
+internal Str8
+func str8_strip_whitespace(Str8 str) {
   Str8 result;
   s64 begin = 0;
   s64 end = str.len - 1;
@@ -158,7 +166,8 @@ Str8 str8_strip_whitespace(Str8 str) {
   return result;
 }
 
-b32 str8_match(Str8 a, Str8 b) {
+internal b32
+func str8_match(Str8 a, Str8 b) {
   if(a.len != b.len) {
     return 0;
   } else {
@@ -166,13 +175,15 @@ b32 str8_match(Str8 a, Str8 b) {
   }
 }
 
-b32 str8_contains(Str8 str, Str8 substr) {
+internal b32
+func str8_contains(Str8 str, Str8 substr) {
   s64 found = str8_find(str, substr);
   b32 result = (found >= 0);
   return result;
 }
 
-s64 str8_find(Str8 haystack, Str8 needle) {
+internal s64
+func str8_find(Str8 haystack, Str8 needle) {
   s64 found = -1;
 
   for(s64 i = 0; i < haystack.len - needle.len; i++) {
@@ -194,7 +205,8 @@ s64 str8_find(Str8 haystack, Str8 needle) {
   return found;
 }
 
-s64 str8_find_char(Str8 haystack, u8 needle) {
+internal s64
+func str8_find_char(Str8 haystack, u8 needle) {
   s64 found = -1;
 
   for(s64 i = 0; i < haystack.len; i++) {
@@ -209,7 +221,8 @@ s64 str8_find_char(Str8 haystack, u8 needle) {
   return found;
 }
 
-s64 str8_find_first_whitespace(Str8 haystack) {
+internal s64
+func str8_find_first_whitespace(Str8 haystack) {
   s64 found = -1;
 
   for(s64 i = 0; i < haystack.len; i++) {
@@ -224,12 +237,13 @@ s64 str8_find_first_whitespace(Str8 haystack) {
   return found;
 }
 
-Str8_Find_Results str8_find_all_chars(Arena *a, Str8 haystack, u8 needle, Arena *output_arena) {
-  Str8_Find_Results results = {0};
+internal Str8_FindResults
+func str8_find_all_chars(Arena *a, Str8 haystack, u8 needle, Arena *output_arena) {
+  Str8_FindResults results = {0};
 
   ASSERT(a != output_arena);
 
-  Scope scope = arena_scope_begin(a);
+  Arena_Scope scope = arena_scope_begin(a);
 
   Arr(s64) begin_indexes;
   Arr(s64) end_indexes;
@@ -262,12 +276,13 @@ Str8_Find_Results str8_find_all_chars(Arena *a, Str8 haystack, u8 needle, Arena 
   return results;
 }
 
-Str8_Find_Results str8_find_all(Arena *a, Str8 haystack, Str8 needle, Arena *output_arena) {
-  Str8_Find_Results results = {0};
+internal Str8_FindResults
+func str8_find_all(Arena *a, Str8 haystack, Str8 needle, Arena *output_arena) {
+  Str8_FindResults results = {0};
 
   ASSERT(a != output_arena);
 
-  Scope scope = arena_scope_begin(a);
+  Arena_Scope scope = arena_scope_begin(a);
 
   Arr(s64) begin_indexes;
   Arr(s64) end_indexes;
@@ -305,7 +320,8 @@ Str8_Find_Results str8_find_all(Arena *a, Str8 haystack, Str8 needle, Arena *out
   return results;
 }
 
-b32 str8_starts_with(Str8 str, Str8 start) {
+internal b32
+func str8_starts_with(Str8 str, Str8 start) {
   b32 result = 0;
 
   if(str.len >= start.len) {
@@ -317,7 +333,8 @@ b32 str8_starts_with(Str8 str, Str8 start) {
   return result;
 }
 
-b32 str8_ends_with(Str8 str, Str8 end) {
+internal b32
+func str8_ends_with(Str8 str, Str8 end) {
   b32 result = 0;
 
   if(str.len >= end.len) {
@@ -332,7 +349,8 @@ b32 str8_ends_with(Str8 str, Str8 end) {
   return result;
 }
 
-b32 str8_is_cident(Str8 str) {
+internal b32
+func str8_is_cident(Str8 str) {
   b32 result = 1;
 
   if(!is_alpha(str.s[0]) && str.s[0] != '_') {
@@ -351,7 +369,8 @@ b32 str8_is_cident(Str8 str) {
   return result;
 }
 
-b32 str8_is_decimal(Str8 str) {
+internal b32
+func str8_is_decimal(Str8 str) {
   b32 result = 1;
 
   for(int i = 0; i < str.len; i++) {
@@ -364,7 +383,8 @@ b32 str8_is_decimal(Str8 str) {
   return result;
 }
 
-Str8 str8_match_begin_int(Str8 str, int base) {
+internal Str8
+func str8_match_begin_int(Str8 str, int base) {
   Str8 result = {0};
   s64 i = 0;
 
@@ -393,7 +413,8 @@ Str8 str8_match_begin_int(Str8 str, int base) {
   return result;
 }
 
-u64 str8_parse_int(Str8 str, int base) {
+internal u64
+func str8_parse_int(Str8 str, int base) {
   u64 result;
   switch(base) {
     default:
@@ -412,7 +433,8 @@ u64 str8_parse_int(Str8 str, int base) {
   return result;
 }
 
-u64 str8_parse_int_decimal(Str8 str) {
+internal u64
+func str8_parse_int_decimal(Str8 str) {
   u64 result = 0;
 
   for(int i = 0; i < str.len; i++) {
@@ -423,48 +445,56 @@ u64 str8_parse_int_decimal(Str8 str) {
   return result;
 }
 
-u64 str8_parse_int_binary(Str8 str) {
+internal u64
+func str8_parse_int_binary(Str8 str) {
   UNIMPLEMENTED;
   return 0;
 }
 
-u64 str8_parse_int_hex(Str8 str) {
+internal u64
+func str8_parse_int_hex(Str8 str) {
   UNIMPLEMENTED;
   return 0;
 }
 
 
-Str8 str8_match_begin_float(Str8 str) {
+internal Str8
+func str8_match_begin_float(Str8 str) {
   Str8 result = {0};
   UNIMPLEMENTED;
   return result;
 }
 
-f64 str8_parse_float(Str8 str) {
+internal f64
+func str8_parse_float(Str8 str) {
   f64 result = 0.0f;
   UNIMPLEMENTED;
   return result;
 }
 
-Str8 str8_copy(Arena *a, Str8 str) {
+internal Str8
+func str8_copy(Arena *a, Str8 str) {
   u8 *s = push_array_no_zero(a, u8, str.len + 1);
   memory_copy(s, str.s, str.len);
   s[str.len] = 0;
   return (Str8) { .s = s, .len = str.len };
 }
 
-force_inline Str8 str8_copy_cstr(Arena *a, char *cstr) {
+internal force_inline Str8
+func str8_copy_cstr(Arena *a, char *cstr) {
   Str8 str = { .s = (u8*)cstr, .len = memory_strlen(cstr) };
   return str8_copy(a, str);
 }
 
-force_inline char* cstr_copy_str8(Arena *a, Str8 str) {
+internal force_inline char*
+func cstr_copy_str8(Arena *a, Str8 str) {
   Str8 s_ = str8_copy(a, str);
   char *s = (char*)s_.s;
   return s;
 }
 
-Str8 str8fv(Arena *a, char *fmt, va_list args) {
+internal Str8
+func str8fv(Arena *a, char *fmt, va_list args) {
   va_list args2;
   va_copy(args2, args);
   u32 needed_bytes = str_vsnprintf(0, 0, fmt, args) + 1;
@@ -476,7 +506,8 @@ Str8 str8fv(Arena *a, char *fmt, va_list args) {
   return result;
 }
 
-Str8 str8f(Arena *a, char *fmt, ...) {
+internal Str8
+func str8f(Arena *a, char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
   Str8 result = str8fv(a, fmt, args);
@@ -484,7 +515,8 @@ Str8 str8f(Arena *a, char *fmt, ...) {
   return result;
 }
 
-char* cstrf(Arena *a, char *fmt, ...) {
+internal char*
+func cstrf(Arena *a, char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
   Str8 result = str8fv(a, fmt, args);
@@ -492,7 +524,8 @@ char* cstrf(Arena *a, char *fmt, ...) {
   return (char*)(result.s);
 }
 
-Str8 str8_to_lower(Arena *a, Str8 str) {
+internal Str8
+func str8_to_lower(Arena *a, Str8 str) {
   Str8 lower_str = str8_copy(a, str);
 
   for(int i = 0; i < lower_str.len; i++) {
@@ -503,7 +536,8 @@ Str8 str8_to_lower(Arena *a, Str8 str) {
   return lower_str;
 }
 
-Str8 str8_to_upper(Arena *a, Str8 str) {
+internal Str8
+func str8_to_upper(Arena *a, Str8 str) {
   Str8 upper_str = str8_copy(a, str);
 
   for(int i = 0; i < upper_str.len; i++) {
@@ -514,7 +548,8 @@ Str8 str8_to_upper(Arena *a, Str8 str) {
   return upper_str;
 }
 
-Str8 str8_chop_last_slash(Str8 str) {
+internal Str8
+func str8_chop_last_slash(Str8 str) {
   if(str.len > 0) {
     u8 *ptr = str.s + str.len - 1;
     for(;ptr >= str.s; ptr -= 1) {
@@ -534,7 +569,8 @@ Str8 str8_chop_last_slash(Str8 str) {
   return str;
 }
 
-Str8_List str8_split_by_chars(Arena *a, Str8 str, u8 *sep_chars, s64 n_sep_chars) {
+internal Str8_List
+func str8_split_by_chars(Arena *a, Str8 str, u8 *sep_chars, s64 n_sep_chars) {
   Str8_List result = {0};
   Str8_Node head = {0};
   Str8_Node *node = &head;
@@ -592,11 +628,13 @@ Str8_List str8_split_by_chars(Arena *a, Str8 str, u8 *sep_chars, s64 n_sep_chars
   return result;
 }
 
-force_inline Str8_List str8_split_by_char(Arena *a, Str8 str, u8 sep_char) {
+internal force_inline Str8_List
+func str8_split_by_char(Arena *a, Str8 str, u8 sep_char) {
   return str8_split_by_chars(a, str, &sep_char, 1);
 }
 
-Str8_List str8_split_by_str(Arena *a, Str8 str, Str8 sep) {
+internal Str8_List
+func str8_split_by_str(Arena *a, Str8 str, Str8 sep) {
   Str8_List result = {0};
   Str8_Node head = {0};
   Str8_Node *node = &head;
@@ -655,7 +693,8 @@ Str8_List str8_split_by_str(Arena *a, Str8 str, Str8 sep) {
   return result;
 }
 
-Str8 str8_cstr_capped(void *cstr, void *cap) {
+internal Str8
+func str8_cstr_capped(void *cstr, void *cap) {
   char *ptr = (char *)cstr;
   char *opl = (char *)cap;
   for(;ptr < opl && *ptr != 0; ptr += 1);

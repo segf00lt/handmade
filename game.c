@@ -2,7 +2,8 @@
 #define GAME_C
 
 
-void render_weird_gradient(Game *gp, int x_offset, int y_offset) {
+internal void
+func render_weird_gradient(Game *gp, int x_offset, int y_offset) {
   u8 *row = gp->render.pixels;
   for(int y = 0; y < gp->render.height; y++) {
     u32 *pixel = (u32*)row;
@@ -27,20 +28,23 @@ void render_weird_gradient(Game *gp, int x_offset, int y_offset) {
 }
 
 
-b32 game_was_key_pressed_once(Game *gp, KeyboardKey key) {
+internal b32
+func game_was_key_pressed_once(Game *gp, KeyboardKey key) {
   return !!(gp->input.key_pressed[key] == 1);
 }
 
-b32 game_is_key_pressed(Game *gp, KeyboardKey key) {
+internal b32
+func game_is_key_pressed(Game *gp, KeyboardKey key) {
   return !!(gp->input.key_pressed[key] > 0);
 }
 
-b32 game_was_key_released(Game *gp, KeyboardKey key) {
+internal b32
+func game_was_key_released(Game *gp, KeyboardKey key) {
   return (gp->input.key_released[key] == true);
 }
 
-
-void game_output_sound(Game *gp) {
+internal void
+func game_output_sound(Game *gp) {
   Game_SoundBuffer *sound_buffer = &gp->sound;
 
   local_persist f32 t_sine;
@@ -61,7 +65,19 @@ void game_output_sound(Game *gp) {
 
 }
 
-void game_update_and_render(Game *gp) {
+internal void
+func game_update_and_render(Game *gp) {
+
+  local_persist b32 once = true;
+  if(once) {
+    once = false;
+
+    Str8 test_file_data = DEBUG_platform_read_entire_file(str8_lit("game.c"));
+    if(DEBUG_platform_write_entire_file(test_file_data, str8_lit("copy_of_game.txt"))) {
+      OutputDebugStringA("cowabunga file copied\n");
+    }
+  }
+
 
   { /* get keyboard and mouse input */
 

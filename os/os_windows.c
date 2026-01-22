@@ -11,7 +11,8 @@
 #include <direct.h>
 #include <shellapi.h>
 
-void* os_alloc(u64 bytes) {
+internal void*
+func os_alloc(u64 bytes) {
   void *result = (void*)VirtualAlloc(
     0,
     (SIZE_T)bytes,
@@ -21,11 +22,13 @@ void* os_alloc(u64 bytes) {
   return result;
 }
 
-void os_free(void *ptr) {
+internal void
+func os_free(void *ptr) {
   VirtualFree(ptr, 0, MEM_RELEASE);
 }
 
-Str8 os_read_entire_file(Arena *a, Str8 path) {
+internal Str8
+func os_read_entire_file(Arena *a, Str8 path) {
   Str8 result = {0};
 
   FILE *f = 0;
@@ -71,7 +74,8 @@ end:
   return result;
 }
 
-b32 os_file_exists(Arena *a, Str8 path) {
+internal b32
+func os_file_exists(Arena *a, Str8 path) {
   b32 result = 0;
 
   arena_scope(a) {
@@ -83,7 +87,8 @@ b32 os_file_exists(Arena *a, Str8 path) {
   return result;
 }
 
-Str8 os_get_current_dir(Arena *a) {
+internal Str8
+func os_get_current_dir(Arena *a) {
   DWORD buf_size = GetCurrentDirectory(0, NULL);
   ASSERT(buf_size > 0);
 
@@ -95,7 +100,8 @@ Str8 os_get_current_dir(Arena *a) {
   return result;
 }
 
-b32 os_set_current_dir_cstr(char *dir_path_cstr) {
+internal b32
+func os_set_current_dir_cstr(char *dir_path_cstr) {
   b32 result = 0;
 
   result = SetCurrentDirectory(dir_path_cstr);
@@ -103,7 +109,8 @@ b32 os_set_current_dir_cstr(char *dir_path_cstr) {
   return result;
 }
 
-b32 os_move_file(Arena *a, Str8 old_path, Str8 new_path) {
+internal b32
+func os_move_file(Arena *a, Str8 old_path, Str8 new_path) {
   b32 result = 0;
 
   arena_scope(a) {
@@ -116,7 +123,8 @@ b32 os_move_file(Arena *a, Str8 old_path, Str8 new_path) {
   return result;
 }
 
-b32 os_remove_file(Arena *a, Str8 path) {
+internal b32
+func os_remove_file(Arena *a, Str8 path) {
   b32 result = 1;
 
   arena_scope(a) {
@@ -129,7 +137,8 @@ b32 os_remove_file(Arena *a, Str8 path) {
   return result;
 }
 
-void* os_library_load(Arena *a, Str8 path) {
+internal void*
+func os_library_load(Arena *a, Str8 path) {
   void *lib = 0;
 
   arena_scope(a) {
@@ -141,11 +150,13 @@ void* os_library_load(Arena *a, Str8 path) {
   return lib;
 }
 
-void os_library_unload(void* lib) {
+internal void
+func os_library_unload(void* lib) {
   FreeLibrary((HMODULE)lib);
 }
 
-Void_Func* os_library_load_func(Arena *a, void* lib, Str8 name) {
+internal Void_Func*
+func os_library_load_func(Arena *a, void* lib, Str8 name) {
   Void_Func *fn = 0;
 
   arena_scope(a) {
@@ -157,7 +168,8 @@ Void_Func* os_library_load_func(Arena *a, void* lib, Str8 name) {
   return fn;
 }
 
-b32 os_make_dir(Arena *a, Str8 path) {
+internal b32
+func os_make_dir(Arena *a, Str8 path) {
   b32 result = 0;
   arena_scope(a) {
     result = _mkdir(cstr_copy_str8(a, path));

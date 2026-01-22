@@ -91,11 +91,11 @@ struct name {                 \
 #define slice_last arr_last
 #define slice_stride arr_stride
 
-void  arr_init_(__Arr_Header *arr, Arena *arena, s64 stride, s64 cap);
-void* arr_push_no_zero_(__Arr_Header *arr, s64 stride, s64 push_count);
+internal void  arr_init_(__Arr_Header *arr, Arena *arena, s64 stride, s64 cap);
+internal void* arr_push_no_zero_(__Arr_Header *arr, s64 stride, s64 push_count);
 
-u64 hash_key(Str8 key);
-s64 arr_dict_put_(__Arr_Header *dict_array, u64 stride, u64 key_offset, Str8 new_key);
-s64 arr_dict_get_(__Arr_Header *dict_array, u64 stride, u64 key_offset, Str8 key);
+internal u64 hash_key(Str8 key);
+internal s64 arr_dict_put_(__Arr_Header *dict_array, u64 stride, u64 key_offset, Str8 new_key);
+internal s64 arr_dict_get_(__Arr_Header *dict_array, u64 stride, u64 key_offset, Str8 key);
 
 #endif

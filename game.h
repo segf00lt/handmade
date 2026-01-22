@@ -2,6 +2,10 @@
 #define GAME_H
 
 
+// NOTE jfd 22/01/2026:
+// This file contains game interfaces that the platform will call in to
+
+
 typedef struct Game_SoundBuffer Game_SoundBuffer;
 struct Game_SoundBuffer {
   int samples_per_second;
@@ -46,13 +50,13 @@ struct Game {
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
 #define GAME_STATE_SIZE ((u64)MB(1))
 
-void game_update_and_render(Game *gp);
+internal void game_update_and_render(Game *gp);
 
-b32  game_is_key_pressed(Game *gp, KeyboardKey key);
-b32  game_was_key_pressed_once(Game *gp, KeyboardKey key);
-b32  game_was_key_released(Game *gp, KeyboardKey key);
+internal b32 game_is_key_pressed(Game *gp, KeyboardKey key);
+internal b32 game_was_key_pressed_once(Game *gp, KeyboardKey key);
+internal b32 game_was_key_released(Game *gp, KeyboardKey key);
 
-void render_weird_gradient(Game *gp, int x_offset, int y_offset);
+internal void render_weird_gradient(Game *gp, int x_offset, int y_offset);
 
 
 #endif

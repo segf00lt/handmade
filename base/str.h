@@ -27,8 +27,8 @@ struct Str8_List {
   s64 total_len;
 };
 
-typedef struct Str8_Find_Results Str8_Find_Results;
-struct Str8_Find_Results {
+typedef struct Str8_FindResults Str8_FindResults;
+struct Str8_FindResults {
   s64 *begin_indexes;
   s64 *end_indexes;
   s64 count;
@@ -37,38 +37,38 @@ struct Str8_Find_Results {
 #define str8_lit(strlit) ((Str8){ .s = (u8*)(strlit), .len = sizeof(strlit) - 1 })
 
 #define str8_match_lit(a_lit, b) str8_match(str8_lit(a_lit), b)
-b32 str8_match(Str8 a_str, Str8 b_str);
-b32 str8_starts_with(Str8 str, Str8 start);
-b32 str8_ends_with(Str8 str, Str8 end);
-b32 str8_contains(Str8 str, Str8 substr);
-s64 str8_find(Str8 haystack, Str8 needle);
-s64 str8_find_char(Str8 haystack, u8 needle);
-s64 str8_find_first_whitespace(Str8 haystack);
+internal b32 str8_match(Str8 a_str, Str8 b_str);
+internal b32 str8_starts_with(Str8 str, Str8 start);
+internal b32 str8_ends_with(Str8 str, Str8 end);
+internal b32 str8_contains(Str8 str, Str8 substr);
+internal s64 str8_find(Str8 haystack, Str8 needle);
+internal s64 str8_find_char(Str8 haystack, u8 needle);
+internal s64 str8_find_first_whitespace(Str8 haystack);
 
-Str8_Find_Results str8_find_all_chars(Arena *scratch, Str8 haystack, u8 needle, Arena *output_arena);
-Str8_Find_Results str8_find_all(Arena *scratch, Str8 haystack, Str8 needle, Arena *output_arena);
+internal Str8_FindResults str8_find_all_chars(Arena *scratch, Str8 haystack, u8 needle, Arena *output_arena);
+internal Str8_FindResults str8_find_all(Arena *scratch, Str8 haystack, Str8 needle, Arena *output_arena);
 
-Str8 str8_cat(Arena *a, Str8 str1, Str8 str2);
+internal Str8 str8_cat(Arena *a, Str8 str1, Str8 str2);
 
-b32 str8_is_cident(Str8 str);
-b32 str8_is_alpha(Str8 str);
-b32 str8_is_numeric(Str8 str, int base);
-b32 str8_is_decimal(Str8 str);
+internal b32 str8_is_cident(Str8 str);
+internal b32 str8_is_alpha(Str8 str);
+internal b32 str8_is_numeric(Str8 str, int base);
+internal b32 str8_is_decimal(Str8 str);
 
-Str8 str8_match_begin_int(Str8 str, int base);
-Str8 str8_match_begin_float(Str8 str);
+internal Str8 str8_match_begin_int(Str8 str, int base);
+internal Str8 str8_match_begin_float(Str8 str);
 
-u64 str8_parse_int(Str8 str, int base);
-u64 str8_parse_int_decimal(Str8 str);
-u64 str8_parse_int_binary(Str8 str);
-u64 str8_parse_int_hex(Str8 str);
+internal u64 str8_parse_int(Str8 str, int base);
+internal u64 str8_parse_int_decimal(Str8 str);
+internal u64 str8_parse_int_binary(Str8 str);
+internal u64 str8_parse_int_hex(Str8 str);
 
-f64 str8_parse_float(Str8 str);
+internal f64 str8_parse_float(Str8 str);
 
-Str8 str8_to_upper(Arena *a, Str8 str);
-Str8 str8_to_lower(Arena *a, Str8 str);
+internal Str8 str8_to_upper(Arena *a, Str8 str);
+internal Str8 str8_to_lower(Arena *a, Str8 str);
 
-Str8 str8_slice(Str8 str, s64 begin, s64 end);
+internal Str8 str8_slice(Str8 str, s64 begin, s64 end);
 
 #define is_space(c) (!!('\0' <= (c) && (c) <= ' '))
 #define is_upper(c) (!!('A' <= (c) && (c) <= 'Z'))
@@ -84,32 +84,32 @@ Str8 str8_slice(Str8 str, s64 begin, s64 end);
 
 #define str8_split_by_chars_lit(a, str, sep_chars_lit) str8_split_by_chars(a, str, (u8*)sep_chars_lit, (s64)sizeof(sep_chars_lit))
 #define str8_split_by_string_lit(a, str, sep) str8_split_by_string(a, str, str8_lit(sep))
-Str8_List str8_split_by_string(Arena *a, Str8 str, Str8 sep);
-Str8_List str8_split_by_chars(Arena *a, Str8 str, u8 *sep_chars, s64 n_sep_chars);
-Str8_List str8_split_by_char(Arena *a, Str8 str, u8 sep_char);
+internal Str8_List str8_split_by_string(Arena *a, Str8 str, Str8 sep);
+internal Str8_List str8_split_by_chars(Arena *a, Str8 str, u8 *sep_chars, s64 n_sep_chars);
+internal Str8_List str8_split_by_char(Arena *a, Str8 str, u8 sep_char);
 
-Str8 str8_cstr_capped(void *cstr, void *cap);
+internal Str8 str8_cstr_capped(void *cstr, void *cap);
 
-Str8 str8_chop_last_slash(Str8 str);
+internal Str8 str8_chop_last_slash(Str8 str);
 
 #define str8_list_append_node(list, node) str8_list_append_node_(&(list), node)
-void str8_list_append_node_(Str8_List *list, Str8_Node *node);
+internal void str8_list_append_node_(Str8_List *list, Str8_Node *node);
 
 #define str8_list_append_str(a, list, str) str8_list_append_str_(a, &(list), str)
-void str8_list_append_str_(Arena *a, Str8_List *list, Str8 str);
+internal void str8_list_append_str_(Arena *a, Str8_List *list, Str8 str);
 
-Str8 str8_list_join(Arena *a, Str8_List list, Str8 sep);
+internal Str8 str8_list_join(Arena *a, Str8_List list, Str8 sep);
 
-Str8_List str8_list_copy(Arena *a, Str8_List list);
+internal Str8_List str8_list_copy(Arena *a, Str8_List list);
 
-Str8  str8_copy(Arena *a, Str8 str);
-Str8  str8_copy_cstr(Arena *a, char *cstr);
-Str8  str8fv(Arena *a, char *fmt, va_list args);
-Str8  str8f(Arena *a, char *fmt, ...);
-char* cstr_copy_str8(Arena *a, Str8 str);
-char* cstrf(Arena *a, char *fmt, ...);
+internal Str8  str8_copy(Arena *a, Str8 str);
+internal Str8  str8_copy_cstr(Arena *a, char *cstr);
+internal Str8  str8fv(Arena *a, char *fmt, va_list args);
+internal Str8  str8f(Arena *a, char *fmt, ...);
+internal char* cstr_copy_str8(Arena *a, Str8 str);
+internal char* cstrf(Arena *a, char *fmt, ...);
 
 #define str8_list_insert_first_str(a, list, str) str8_list_insert_first_str_(a, &(list), str)
-void str8_list_insert_first_str_(Arena *a, Str8_List *list, Str8 str);
+internal void str8_list_insert_first_str_(Arena *a, Str8_List *list, Str8 str);
 
 #endif

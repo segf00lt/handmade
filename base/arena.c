@@ -2,7 +2,8 @@
 #define ARENA_C
 
 
-Arena* arena_create_ex(u64 size, b32 cannot_chain, void *backing_buffer) {
+internal Arena*
+func arena_create_ex(u64 size, b32 cannot_chain, void *backing_buffer) {
   b32 has_backing_buffer = 0;
   void *base = backing_buffer;
 
@@ -30,7 +31,8 @@ Arena* arena_create_ex(u64 size, b32 cannot_chain, void *backing_buffer) {
   return arena;
 }
 
-void arena_destroy(Arena *arena) {
+internal void
+func arena_destroy(Arena *arena) {
   ASSERT(arena);
 
   if(arena->has_backing_buffer) return;
@@ -47,7 +49,8 @@ void arena_destroy(Arena *arena) {
 
 }
 
-void *arena_push(Arena *arena, u64 size, u64 align) {
+internal void*
+func arena_push(Arena *arena, u64 size, u64 align) {
   ASSERT(arena);
 
   Arena *cur = arena->cur;
@@ -98,7 +101,8 @@ void *arena_push(Arena *arena, u64 size, u64 align) {
   return result;
 }
 
-u64 arena_pos(Arena *arena) {
+internal u64
+func arena_pos(Arena *arena) {
   ASSERT(arena);
 
   Arena *cur = arena->cur;
@@ -106,7 +110,8 @@ u64 arena_pos(Arena *arena) {
   return pos;
 }
 
-void arena_pop_to(Arena *arena, u64 pos) {
+internal void
+func arena_pop_to(Arena *arena, u64 pos) {
   ASSERT(arena);
 
   u64 big_pos = CLAMP_BOT(ARENA_HEADER_SIZE, pos);
@@ -124,11 +129,13 @@ void arena_pop_to(Arena *arena, u64 pos) {
   cur->pos = new_pos;
 }
 
-void arena_clear(Arena *arena) {
+internal void
+func arena_clear(Arena *arena) {
   arena_pop_to(arena, 0);
 }
 
-void arena_pop(Arena *arena, u64 amount) {
+internal void
+func arena_pop(Arena *arena, u64 amount) {
   u64 old_pos = arena_pos(arena);
   u64 new_pos = old_pos;
   if(amount < old_pos) {
@@ -137,13 +144,15 @@ void arena_pop(Arena *arena, u64 amount) {
   arena_pop_to(arena, new_pos);
 }
 
-Scope arena_scope_begin(Arena *arena) {
+internal Arena_Scope
+func arena_scope_begin(Arena *arena) {
   u64 pos = arena_pos(arena);
-  Scope scope = { arena, pos };
+  Arena_Scope scope = { arena, pos };
   return scope;
 }
 
-void arena_scope_end(Scope scope) {
+internal void
+func arena_scope_end(Arena_Scope scope) {
   arena_pop_to(scope.arena, scope.pos);
 }
 

@@ -1,14 +1,16 @@
 #ifndef ARRAY_C
 #define ARRAY_C
 
-void arr_init_(__Arr_Header *arr, Arena *arena, s64 stride, s64 cap) {
+internal void
+func arr_init_(__Arr_Header *arr, Arena *arena, s64 stride, s64 cap) {
   arr->count = 0;
   arr->cap = cap;
   arr->arena = arena;
   arr->d = arena_push(arena, cap * stride, 1);
 }
 
-void* arr_push_no_zero_(__Arr_Header *arr, s64 stride, s64 push_count) {
+internal void*
+func arr_push_no_zero_(__Arr_Header *arr, s64 stride, s64 push_count) {
   ASSERT(arr->d && arr->cap && arr->arena);
 
   if(arr->count + push_count >= arr->cap) {
@@ -30,7 +32,8 @@ void* arr_push_no_zero_(__Arr_Header *arr, s64 stride, s64 push_count) {
   return result;
 }
 
-s64 arr_dict_put_(__Arr_Header *dict_array, u64 stride, u64 key_offset, Str8 new_key) {
+internal s64
+func arr_dict_put_(__Arr_Header *dict_array, u64 stride, u64 key_offset, Str8 new_key) {
   ASSERT(dict_array->d && dict_array->cap && dict_array->arena);
   ASSERT((u64)stride > sizeof(Str8));
 
@@ -110,7 +113,8 @@ s64 arr_dict_put_(__Arr_Header *dict_array, u64 stride, u64 key_offset, Str8 new
   return new_key_pos;
 }
 
-s64 arr_dict_get_(__Arr_Header *dict_array, u64 stride, u64 key_offset, Str8 key) {
+internal s64
+func arr_dict_get_(__Arr_Header *dict_array, u64 stride, u64 key_offset, Str8 key) {
   u64 hash = hash_key(key);
   s64 pos = hash % dict_array->cap;
   s64 pos_byte_offset = pos * stride;
@@ -131,7 +135,8 @@ s64 arr_dict_get_(__Arr_Header *dict_array, u64 stride, u64 key_offset, Str8 key
   return pos;
 }
 
-u64 hash_key(Str8 key) {
+internal u64
+func hash_key(Str8 key) {
   u64 hash = 0;
   for(s64 i = 0; i < key.len; i++) {
     hash += (key.s[i] * 37) >> 1;

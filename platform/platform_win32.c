@@ -2,14 +2,17 @@
 #define PLATFORM_WIN32_C
 
 
+// NOTE jfd 22/01/2026:
+// This file contains the global variables and function implementations for platform specific code.
+// DO NOT CALL THESE FROM GAME OR APP CODE
 
-/*
- * globals
- */
+/////////////////////////////////
+// globals
 
 global Arena *platform_main_arena;
 global Arena *platform_frame_arena;
 global Arena *platform_event_arena;
+global Arena *platform_file_arena;
 
 global PLTFM_WIN32_XInputGetStateFunc *platform_win32_xinput_get_state = _platform_win32_xinput_get_state_stub;
 global PLTFM_WIN32_XInputSetStateFunc *platform_win32_xinput_set_state = _platform_win32_xinput_set_state_stub;
@@ -28,12 +31,11 @@ global PLTFM_EventList _platform_event_list_stub;
 global PLTFM_EventList *platform_event_list = &_platform_event_list_stub;
 
 
-/*
- * functions
- */
+/////////////////////////////////
+// functions
 
-
-PLTFM_WIN32_WindowDimensions platform_win32_get_window_dimensions(HWND window_handle) {
+internal
+func PLTFM_WIN32_WindowDimensions platform_win32_get_window_dimensions(HWND window_handle) {
   RECT client_rect;
   GetClientRect(window_handle, &client_rect);
 
@@ -45,7 +47,8 @@ PLTFM_WIN32_WindowDimensions platform_win32_get_window_dimensions(HWND window_ha
   return window_dimensions;
 }
 
-void platform_win32_resize_backbuffer(PLTFM_WIN32_Backbuffer *backbuffer, int window_width, int window_height) {
+internal
+func void platform_win32_resize_backbuffer(PLTFM_WIN32_Backbuffer *backbuffer, int window_width, int window_height) {
   int width = window_width;
   int height = window_height;
   // TODO jfd: bulletproof this
@@ -73,7 +76,17 @@ void platform_win32_resize_backbuffer(PLTFM_WIN32_Backbuffer *backbuffer, int wi
   backbuffer->stride = backbuffer->bitmap_width * backbuffer->bytes_per_pixel;
 }
 
-void platform_win32_display_buffer_in_window(PLTFM_WIN32_Backbuffer *backbuffer, HDC device_context, int window_width, int window_height, int x, int y, int width, int height ) {
+internal void
+func platform_win32_display_buffer_in_window(
+  PLTFM_WIN32_Backbuffer *backbuffer,
+  HDC device_context,
+  int window_width,
+  int window_height,
+  int x,
+  int y,
+  int width,
+  int height
+) {
 
   StretchDIBits(
     device_context,
@@ -87,7 +100,8 @@ void platform_win32_display_buffer_in_window(PLTFM_WIN32_Backbuffer *backbuffer,
 
 }
 
-KeyboardModifier platform_get_keyboard_modifiers(void) {
+internal KeyboardModifier
+func platform_get_keyboard_modifiers(void) {
   KeyboardModifier modifier_mask = 0;
 
   if(GetKeyState(VK_CONTROL) & 0x8000) {
@@ -110,7 +124,8 @@ KeyboardModifier platform_get_keyboard_modifiers(void) {
 }
 
 
-PLTFM_Event* platform_win32_event_push(Arena *a, PLTFM_EventList *event_list, PLTFM_EventKind event_kind) {
+internal PLTFM_Event*
+func platform_win32_event_push(Arena *a, PLTFM_EventList *event_list, PLTFM_EventKind event_kind) {
   PLTFM_Event *event = push_struct_no_zero(a, PLTFM_Event);
   event->kind = event_kind;
   event->modifier_mask = platform_get_keyboard_modifiers();
@@ -120,7 +135,8 @@ PLTFM_Event* platform_win32_event_push(Arena *a, PLTFM_EventList *event_list, PL
 }
 
 
-PLTFM_Event* platform_win32_event_pop(PLTFM_EventList *event_list) {
+internal PLTFM_Event*
+func platform_win32_event_pop(PLTFM_EventList *event_list) {
   PLTFM_Event *event = event_list->last;
   sll_queue_pop(event_list->first, event_list->last);
   event_list->count--;
@@ -128,7 +144,8 @@ PLTFM_Event* platform_win32_event_pop(PLTFM_EventList *event_list) {
 }
 
 
-MouseButton platform_win32_mouse_button_from_virtual_keycode(WPARAM virtual_keycode) {
+internal MouseButton
+func platform_win32_mouse_button_from_virtual_keycode(WPARAM virtual_keycode) {
   MouseButton button = 0;
 
   switch(virtual_keycode) {
@@ -146,7 +163,8 @@ MouseButton platform_win32_mouse_button_from_virtual_keycode(WPARAM virtual_keyc
   return button;
 }
 
-KeyboardKey platform_win32_keyboard_key_from_virtual_keycode(WPARAM virtual_keycode) {
+internal KeyboardKey
+func platform_win32_keyboard_key_from_virtual_keycode(WPARAM virtual_keycode) {
   KeyboardKey key = 0;
 
   switch(virtual_keycode) {
@@ -518,7 +536,8 @@ KeyboardKey platform_win32_keyboard_key_from_virtual_keycode(WPARAM virtual_keyc
 
 
 // TODO jfd: mouse clicks and scroll wheel
-void platform_get_game_input_from_events(PLTFM_EventList *event_list, Game *gp) {
+internal void
+func platform_get_game_input_from_events(PLTFM_EventList *event_list, Game *gp) {
   Game_Input *input = &gp->input;
 
   memory_zero(input->key_released, sizeof(input->key_released));
@@ -578,8 +597,8 @@ void platform_get_game_input_from_events(PLTFM_EventList *event_list, Game *gp) 
 
 }
 
-// TODO jfd: Eventually we'll move this in to the gfx layer
-LRESULT CALLBACK platform_win32_main_window_callback(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+internal LRESULT CALLBACK
+func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
   LRESULT result = 0;
 
   switch(message) {
@@ -704,7 +723,8 @@ LRESULT CALLBACK platform_win32_main_window_callback(HWND window, UINT message, 
   return result;
 }
 
-void platform_win32_load_xinput(void) {
+internal void
+func platform_win32_load_xinput(void) {
   void *lib = os_library_load(platform_main_arena, str8_lit("Xinput1_4.dll"));
   if(lib) {
     platform_win32_xinput_get_state = (PLTFM_WIN32_XInputGetStateFunc*)os_library_load_func(platform_main_arena, lib, str8_lit("XInputGetState"));
@@ -712,7 +732,8 @@ void platform_win32_load_xinput(void) {
   }
 }
 
-void platform_win32_init_dsound(HWND window_handle, s32 sound_buffer_size, s32 samples_per_second) {
+internal void
+func platform_win32_init_dsound(HWND window_handle, s32 sound_buffer_size, s32 samples_per_second) {
   // NOTE jfd: load the library
 
   void *lib = os_library_load(platform_main_arena, str8_lit("dsound.dll"));
@@ -789,7 +810,8 @@ void platform_win32_init_dsound(HWND window_handle, s32 sound_buffer_size, s32 s
   }
 }
 
-void platform_win32_clear_sound_buffer(PLTFM_WIN32_SoundOutput *sound_output) {
+internal void
+func platform_win32_clear_sound_buffer(PLTFM_WIN32_SoundOutput *sound_output) {
   void *region1;
   DWORD region1_size;
   void *region2;
@@ -813,7 +835,8 @@ void platform_win32_clear_sound_buffer(PLTFM_WIN32_SoundOutput *sound_output) {
   }
 }
 
-void platform_win32_fill_sound_buffer(PLTFM_WIN32_SoundOutput *sound_output, DWORD byte_to_lock_at, DWORD bytes_to_write, Game_SoundBuffer *source_buffer) {
+internal void
+func platform_win32_fill_sound_buffer(PLTFM_WIN32_SoundOutput *sound_output, DWORD byte_to_lock_at, DWORD bytes_to_write, Game_SoundBuffer *source_buffer) {
 
   void *region1;
   DWORD region1_size;
@@ -858,7 +881,57 @@ void platform_win32_fill_sound_buffer(PLTFM_WIN32_SoundOutput *sound_output, DWO
 }
 
 
-int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode) {
+internal Str8
+func DEBUG_platform_read_entire_file(Str8 path) {
+  Str8 data;
+
+  Arena_Scope scope = arena_scope_begin(platform_file_arena);
+
+  char *path_cstr = cstr_copy_str8(platform_file_arena, path);
+
+  HANDLE file_handle = CreateFileA(path_cstr, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+  LARGE_INTEGER file_size;
+  b32 got_size = GetFileSizeEx(file_handle, &file_size);
+  ASSERT(got_size);
+  data.len = file_size.QuadPart;
+
+  arena_scope_end(scope);
+
+  data.s = push_array_no_zero(platform_file_arena, u8, data.len);
+  ASSERT(data.s);
+
+  DWORD bytes_read;
+  b32 read_file_success = ReadFile(file_handle, (void*)data.s, (s32)data.len, &bytes_read, 0);
+  ASSERT(read_file_success);
+  ASSERT((s64)bytes_read == data.len);
+
+  CloseHandle(file_handle);
+
+  return data;
+}
+
+internal b32
+func DEBUG_platform_write_entire_file(Str8 data, Str8 path) {
+
+  Arena_Scope scope = arena_scope_begin(platform_file_arena);
+
+  char *path_cstr = cstr_copy_str8(platform_file_arena, path);
+  HANDLE file_handle = CreateFileA(path_cstr, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
+
+  arena_scope_end(scope);
+
+  DWORD bytes_written;
+  b32 success = WriteFile(file_handle, (void*)data.s, (DWORD)data.len, &bytes_written, 0);
+  ASSERT((s64)bytes_written == data.len);
+
+  CloseHandle(file_handle);
+
+  return success;
+}
+
+
+int CALLBACK
+WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode) {
 
   LARGE_INTEGER performance_counter_frequency;
   QueryPerformanceFrequency(&performance_counter_frequency);
@@ -866,6 +939,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, 
   platform_main_arena  = arena_create(MB(5));
   platform_frame_arena = arena_create(KB(5));
   platform_event_arena = arena_create(KB(50));
+  platform_file_arena  = arena_create(GB(1));
 
   // os_win32_load_xinput();
 
