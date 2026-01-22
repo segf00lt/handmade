@@ -973,7 +973,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
   window_class.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
   window_class.lpfnWndProc = platform_win32_main_window_callback;
   window_class.hInstance = instance;
-  window_class.lpszClassName = "Handmade Hero Window Class";
+  window_class.lpszClassName = "Handmade Hero";
 
   // TODO jfd 22/01/2026: Redesign arena allocator to be recursive, and allocate from a fixed backing buffer provided by the OS
   Game *gp;
