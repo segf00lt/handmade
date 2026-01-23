@@ -9,6 +9,12 @@ func arr_init_(__Arr_Header *arr, Arena *arena, s64 stride, s64 cap) {
   arr->d = arena_push(arena, cap * stride, 1);
 }
 
+internal void
+func slice_init_(__Slice_Header *slice, Arena *arena, s64 stride, s64 count) {
+  slice->count = count;
+  slice->d = arena_push(arena, count * stride, 1);
+}
+
 internal void*
 func arr_push_no_zero_(__Arr_Header *arr, s64 stride, s64 push_count) {
   ASSERT(arr->d && arr->cap && arr->arena);

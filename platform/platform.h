@@ -7,14 +7,14 @@
 // It serves as a platform abstraction layer that contains only those things that the game
 // absolutely must be able to ask the platform for.
 
-typedef enum PLTFM_EventKind {
+typedef enum Platform_EventKind {
   EVENT_NULL = 0,
   EVENT_KEY_PRESS,
   EVENT_KEY_RELEASE,
   EVENT_MOUSE_MOVE,
   EVENT_MOUSE_CLICK,
   EVENT_MOUSE_SCROLL,
-} PLTFM_EventKind;
+} Platform_EventKind;
 
 typedef enum KeyboardModifierIndex {
   KBD_MOD_INDEX_NONE = -1,
@@ -125,11 +125,11 @@ typedef enum KeyboardKey {
 } KeyboardKey;
 
 
-typedef struct PLTFM_Event PLTFM_Event;
-struct PLTFM_Event {
-  PLTFM_Event *next;
-  PLTFM_Event *prev;
-  PLTFM_EventKind kind;
+typedef struct Platform_Event Platform_Event;
+struct Platform_Event {
+  Platform_Event *next;
+  Platform_Event *prev;
+  Platform_EventKind kind;
   KeyboardModifier modifier_mask;
   KeyboardKey key;
   MouseButton mouse_button;
@@ -140,11 +140,11 @@ struct PLTFM_Event {
   Vec2 scroll_delta;
 };
 
-typedef struct PLTFM_EventList PLTFM_EventList;
-struct PLTFM_EventList {
+typedef struct Platform_EventList Platform_EventList;
+struct Platform_EventList {
   s64 count;
-  PLTFM_Event *first;
-  PLTFM_Event *last;
+  Platform_Event *first;
+  Platform_Event *last;
 };
 
 internal KeyboardModifier platform_get_keyboard_modifiers(void);

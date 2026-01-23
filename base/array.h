@@ -16,16 +16,20 @@ struct __Slice_Header {
   s64 count;
 };
 
-#define DECL_ARR_TYPE(T) DECL_ARR_TYPE_NAME(T, Arr_##T)
-#define DECL_SLICE_TYPE(T) DECL_SLICE_TYPE_NAME(T, Slice_##T)
-
-#define DECL_ARR_TYPE_NAME(T, name) \
+#define TYPEDEF_ARRAY(T, name) \
 typedef struct name name; \
 struct name {                 \
   T *d;                           \
   s64 count;                      \
   s64 cap;                        \
   Arena *arena;                   \
+};                                \
+
+#define TYPEDEF_SLICE(T, name) \
+typedef struct name name; \
+struct name {                 \
+  T *d;                           \
+  s64 count;                      \
 };                                \
 
 #define ARRAY_DEFAULT_CAP 64
@@ -47,7 +51,7 @@ struct name {                 \
 #define arr_ptr_stride(array) ((s64)sizeof(*((array)->d)))
 
 #define arr_init(array, arena) arr_init_(header_ptr_from_arr((array)), arena, arr_stride(array), ARRAY_DEFAULT_CAP)
-#define arr_init_ex(array, arena, cap) arr_init_(header_ptr_from_arr((array)), arena, arr_stride(array), cap)
+#define arr_init_ex(array, arena, cap) arr_init_(header_ptr_from_arr((array)), arena, arr_stride(array), (cap))
 
 #define dict_init(dict, arena) dict_init_ex(dict, arena, DICT_DEFAULT_CAP)
 #define dict_init_ex(dict, arena, cap) (memory_zero(&((dict).nil_item), sizeof(*&(dict).nil_item)), arr_init_(header_ptr_from_arr((dict)), arena, dict_stride(dict), cap))
@@ -68,7 +72,6 @@ struct name {                 \
 #define arr_last_index(array) ( ( ((array).count > 0) ? ((array).count - 1) : (0) ) )
 #define arr_last(array) ( (array).d[ arr_last_index(array) ] )
 #define arr_last_ptr(array) ( &((array).d[ arr_last_index(array) ]) )
-
 
 // NOTE ~jfd 23/12/2025: unordered insert
 #define arr_insert_unordered(array, i, elem) \
@@ -91,8 +94,12 @@ struct name {                 \
 #define slice_last arr_last
 #define slice_stride arr_stride
 
+#define slice_init(slice, n, arena) (slice_init_(header_ptr_from_slice(slice), arena, slice_stride(slice), (n)), (slice).count = (s64)(n))
+
 internal void  arr_init_(__Arr_Header *arr, Arena *arena, s64 stride, s64 cap);
 internal void* arr_push_no_zero_(__Arr_Header *arr, s64 stride, s64 push_count);
+
+internal void  slice_init_(__Slice_Header *slice, Arena *arena, s64 stride, s64 count);
 
 internal u64 hash_key(Str8 key);
 internal s64 arr_dict_put_(__Arr_Header *dict_array, u64 stride, u64 key_offset, Str8 new_key);

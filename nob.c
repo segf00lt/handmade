@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
     "/wd4100",
     "/Zi",
     "/Od",
-    "/DGFX_ENABLED",
+    "/DHANDMADE_INTERNAL",
     "/Fe:handmade.exe",
     "handmade.c",
     "user32.lib",
