@@ -150,8 +150,8 @@ struct Platform_EventList {
 internal KeyboardModifier platform_get_keyboard_modifiers(void);
 internal b32              platform_is_modifier_key(KeyboardKey key);
 
-internal Str8 DEBUG_platform_read_entire_file(Str8 path);
-internal b32  DEBUG_platform_write_entire_file(Str8 data, Str8 path);
+internal Str8 platform_debug_read_entire_file(Str8 path);
+internal b32  platform_debug_write_entire_file(Str8 data, Str8 path);
 
 
 #endif

@@ -818,7 +818,7 @@ func platform_win32_init_dsound(HWND window_handle, s32 sound_buffer_size, s32 s
 }
 
 internal void
-func DEBUG_platform_win32_draw_vertical_line(PlatformWin32_Backbuffer *backbuffer, int x, int top, int bottom, u32 color) {
+func platform_win32_debug_draw_vertical_line(PlatformWin32_Backbuffer *backbuffer, int x, int top, int bottom, u32 color) {
   u8 *pixel = (u8*)backbuffer->bitmap_memory + x*backbuffer->bytes_per_pixel + top*backbuffer->stride;
   for(int y = top; y < bottom; y++) {
     *(u32*)pixel = color;
@@ -827,7 +827,7 @@ func DEBUG_platform_win32_draw_vertical_line(PlatformWin32_Backbuffer *backbuffe
 }
 
 internal void
-func DEBUG_platform_win32_draw_sound_buffer_marker(
+func platform_win32_debug_draw_sound_buffer_marker(
   PlatformWin32_Backbuffer *backbuffer,
   PlatformWin32_SoundOutput *sound_output,
   f32 c,
@@ -840,11 +840,11 @@ func DEBUG_platform_win32_draw_sound_buffer_marker(
   ASSERT(value < sound_output->buffer_size);
   f32 x_float_val = c * (f32)value;
   int x = padding_x + (int)x_float_val;
-  DEBUG_platform_win32_draw_vertical_line(backbuffer, x, top, bottom, color);
+  platform_win32_debug_draw_vertical_line(backbuffer, x, top, bottom, color);
 }
 
 internal void
-func DEBUG_platform_win32_sync_display(
+func platform_win32_debug_sync_display(
   PlatformWin32_Backbuffer *backbuffer,
   PlatformWin32_SoundOutput *sound_output,
   PlatformWin32Debug_TimeMarkerSlice markers,
@@ -860,8 +860,8 @@ func DEBUG_platform_win32_sync_display(
 
   for(int marker_index = 0; marker_index < markers.count; marker_index++) {
     PlatformWin32Debug_TimeMarker *this_marker = &markers.d[marker_index];
-    DEBUG_platform_win32_draw_sound_buffer_marker(backbuffer, sound_output, c, padding_x, top, bottom, this_marker->play_cursor, 0xffffffff);
-    DEBUG_platform_win32_draw_sound_buffer_marker(backbuffer, sound_output, c, padding_x, top, bottom, this_marker->write_cursor, 0xff00ff00);
+    platform_win32_debug_draw_sound_buffer_marker(backbuffer, sound_output, c, padding_x, top, bottom, this_marker->play_cursor, 0xffffffff);
+    platform_win32_debug_draw_sound_buffer_marker(backbuffer, sound_output, c, padding_x, top, bottom, this_marker->write_cursor, 0xff00ff00);
   }
 
 }
@@ -939,7 +939,7 @@ func platform_win32_fill_sound_buffer(PlatformWin32_SoundOutput *sound_output, D
 
 
 internal Str8
-func DEBUG_platform_read_entire_file(Str8 path) {
+func platform_debug_read_entire_file(Str8 path) {
   Str8 data;
 
   Arena_Scope scope = arena_scope_begin(platform_file_arena);
@@ -968,7 +968,7 @@ func DEBUG_platform_read_entire_file(Str8 path) {
 }
 
 internal b32
-func DEBUG_platform_write_entire_file(Str8 data, Str8 path) {
+func platform_debug_write_entire_file(Str8 data, Str8 path) {
 
   Arena_Scope scope = arena_scope_begin(platform_file_arena);
 
@@ -1088,9 +1088,9 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
       platform_is_running = true;
 
-      int DEBUG_time_marker_index = 0;
-      PlatformWin32Debug_TimeMarkerSlice DEBUG_time_markers;
-      slice_init(DEBUG_time_markers, game_update_hz / 2, platform_debug_arena);
+      int debug_time_marker_index = 0;
+      PlatformWin32Debug_TimeMarkerSlice debug_time_markers;
+      slice_init(debug_time_markers, game_update_hz / 2, platform_debug_arena);
 
       LARGE_INTEGER last_counter = platform_win32_get_wall_clock();
 
@@ -1251,7 +1251,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
           PlatformWin32_WindowDimensions window_dimensions = platform_win32_get_window_dimensions(window_handle);
 
           #ifdef HANDMADE_INTERNAL
-          DEBUG_platform_win32_sync_display(&global_backbuffer, platform_sound_output, DEBUG_time_markers, target_seconds_per_frame);
+          platform_win32_debug_sync_display(&global_backbuffer, platform_sound_output, debug_time_markers, target_seconds_per_frame);
           #endif
 
           platform_win32_display_buffer_in_window(&global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, 0, 0, window_dimensions.width, window_dimensions.height);
@@ -1273,10 +1273,10 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
         #ifdef HANDMADE_INTERNAL
         {
-          ASSERT(DEBUG_time_marker_index < DEBUG_time_markers.count);
-          PlatformWin32Debug_TimeMarker *marker = &DEBUG_time_markers.d[DEBUG_time_marker_index++];
-          if(DEBUG_time_marker_index >= DEBUG_time_markers.count) {
-            DEBUG_time_marker_index = 0;
+          ASSERT(debug_time_marker_index < debug_time_markers.count);
+          PlatformWin32Debug_TimeMarker *marker = &debug_time_markers.d[debug_time_marker_index++];
+          if(debug_time_marker_index >= debug_time_markers.count) {
+            debug_time_marker_index = 0;
           }
           platform_sound_buffer->lpVtbl->GetCurrentPosition(platform_sound_buffer, &marker->play_cursor, &marker->write_cursor);
         }

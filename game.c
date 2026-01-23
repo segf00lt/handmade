@@ -83,8 +83,8 @@ func game_update_and_render(Game *gp) {
   if(once) {
     once = false;
 
-    Str8 test_file_data = DEBUG_platform_read_entire_file(str8_lit("game.c"));
-    if(DEBUG_platform_write_entire_file(test_file_data, str8_lit("copy_of_game.txt"))) {
+    Str8 test_file_data = platform_debug_read_entire_file(str8_lit("game.c"));
+    if(platform_debug_write_entire_file(test_file_data, str8_lit("copy_of_game.txt"))) {
       OutputDebugStringA("cowabunga file copied\n");
     }
   }

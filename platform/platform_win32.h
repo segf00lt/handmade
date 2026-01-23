@@ -56,23 +56,23 @@ internal PlatformWin32_WindowDimensions platform_win32_get_window_dimensions(HWN
 
 internal void platform_win32_load_xinput(void);
 
-#define PlatformWin32_XINPUT_SET_STATE(name) DWORD name(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
-typedef PlatformWin32_XINPUT_SET_STATE(PlatformWin32_XInputSetStateFunc);
+#define PLATFORM_WIN32_XINPUT_SET_STATE(name) DWORD name(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
+typedef PLATFORM_WIN32_XINPUT_SET_STATE(PlatformWin32_XInputSetStateFunc);
 
-PlatformWin32_XINPUT_SET_STATE(_platform_win32_xinput_set_state_stub) {
+PLATFORM_WIN32_XINPUT_SET_STATE(_platform_win32_xinput_set_state_stub) {
   return 0;
 }
 
-#define PlatformWin32_XINPUT_GET_STATE(name) DWORD name(DWORD dwUserIndex, XINPUT_STATE *pState)
-typedef PlatformWin32_XINPUT_GET_STATE(PlatformWin32_XInputGetStateFunc);
+#define PLATFORM_WIN32_XINPUT_GET_STATE(name) DWORD name(DWORD dwUserIndex, XINPUT_STATE *pState)
+typedef PLATFORM_WIN32_XINPUT_GET_STATE(PlatformWin32_XInputGetStateFunc);
 
-PlatformWin32_XINPUT_GET_STATE(_platform_win32_xinput_get_state_stub) {
+PLATFORM_WIN32_XINPUT_GET_STATE(_platform_win32_xinput_get_state_stub) {
   return 0;
 }
 
-#define PlatformWin32_DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPGUID lpGuid, LPDIRECTSOUND* ppDS, LPUNKNOWN  pUnkOuter)
-typedef PlatformWin32_DIRECT_SOUND_CREATE(PlatformWin32_DirectSoundCreateFunc);
-PlatformWin32_DIRECT_SOUND_CREATE(_platform_win32_direct_sound_create_stub) {
+#define PLATFORM_WIN32_DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPGUID lpGuid, LPDIRECTSOUND* ppDS, LPUNKNOWN  pUnkOuter)
+typedef PLATFORM_WIN32_DIRECT_SOUND_CREATE(PlatformWin32_DirectSoundCreateFunc);
+PLATFORM_WIN32_DIRECT_SOUND_CREATE(_platform_win32_direct_sound_create_stub) {
   return 0;
 }
 
