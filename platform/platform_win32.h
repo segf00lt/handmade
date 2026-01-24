@@ -33,15 +33,21 @@ typedef struct PlatformWin32_SoundOutput PlatformWin32_SoundOutput;
 struct PlatformWin32_SoundOutput {
   int samples_per_second;
   DWORD buffer_size;
-  u32 running_sample_index;
+  u32 running_sample_index; // TODO jfd: should this be in bytes instead?
   int bytes_per_sample;
   int latency_sample_count;
+  DWORD safety_bytes;
 };
 
 typedef struct PlatformWin32Debug_TimeMarker PlatformWin32Debug_TimeMarker;
 struct PlatformWin32Debug_TimeMarker {
-  DWORD play_cursor;
-  DWORD write_cursor;
+  DWORD output_play_cursor;
+  DWORD output_write_cursor;
+  DWORD output_location;
+  DWORD output_byte_count;
+  DWORD expected_flip_cursor;
+  DWORD flip_play_cursor;
+  DWORD flip_write_cursor;
 };
 
 TYPEDEF_SLICE(PlatformWin32Debug_TimeMarker, PlatformWin32Debug_TimeMarkerSlice);

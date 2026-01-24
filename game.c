@@ -66,12 +66,22 @@ func game_output_sound(Game *gp) {
   s16 *sample_out = sound_buffer->samples;
   for(s32 sample_index = 0; sample_index < sound_buffer->sample_count; sample_index++) {
     f32 sine_value = sinf(t_sine);
+
+    #if 0
+    OutputDebugStringA(cstrf(gp->temp_arena, "sine_value = %f\n", sine_value));
+    arena_clear(gp->temp_arena);
+    #endif
+
     s16 sample_value = (s16)(sine_value * tone_volume);
 
     *sample_out++ = sample_value;
     *sample_out++ = sample_value;
 
-    t_sine += 2.0f*PI*1.0f/((f32)wave_period);
+    t_sine += (2.0f*PI*1.0f/((f32)wave_period));
+    if(t_sine > 2.0f*PI) {
+      t_sine -= 2.0f*PI;
+    }
+
   }
 
 }
@@ -111,13 +121,6 @@ func game_update_and_render(Game *gp) {
   } /* get keyboard and mouse input */
 
 
-  { /* play sound */
-
-    // TODO jfd: allow sample offsets here for more robust platform options
-    game_output_sound(gp);
-
-  } /* play sound */
-
   { /* draw */
 
     render_weird_gradient(gp, gp->x_offset, gp->y_offset);
@@ -128,6 +131,13 @@ func game_update_and_render(Game *gp) {
 
 }
 
+internal void
+func game_get_sound_samples(Game *gp) {
+
+  // TODO jfd: allow sample offsets here for more robust platform options
+  game_output_sound(gp);
+
+}
 
 
 #endif

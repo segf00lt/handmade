@@ -52,6 +52,9 @@ STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
 
 internal void game_update_and_render(Game *gp);
 
+// NOTE jfd: This has to run in under 1ms
+internal void game_get_sound_samples(Game *gp);
+
 internal b32 game_is_key_pressed(Game *gp, KeyboardKey key);
 internal b32 game_was_key_pressed_once(Game *gp, KeyboardKey key);
 internal b32 game_was_key_released(Game *gp, KeyboardKey key);
