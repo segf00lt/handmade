@@ -39,6 +39,8 @@ func game_init(Platform *pp) {
   gp->frame_arena = arena_create(MB(1));
   gp->temp_arena  = arena_create(KB(5));
 
+  gp->once = true;
+
   #ifdef HANDMADE_HOTRELOAD
 
   platform_get_keyboard_modifiers  = pp->vtable.get_keyboard_modifiers;
@@ -68,7 +70,9 @@ func render_weird_gradient(Game *gp, int x_offset, int y_offset) {
       u8 g = 0;
       u8 b = (u8)(y + y_offset);
 
-      *pixel++ = (r << 16) | (g << 8) | b;
+      // *pixel++ = (r << 16) | (g << 8) | b;
+      // *pixel++ = (r << 16) | (b << 8) | g;
+      *pixel++ = (r << 8) | (g << 16) | b;
     }
 
     row += gp->render.stride;
@@ -96,14 +100,13 @@ internal void
 func output_sound(Game *gp) {
   Game_SoundBuffer *sound_buffer = &gp->sound;
 
-  local_persist f32 t_sine;
   s16 tone_volume = 600;
   int tone_hz = 256;
   int wave_period = sound_buffer->samples_per_second / tone_hz;
 
   s16 *sample_out = sound_buffer->samples;
   for(s32 sample_index = 0; sample_index < sound_buffer->sample_count; sample_index++) {
-    f32 sine_value = sinf(t_sine);
+    f32 sine_value = sinf(gp->t_sine);
 
     #if 0
     OutputDebugStringA(cstrf(gp->temp_arena, "sine_value = %f\n", sine_value));
@@ -115,9 +118,9 @@ func output_sound(Game *gp) {
     *sample_out++ = sample_value;
     *sample_out++ = sample_value;
 
-    t_sine += (2.0f*PI*1.0f/((f32)wave_period));
-    if(t_sine > 2.0f*PI) {
-      t_sine -= 2.0f*PI;
+    gp->t_sine += (2.0f*PI*1.0f/((f32)wave_period));
+    if(gp->t_sine > 2.0f*PI) {
+      gp->t_sine -= 2.0f*PI;
     }
 
   }
@@ -127,9 +130,8 @@ func output_sound(Game *gp) {
 void
 func game_update_and_render(Game *gp) {
 
-  local_persist b32 once = true;
-  if(once) {
-    once = false;
+  if(gp->once) {
+    gp->once = false;
 
     Str8 test_file_data = platform_debug_read_entire_file(str8_lit("game.c"));
     if(platform_debug_write_entire_file(test_file_data, str8_lit("copy_of_game.txt"))) {
@@ -141,7 +143,7 @@ func game_update_and_render(Game *gp) {
   { /* get keyboard and mouse input */
 
     // TODO jfd: mouse movement and clicks
-    int step_pixels = 1;
+    int step_pixels = 8;
 
     if(is_key_pressed(gp, KBD_KEY_W)) {
       gp->y_offset -= step_pixels;

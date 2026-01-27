@@ -46,6 +46,11 @@ struct Game {
 
   int x_offset;
   int y_offset;
+
+  b32 once;
+  f32 t_sine;
+
+
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
 #define GAME_STATE_SIZE ((u64)MB(1))

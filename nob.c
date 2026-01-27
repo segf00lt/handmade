@@ -91,10 +91,10 @@ int main(int argc, char **argv) {
   NOB_GO_REBUILD_URSELF(argc, argv);
 
 
-
-  // if(build_static()) return 1;
-  // if(build_hot_reload()) return 1;
   if(build_hot_reload_no_cradle()) return 1;
+  return 0;
+  if(build_hot_reload()) return 1;
+  if(build_static()) return 1;
 
 
 

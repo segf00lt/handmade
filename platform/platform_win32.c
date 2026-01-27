@@ -1053,20 +1053,61 @@ func platform_debug_write_entire_file(Str8 data, Str8 path) {
   return success;
 }
 
+internal FILETIME
+func platform_win32_get_last_file_write_time(char *path) {
+  WIN32_FILE_ATTRIBUTE_DATA file_info;
+  ASSERT(GetFileAttributesExA(path, GetFileExInfoStandard, &file_info));
+  FILETIME result = file_info.ftLastWriteTime;
+  return result;
+}
+
+internal b32
+func platform_win32_file_exists(char *path) {
+  DWORD attrs = GetFileAttributesA(path);
+  b32 result = (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY));
+  return result;
+}
+
 internal void
 func platform_win32_load_game(void) {
-  #ifdef HANDMADE_HOTRELOAD
 
-  game_dll = LoadLibraryA("game.dll");
+  for(;;) {
+    if(MoveFileExA("game.dll", "game.dll.live", MOVEFILE_REPLACE_EXISTING)) {
+      break;
+    }
+    DWORD err = GetLastError();
+    if(err != ERROR_SHARING_VIOLATION) {
+      OutputDebugStringA("error when loading game code\n");
+      UNREACHABLE;
+    }
+
+    platform_win32_sleep_ms(10);
+  }
+
+  game_dll = LoadLibraryA("game.dll.live");
   ASSERT(game_dll);
+
   Game_LoadProcsFunc *game_load_procs = (Game_LoadProcsFunc*)GetProcAddress(game_dll, "game_load_procs");
   ASSERT(game_load_procs);
+
   Game_Vtable game_vtable = game_load_procs();
+
   game_init              = game_vtable.init;
   game_update_and_render = game_vtable.update_and_render;
   game_get_sound_samples = game_vtable.get_sound_samples;
 
-  #endif
+}
+
+internal void
+func platform_win32_unload_game(void) {
+
+  if(game_dll) {
+    FreeLibrary(game_dll);
+  }
+  game_init              = 0x0;
+  game_update_and_render = 0x0;
+  game_get_sound_samples = 0x0;
+
 }
 
 force_inline void
@@ -1123,7 +1164,9 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
     };
   }
 
+  #ifdef HANDMADE_HOTRELOAD
   platform_win32_load_game();
+  #endif
 
   // TODO jfd 22/01/2026: Redesign arena allocator to be recursive, and allocate from a fixed backing buffer provided by the OS
   Game *gp = game_init(&platform);
@@ -1191,6 +1234,13 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
 
       while(platform_is_running) {
+
+        #ifdef HANDMADE_HOTRELOAD
+        if(platform_win32_file_exists("game.dll")) {
+          platform_win32_unload_game();
+          platform_win32_load_game();
+        }
+        #endif
 
         // NOTE jfd: get input messages
         while(PeekMessageA(&message, window_handle, 0, 0, PM_REMOVE)) {
