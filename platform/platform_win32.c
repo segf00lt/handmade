@@ -18,6 +18,16 @@ global Arena *platform_file_arena;
 global PlatformWin32_XInputGetStateFunc *platform_win32_xinput_get_state = _platform_win32_xinput_get_state_stub;
 global PlatformWin32_XInputSetStateFunc *platform_win32_xinput_set_state = _platform_win32_xinput_set_state_stub;
 
+#ifdef HANDMADE_HOTRELOAD
+
+HMODULE game_dll;
+
+Game_InitFunc            *game_init;
+Game_UpdateAndRenderFunc *game_update_and_render;
+Game_GetSoundSamplesFunc *game_get_sound_samples;
+
+#endif
+
 #ifdef HANDMADE_INTERNAL
 global b32 debug_paused;
 #endif
@@ -1043,6 +1053,21 @@ func platform_debug_write_entire_file(Str8 data, Str8 path) {
   return success;
 }
 
+internal void
+func platform_win32_load_game(void) {
+  #ifdef HANDMADE_HOTRELOAD
+
+  game_dll = LoadLibraryA("game.dll");
+  ASSERT(game_dll);
+  Game_LoadProcsFunc *game_load_procs = (Game_LoadProcsFunc*)GetProcAddress(game_dll, "game_load_procs");
+  ASSERT(game_load_procs);
+  Game_Vtable game_vtable = game_load_procs();
+  game_init              = game_vtable.init;
+  game_update_and_render = game_vtable.update_and_render;
+  game_get_sound_samples = game_vtable.get_sound_samples;
+
+  #endif
+}
 
 force_inline void
 func platform_win32_sleep_ms(DWORD ms) {
@@ -1088,17 +1113,20 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
   window_class.hInstance = instance;
   window_class.lpszClassName = "Handmade Hero";
 
+  Platform platform = {0};
+  {
+    platform.arena = platform_main_arena;
+    platform.vtable = (Platform_Vtable) {
+      .get_keyboard_modifiers  = &platform_get_keyboard_modifiers,
+      .debug_read_entire_file  = &platform_debug_read_entire_file,
+      .debug_write_entire_file = &platform_debug_write_entire_file,
+    };
+  }
+
+  platform_win32_load_game();
+
   // TODO jfd 22/01/2026: Redesign arena allocator to be recursive, and allocate from a fixed backing buffer provided by the OS
-  Game *gp;
-  { /* game_init */
-
-    gp = push_struct(platform_main_arena, Game);
-
-    gp->main_arena  = arena_create(MB(5));
-    gp->frame_arena = arena_create(MB(1));
-    gp->temp_arena  = arena_create(KB(5));
-
-  } /* game_init */
+  Game *gp = game_init(&platform);
 
   // TODO jfd: how do we reliably get this on windows?
   int monitor_refresh_hz = 60;

@@ -13,7 +13,11 @@
 
 #include "base/math.h"
 
+#include "base/device_input.h"
+
+
 #include "os/os.h"
+
 
 #endif
 
@@ -31,6 +35,8 @@
 #include "base/array.c"
 
 #include "base/math.c"
+
+#include "base/device_input.c"
 
 #include "os/os.c"
 

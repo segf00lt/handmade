@@ -89,11 +89,6 @@ internal KeyboardKey platform_win32_keyboard_key_from_virtual_keycode(WPARAM vir
 
 internal void platform_get_game_input_from_events(Platform_EventList *event_list, Game *gp);
 
-internal Str8 debug_platform_read_entire_file(Str8 path);
-internal b32  debug_platform_write_entire_file(Str8 data, Str8 path);
-
-internal void debug_platform_win32_sync_display(PlatformWin32_Backbuffer *backbuffer, PlatformWin32_SoundOutput *sound_output, PlatformWin32Debug_TimeMarkerSlice markers, f32 target_seconds_per_frame);
-
 force_inline void platform_win32_sleep_ms(DWORD ms);
 
 force_inline LARGE_INTEGER platform_win32_get_wall_clock(void);

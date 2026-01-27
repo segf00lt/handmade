@@ -2,16 +2,54 @@
 #define GAME_C
 
 
-
 /////////////////////////////////
 // globals
 
+#ifdef HANDMADE_HOTRELOAD
+
+Platform_GetKeyboardModifiersFunc *platform_get_keyboard_modifiers;
+Platform_DebugReadEntireFileFunc  *platform_debug_read_entire_file;
+Platform_DebugWriteEntireFileFunc *platform_debug_write_entire_file;
+
+#endif
 
 
 
 
 /////////////////////////////////
 // functions
+
+
+Game_Vtable
+func game_load_procs(void) {
+  Game_Vtable vtable = {
+    .init              = &game_init,
+    .update_and_render = &game_update_and_render,
+    .get_sound_samples = &game_get_sound_samples,
+  };
+
+  return vtable;
+}
+
+Game*
+func game_init(Platform *pp) {
+  Game *gp = push_struct(pp->arena, Game);
+
+  gp->main_arena  = arena_create(MB(5));
+  gp->frame_arena = arena_create(MB(1));
+  gp->temp_arena  = arena_create(KB(5));
+
+  #ifdef HANDMADE_HOTRELOAD
+
+  platform_get_keyboard_modifiers  = pp->vtable.get_keyboard_modifiers;
+  platform_debug_read_entire_file  = pp->vtable.debug_read_entire_file;
+  platform_debug_write_entire_file = pp->vtable.debug_write_entire_file;
+
+  #endif
+
+  return gp;
+}
+
 
 internal void
 func render_weird_gradient(Game *gp, int x_offset, int y_offset) {
@@ -40,22 +78,22 @@ func render_weird_gradient(Game *gp, int x_offset, int y_offset) {
 
 
 internal b32
-func game_was_key_pressed_once(Game *gp, KeyboardKey key) {
+func was_key_pressed_once(Game *gp, KeyboardKey key) {
   return !!(gp->input.key_pressed[key] == 1);
 }
 
 internal b32
-func game_is_key_pressed(Game *gp, KeyboardKey key) {
+func is_key_pressed(Game *gp, KeyboardKey key) {
   return !!(gp->input.key_pressed[key] > 0);
 }
 
 internal b32
-func game_was_key_released(Game *gp, KeyboardKey key) {
+func was_key_released(Game *gp, KeyboardKey key) {
   return (gp->input.key_released[key] == true);
 }
 
 internal void
-func game_output_sound(Game *gp) {
+func output_sound(Game *gp) {
   Game_SoundBuffer *sound_buffer = &gp->sound;
 
   local_persist f32 t_sine;
@@ -86,7 +124,7 @@ func game_output_sound(Game *gp) {
 
 }
 
-internal void
+void
 func game_update_and_render(Game *gp) {
 
   local_persist b32 once = true;
@@ -105,16 +143,16 @@ func game_update_and_render(Game *gp) {
     // TODO jfd: mouse movement and clicks
     int step_pixels = 1;
 
-    if(game_is_key_pressed(gp, KBD_KEY_W)) {
+    if(is_key_pressed(gp, KBD_KEY_W)) {
       gp->y_offset -= step_pixels;
     }
-    if(game_is_key_pressed(gp, KBD_KEY_A)) {
+    if(is_key_pressed(gp, KBD_KEY_A)) {
       gp->x_offset -= step_pixels;
     }
-    if(game_is_key_pressed(gp, KBD_KEY_S)) {
+    if(is_key_pressed(gp, KBD_KEY_S)) {
       gp->y_offset += step_pixels;
     }
-    if(game_is_key_pressed(gp, KBD_KEY_D)) {
+    if(is_key_pressed(gp, KBD_KEY_D)) {
       gp->x_offset += step_pixels;
     }
 
@@ -131,11 +169,11 @@ func game_update_and_render(Game *gp) {
 
 }
 
-internal void
+void
 func game_get_sound_samples(Game *gp) {
 
   // TODO jfd: allow sample offsets here for more robust platform options
-  game_output_sound(gp);
+  output_sound(gp);
 
 }
 

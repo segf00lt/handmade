@@ -7,8 +7,6 @@
 
 
 #include "game_types.h"
-#include "game.h"
-#include "game.c"
 
 
 
