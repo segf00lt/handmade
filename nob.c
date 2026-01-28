@@ -1,18 +1,11 @@
 #define NOB_IMPLEMENTATION
 #include "nob.h"
 
-#ifdef _WIN32
-#define CC "cl"
-#else
-#define CC "clang"
-#endif
-
-
-int build_hot_reload_no_cradle(void) {
+int win32_build_hot_reload_no_cradle(void) {
   Nob_Cmd cmd = {0};
 
   nob_cmd_append(&cmd,
-    CC,
+    "cl",
     "/nologo",
     "/W4",
     "/wd4100",
@@ -33,10 +26,10 @@ int build_hot_reload_no_cradle(void) {
   return 0;
 }
 
-int build_hot_reload(void) {
+int win32_build_hot_reload(void) {
   Nob_Cmd cmd = {0};
   nob_cmd_append(&cmd,
-    CC,
+    "cl",
     "/nologo",
     "/W4",
     "/wd4100",
@@ -58,13 +51,13 @@ int build_hot_reload(void) {
   );
   if(!nob_cmd_run_sync_and_reset(&cmd)) return 1;
 
-  return build_hot_reload_no_cradle();
+  return win32_build_hot_reload_no_cradle();
 }
 
-int build_static(void) {
+int win32_build_static(void) {
   Nob_Cmd cmd = {0};
   nob_cmd_append(&cmd,
-    CC,
+    "cl",
     "/nologo",
     "/W4",
     "/wd4100",
@@ -87,14 +80,39 @@ int build_static(void) {
   return 0;
 }
 
+int macos_build_virutal_memory_test(void) {
+  Nob_Cmd cmd = {0};
+
+  nob_cmd_append(&cmd,
+    "clang",
+    "-std=c99",
+    "-Wall",
+    "-Wextra",
+    "-Wno-unused-parameter",
+    "-g",
+    "-fno-omit-frame-pointer",
+    // "-no-pie",
+    "-O0",
+    // "-pthread",
+    "-o",
+    "macos_virtual_memory_test",
+    "macos_virtual_memory_test.c");
+
+  if (!nob_cmd_run_sync(cmd)) return 0;
+
+  return 1;
+}
+
 int main(int argc, char **argv) {
   NOB_GO_REBUILD_URSELF(argc, argv);
 
 
-  if(build_hot_reload_no_cradle()) return 1;
+  if(!macos_build_virutal_memory_test()) return 1;
+
   return 0;
-  if(build_hot_reload()) return 1;
-  if(build_static()) return 1;
+  if(!win32_build_hot_reload_no_cradle()) return 1;
+  if(!win32_build_hot_reload()) return 1;
+  if(!win32_build_static()) return 1;
 
 
 
