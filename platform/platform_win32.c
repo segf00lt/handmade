@@ -1140,7 +1140,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
   UINT scheduler_granularity_ms = 1;
   b32 sleep_is_granular = timeBeginPeriod(scheduler_granularity_ms);
 
-  platform_main_arena  = arena_create(MB(5));
+  platform_main_arena  = arena_create(MB(100));
   platform_debug_arena = arena_create(MB(5));
   platform_temp_arena  = arena_create(KB(5));
   platform_event_arena = arena_create(KB(50));
@@ -1156,12 +1156,23 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
   Platform platform = {0};
   {
-    platform.arena = platform_main_arena;
+
+    platform.game_memory_backbuffer_size = GB(4);
+    platform.game_memory_backbuffer =
+    VirtualAlloc(
+      // TODO jfd: find a way to enforce stable base addresses on macos and linux, for development only
+      (void*)(u64)0x87187898, // NOTE jfd: this is going to be the base address for all the allocations done in the game code
+      platform.game_memory_backbuffer_size,
+      MEM_RESERVE|MEM_COMMIT,
+      PAGE_READWRITE
+    );
+
     platform.vtable = (Platform_Vtable) {
       .get_keyboard_modifiers  = &platform_get_keyboard_modifiers,
       .debug_read_entire_file  = &platform_debug_read_entire_file,
       .debug_write_entire_file = &platform_debug_write_entire_file,
     };
+
   }
 
   #ifdef HANDMADE_HOTRELOAD
@@ -1498,6 +1509,20 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
   } else {
     // TODO jfd: logging
+  }
+
+  platform_win32_unload_game();
+  for(;;) {
+    if(MoveFileExA("game.dll.live", "game.dll", MOVEFILE_REPLACE_EXISTING)) {
+      break;
+    }
+    DWORD err = GetLastError();
+    if(err != ERROR_SHARING_VIOLATION) {
+      OutputDebugStringA("error when unloading live game code\n");
+      UNREACHABLE;
+    }
+
+    platform_win32_sleep_ms(10);
   }
 
   return 0;

@@ -33,11 +33,19 @@ func game_load_procs(void) {
 
 Game*
 func game_init(Platform *pp) {
-  Game *gp = push_struct(pp->arena, Game);
+  Arena *game_main_arena = arena_create_ex(pp->game_memory_backbuffer_size, true, pp->game_memory_backbuffer);
 
-  gp->main_arena  = arena_create(MB(5));
-  gp->frame_arena = arena_create(MB(1));
-  gp->temp_arena  = arena_create(KB(5));
+  Game *gp = push_struct(game_main_arena, Game);
+  gp->main_arena = game_main_arena;
+
+  u64 game_frame_arena_backbuffer_size = MB(20);
+  u64 game_temp_arena_backbuffer_size  = MB(10);
+
+  void *game_frame_arena_backbuffer = arena_push(game_main_arena, game_frame_arena_backbuffer_size, 1);
+  void *game_temp_arena_backbuffer  = arena_push(game_main_arena, game_temp_arena_backbuffer_size,  1);
+
+  gp->frame_arena = arena_create_ex(game_frame_arena_backbuffer_size, true, game_frame_arena_backbuffer);
+  gp->temp_arena  = arena_create_ex(game_temp_arena_backbuffer_size,  true, game_temp_arena_backbuffer);
 
   gp->once = true;
 
@@ -71,8 +79,8 @@ func render_weird_gradient(Game *gp, int x_offset, int y_offset) {
       u8 b = (u8)(y + y_offset);
 
       // *pixel++ = (r << 16) | (g << 8) | b;
-      // *pixel++ = (r << 16) | (b << 8) | g;
-      *pixel++ = (r << 8) | (g << 16) | b;
+      *pixel++ = (r << 16) | (b << 8) | g;
+      // *pixel++ = (r << 8) | (g << 16) | b;
     }
 
     row += gp->render.stride;
@@ -131,6 +139,7 @@ void
 func game_update_and_render(Game *gp) {
 
   if(gp->once) {
+    OutputDebugStringA(cstrf(gp->temp_arena, "gp = %p\n", gp));
     gp->once = false;
 
     Str8 test_file_data = platform_debug_read_entire_file(str8_lit("game.c"));

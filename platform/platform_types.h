@@ -52,7 +52,8 @@ struct Platform_Vtable {
 
 typedef struct Platform Platform;
 struct Platform {
-  Arena *arena;
+  void *game_memory_backbuffer;
+  u64 game_memory_backbuffer_size;
   Platform_Vtable vtable;
 };
 
