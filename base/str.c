@@ -481,13 +481,13 @@ func str8_copy(Arena *a, Str8 str) {
 }
 
 internal force_inline Str8
-func str8_copy_cstr(Arena *a, char *cstr) {
+func str8_from_cstr(Arena *a, char *cstr) {
   Str8 str = { .s = (u8*)cstr, .len = memory_strlen(cstr) };
   return str8_copy(a, str);
 }
 
 internal force_inline char*
-func cstr_copy_str8(Arena *a, Str8 str) {
+func cstr_from_str8(Arena *a, Str8 str) {
   Str8 s_ = str8_copy(a, str);
   char *s = (char*)s_.s;
   return s;

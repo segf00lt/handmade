@@ -40,14 +40,14 @@ struct Platform_event_list {
 
 
 typedef Keyboard_modifier Platform_get_keyboard_modifiers_func(void);
-typedef Str8              Platform_debug_read_entire_file_func(Str8);
-typedef b32               Platform_debug_write_entire_file_func(Str8, Str8);
+typedef Str8              Platform_read_entire_file_func(char*);
+typedef b32               Platform_write_entire_file_func(Str8, char*);
 
 typedef struct Platform_vtable Platform_vtable;
 struct Platform_vtable {
   Platform_get_keyboard_modifiers_func  *get_keyboard_modifiers;
-  Platform_debug_read_entire_file_func  *debug_read_entire_file;
-  Platform_debug_write_entire_file_func *debug_write_entire_file;
+  Platform_read_entire_file_func  *read_entire_file;
+  Platform_write_entire_file_func *write_entire_file;
 };
 
 typedef struct Platform Platform;

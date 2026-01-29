@@ -103,8 +103,6 @@ internal Keyboard_key platform_win32_keyboard_key_from_virtual_keycode(WPARAM vi
 
 internal void platform_get_game_input_from_events(Platform_event_list *event_list, Game *gp);
 
-force_inline void platform_win32_sleep_ms(DWORD ms);
-
 force_inline LARGE_INTEGER platform_win32_get_wall_clock(void);
 
 force_inline f32 platform_win32_get_seconds_elapsed(LARGE_INTEGER begin, LARGE_INTEGER end);

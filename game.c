@@ -8,8 +8,8 @@
 #ifdef HANDMADE_HOTRELOAD
 
 Platform_get_keyboard_modifiers_func *platform_get_keyboard_modifiers;
-Platform_debug_read_entire_file_func  *platform_debug_read_entire_file;
-Platform_debug_write_entire_file_func *platform_debug_write_entire_file;
+Platform_read_entire_file_func  *platform_read_entire_file;
+Platform_write_entire_file_func *platform_write_entire_file;
 
 #endif
 
@@ -51,8 +51,8 @@ func game_init(Platform *pp) {
   #ifdef HANDMADE_HOTRELOAD
 
   platform_get_keyboard_modifiers  = pp->vtable.get_keyboard_modifiers;
-  platform_debug_read_entire_file  = pp->vtable.debug_read_entire_file;
-  platform_debug_write_entire_file = pp->vtable.debug_write_entire_file;
+  platform_read_entire_file  = pp->vtable.read_entire_file;
+  platform_write_entire_file = pp->vtable.write_entire_file;
 
   #endif
 
@@ -141,8 +141,8 @@ func game_update_and_render(Game *gp) {
     OutputDebugStringA(cstrf(gp->temp_arena, "gp = %p\n", gp));
     gp->once = false;
 
-    Str8 test_file_data = platform_debug_read_entire_file(str8_lit("game.c"));
-    if(platform_debug_write_entire_file(test_file_data, str8_lit("copy_of_game.txt"))) {
+    Str8 test_file_data = platform_read_entire_file("game.c");
+    if(platform_write_entire_file(test_file_data, "copy_of_game.txt")) {
       OutputDebugStringA("cowabunga file copied\n");
     }
   }

@@ -9,15 +9,6 @@
 /////////////////////////////////
 // globals
 
-global Arena *platform_main_arena;
-global Arena *platform_debug_arena;
-global Arena *platform_temp_arena;
-global Arena *platform_event_arena;
-global Arena *platform_file_arena;
-
-global Platform_win32_xinput_get_state_func *platform_win32_xinput_get_state = _platform_win32_xinput_get_state_stub;
-global Platform_win32_xinput_set_state_func *platform_win32_xinput_set_state = _platform_win32_xinput_set_state_stub;
-
 #ifdef HANDMADE_HOTRELOAD
 
 global HMODULE game_dll;
@@ -33,6 +24,15 @@ global Platform_win32_debug_loop_recorder debug_loop_recorder;
 #ifdef HANDMADE_INTERNAL
 global b32 debug_paused;
 #endif
+
+global Arena *platform_main_arena;
+global Arena *platform_debug_arena;
+global Arena *platform_temp_arena;
+global Arena *platform_event_arena;
+global Arena *platform_file_arena;
+
+global Platform_win32_xinput_get_state_func *platform_win32_xinput_get_state = _platform_win32_xinput_get_state_stub;
+global Platform_win32_xinput_set_state_func *platform_win32_xinput_set_state = _platform_win32_xinput_set_state_stub;
 
 global b32 platform_is_running;
 global Platform_win32_backbuffer global_backbuffer = {
@@ -53,8 +53,8 @@ global s64 platform_win32_perf_counter_frequency;
 /////////////////////////////////
 // functions
 
-internal
-func Platform_win32_window_dimensions platform_win32_get_window_dimensions(HWND window_handle) {
+internal Platform_win32_window_dimensions
+func platform_win32_get_window_dimensions(HWND window_handle) {
   RECT client_rect;
   GetClientRect(window_handle, &client_rect);
 
@@ -66,10 +66,27 @@ func Platform_win32_window_dimensions platform_win32_get_window_dimensions(HWND 
   return window_dimensions;
 }
 
-internal
-func void platform_win32_resize_backbuffer(Platform_win32_backbuffer *backbuffer, int window_width, int window_height) {
-  int width = window_width;
-  int height = window_height;
+internal Platform_win32_window_dimensions
+func platform_win32_clear_window_and_get_dimensions(HWND window_handle, HDC device_context) {
+  RECT client_rect;
+  GetClientRect(window_handle, &client_rect);
+
+  Platform_win32_window_dimensions window_dimensions = {
+    .width = client_rect.right - client_rect.left,
+    .height = client_rect.bottom - client_rect.top,
+  };
+
+  HBRUSH black = (HBRUSH)GetStockObject(BLACK_BRUSH);
+  FillRect(device_context, &client_rect, black);
+
+  return window_dimensions;
+}
+
+internal void
+func platform_win32_resize_backbuffer(Platform_win32_backbuffer *backbuffer, int window_width, int window_height) {
+  int width = 1368;
+  int height = 760;
+
   // TODO jfd: bulletproof this
   // maybe don't free first, free after, then free first if that fails
 
@@ -91,6 +108,7 @@ func void platform_win32_resize_backbuffer(Platform_win32_backbuffer *backbuffer
 
   u64 bitmap_memory_size = backbuffer->bitmap_width*backbuffer->bitmap_height * backbuffer->bytes_per_pixel;
   backbuffer->bitmap_memory = os_alloc(bitmap_memory_size);
+  memory_zero(backbuffer->bitmap_memory, bitmap_memory_size);
 
   backbuffer->stride = backbuffer->bitmap_width * backbuffer->bytes_per_pixel;
 }
@@ -107,10 +125,14 @@ func platform_win32_display_buffer_in_window(
   int height
 ) {
 
+  int dest_x = (window_width - backbuffer->bitmap_width) >> 1;
+  int dest_y = (window_height - backbuffer->bitmap_height) >> 1;
+
   StretchDIBits(
     device_context,
+    // 0, 0, window_width, window_height, // destination coordinates
+    dest_x, dest_y, backbuffer->bitmap_width, backbuffer->bitmap_height, // destination coordinates
     0, 0, backbuffer->bitmap_width, backbuffer->bitmap_height,
-    0, 0, window_width, window_height, // destination coordinates
     backbuffer->bitmap_memory,
     &backbuffer->bitmap_info,
     DIB_RGB_COLORS,
@@ -740,25 +762,21 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
       event->mouse_pos.y = (f32)p.y;
       event->scroll_delta.y = -(f32)wheel_delta;
     } break;
-
+    case WM_ERASEBKGND: {
+      return 1; // tell Windows "I handled it"
+    }
     case WM_PAINT: {
       PAINTSTRUCT paint;
 
       HDC device_context = BeginPaint(window, &paint);
+
+      Platform_win32_window_dimensions window_dimensions = platform_win32_clear_window_and_get_dimensions(window, device_context);
 
       int x = paint.rcPaint.left;
       int y = paint.rcPaint.top;
       int width = paint.rcPaint.right - x;
       int height = paint.rcPaint.bottom - y;
 
-      static int color = WHITENESS;
-      if(color == WHITENESS) {
-        color = BLACKNESS;
-      } else {
-        color = WHITENESS;
-      }
-
-      Platform_win32_window_dimensions window_dimensions = platform_win32_get_window_dimensions(window);
       platform_win32_display_buffer_in_window(&global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, x, y, width, height);
       EndPaint(window, &paint);
     } break;
@@ -1030,20 +1048,14 @@ func platform_win32_fill_sound_buffer(Platform_win32_sound_output *sound_output,
 
 
 internal Str8
-func platform_debug_read_entire_file(Str8 path) {
+func platform_read_entire_file(char *path) {
   Str8 data;
 
-  Arena_scope scope = arena_scope_begin(platform_file_arena);
-
-  char *path_cstr = cstr_copy_str8(platform_file_arena, path);
-
-  HANDLE file_handle = CreateFileA(path_cstr, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+  HANDLE file_handle = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
   LARGE_INTEGER file_size;
   b32 got_size = GetFileSizeEx(file_handle, &file_size);
   ASSERT(got_size);
   data.len = file_size.QuadPart;
-
-  arena_scope_end(scope);
 
   data.s = push_array_no_zero(platform_file_arena, u8, data.len);
   ASSERT(data.s);
@@ -1100,15 +1112,10 @@ func platform_debug_read_entire_file(Str8 path) {
 }
 
 internal b32
-func platform_debug_write_entire_file(Str8 data, Str8 path) {
+func platform_write_entire_file(Str8 data, char *path) {
   b32 success = true;
 
-  Arena_scope scope = arena_scope_begin(platform_file_arena);
-
-  char *path_cstr = cstr_copy_str8(platform_file_arena, path);
-  HANDLE file_handle = CreateFileA(path_cstr, GENERIC_WRITE | GENERIC_READ, 0, 0, CREATE_ALWAYS, 0, 0);
-
-  arena_scope_end(scope);
+  HANDLE file_handle = CreateFileA(path, GENERIC_WRITE | GENERIC_READ, 0, 0, CREATE_ALWAYS, 0, 0);
 
   #if 0
   u8 *ptr = data.s;
@@ -1173,16 +1180,54 @@ func platform_win32_get_last_file_write_time(char *path) {
 }
 
 internal b32
-func platform_win32_file_exists(char *path) {
+func platform_file_exists(char *path) {
   DWORD attrs = GetFileAttributesA(path);
   b32 result = (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY));
+  return result;
+}
+
+internal Str8
+func platform_get_current_dir(Arena *a) {
+  DWORD buf_size = GetCurrentDirectory(0, NULL);
+  ASSERT(buf_size > 0);
+
+  char *buf = push_array_no_zero(a, char, buf_size);
+  ASSERT(GetCurrentDirectory(buf_size, buf) != 0);
+
+  Str8 result = { .s = (u8*)buf, .len = buf_size - 1 };
+
+  return result;
+}
+
+internal b32
+func platform_set_current_dir(char *dir_path) {
+  b32 result = 0;
+
+  result = SetCurrentDirectory(dir_path);
+
+  return result;
+}
+
+internal b32
+func platform_move_file(char *old_path, char *new_path) {
+  b32 result = 0;
+
+  result = MoveFileEx(old_path, new_path, MOVEFILE_REPLACE_EXISTING);
+
+  return result;
+}
+
+internal b32
+func platform_remove_file(char *path) {
+  b32 result = !!(DeleteFileA(path));
+
   return result;
 }
 
 internal void
 func platform_win32_load_game(void) {
 
-  if(platform_win32_file_exists("game.dll")) {
+  if(platform_file_exists("game.dll")) {
     for(;;) {
       if(MoveFileExA("game.dll", "game.dll.live", MOVEFILE_REPLACE_EXISTING)) {
         break;
@@ -1193,7 +1238,7 @@ func platform_win32_load_game(void) {
         UNREACHABLE;
       }
 
-      platform_win32_sleep_ms(10);
+      platform_sleep_ms(10);
     }
   }
 
@@ -1223,9 +1268,15 @@ func platform_win32_unload_game(void) {
 
 }
 
+force_inline b32
+func platform_make_dir(char *dir_path) {
+  b32 result = CreateDirectoryA(dir_path, 0);
+  return result;
+}
+
 force_inline void
-func platform_win32_sleep_ms(DWORD ms) {
-  Sleep(ms);
+func platform_sleep_ms(s32 ms) {
+  Sleep((DWORD)ms);
 }
 
 force_inline LARGE_INTEGER
@@ -1281,8 +1332,8 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
     platform.vtable = (Platform_vtable) {
       .get_keyboard_modifiers  = &platform_get_keyboard_modifiers,
-      .debug_read_entire_file  = &platform_debug_read_entire_file,
-      .debug_write_entire_file = &platform_debug_write_entire_file,
+      .read_entire_file  = &platform_read_entire_file,
+      .write_entire_file = &platform_write_entire_file,
     };
 
   }
@@ -1306,10 +1357,10 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
       window_class.lpszClassName,
       "Handmade Hero",
       WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-      CW_USEDEFAULT,
-      CW_USEDEFAULT,
-      CW_USEDEFAULT,
-      CW_USEDEFAULT,
+      100,
+      50,
+      1500,
+      900,
       0,
       0,
       instance,
@@ -1358,7 +1409,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
       while(platform_is_running) {
 
         #ifdef HANDMADE_HOTRELOAD
-        if(platform_win32_file_exists("game.dll")) {
+        if(platform_file_exists("game.dll")) {
           platform_win32_unload_game();
           platform_win32_load_game();
         }
@@ -1431,7 +1482,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
             if(debug_loop_recorder.write_game_state_to_file) {
               debug_loop_recorder.write_game_state_to_file = false;
               Str8 game_state_data = { .s = (u8*)(platform.game_memory_backbuffer), .len = (s64)platform.game_memory_backbuffer_size, };
-              ASSERT(platform_debug_write_entire_file(game_state_data, str8_lit("game.state")));
+              ASSERT(platform_write_entire_file(game_state_data, "game.state"));
 
               debug_loop_recorder.game_input_file_handle = CreateFileA("game.input", GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
               ASSERT(debug_loop_recorder.game_input_file_handle);
@@ -1454,11 +1505,11 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
               debug_loop_recorder.read_game_state_from_file = false;
 
               // TODO jfd: input recording arena
-              debug_loop_recorder.recorded_game_state = platform_debug_read_entire_file(str8_lit("game.state"));
+              debug_loop_recorder.recorded_game_state = platform_read_entire_file("game.state");
 
               CloseHandle(debug_loop_recorder.game_input_file_handle);
 
-              Str8 recorded_game_input_data = platform_debug_read_entire_file(str8_lit("game.input"));
+              Str8 recorded_game_input_data = platform_read_entire_file("game.input");
 
               debug_loop_recorder.recorded_game_input.d = (Game_input*)(recorded_game_input_data.s);
               debug_loop_recorder.recorded_game_input.count = debug_loop_recorder.input_recording_write_index;
@@ -1618,7 +1669,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
           while(seconds_elapsed_for_frame < target_seconds_per_frame) {
             if(sleep_is_granular) {
               DWORD sleep_for_ms = (DWORD)(1000.0f * (target_seconds_per_frame - seconds_elapsed_for_frame));
-              platform_win32_sleep_ms(sleep_for_ms);
+              platform_sleep_ms(sleep_for_ms);
             }
             LARGE_INTEGER check_counter = platform_win32_get_wall_clock();
             seconds_elapsed_for_frame = platform_win32_get_seconds_elapsed(last_counter, check_counter);
@@ -1693,7 +1744,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
       UNREACHABLE;
     }
 
-    platform_win32_sleep_ms(10);
+    platform_sleep_ms(10);
   }
 
   return 0;
