@@ -179,6 +179,7 @@
 #define memory_copy_array(d,s)   memory_copy((d),(s),sizeof(d))
 #define memory_copy_typed(d,s,c) memory_copy((d),(s),sizeof(*(d))*(c))
 
+
 ////////////////////////////////
 //~ rjf: Linked List Building Macros
 

@@ -5,24 +5,24 @@
 // NOTE jfd 22/01/2026:
 // This file contains type definitions for the game (or application) to interface with the platform.
 
-typedef enum Platform_EventKind {
+typedef enum Platform_event_kind {
   EVENT_NULL = 0,
   EVENT_KEY_PRESS,
   EVENT_KEY_RELEASE,
   EVENT_MOUSE_MOVE,
   EVENT_MOUSE_CLICK,
   EVENT_MOUSE_SCROLL,
-} Platform_EventKind;
+} Platform_event_kind;
 
 
-typedef struct Platform_Event Platform_Event;
-struct Platform_Event {
-  Platform_Event *next;
-  Platform_Event *prev;
-  Platform_EventKind kind;
-  KeyboardModifier modifier_mask;
-  KeyboardKey key;
-  MouseButton mouse_button;
+typedef struct Platform_event Platform_event;
+struct Platform_event {
+  Platform_event *next;
+  Platform_event *prev;
+  Platform_event_kind kind;
+  Keyboard_modifier modifier_mask;
+  Keyboard_key key;
+  Mouse_button mouse_button;
   b16 is_repeat;
   u16 repeat_count;
   u32 character;
@@ -30,31 +30,31 @@ struct Platform_Event {
   Vec2 scroll_delta;
 };
 
-typedef struct Platform_EventList Platform_EventList;
-struct Platform_EventList {
+typedef struct Platform_event_list Platform_event_list;
+struct Platform_event_list {
   s64 count;
-  Platform_Event *first;
-  Platform_Event *last;
+  Platform_event *first;
+  Platform_event *last;
 };
 
 
 
-typedef KeyboardModifier Platform_GetKeyboardModifiersFunc(void);
-typedef Str8             Platform_DebugReadEntireFileFunc(Str8);
-typedef b32              Platform_DebugWriteEntireFileFunc(Str8, Str8);
+typedef Keyboard_modifier Platform_get_keyboard_modifiers_func(void);
+typedef Str8              Platform_read_entire_file_func(char*);
+typedef b32               Platform_write_entire_file_func(Str8, char*);
 
-typedef struct Platform_Vtable Platform_Vtable;
-struct Platform_Vtable {
-  Platform_GetKeyboardModifiersFunc *get_keyboard_modifiers;
-  Platform_DebugReadEntireFileFunc  *debug_read_entire_file;
-  Platform_DebugWriteEntireFileFunc *debug_write_entire_file;
+typedef struct Platform_vtable Platform_vtable;
+struct Platform_vtable {
+  Platform_get_keyboard_modifiers_func  *get_keyboard_modifiers;
+  Platform_read_entire_file_func  *read_entire_file;
+  Platform_write_entire_file_func *write_entire_file;
 };
 
 typedef struct Platform Platform;
 struct Platform {
   void *game_memory_backbuffer;
   u64 game_memory_backbuffer_size;
-  Platform_Vtable vtable;
+  Platform_vtable vtable;
 };
 
 #endif

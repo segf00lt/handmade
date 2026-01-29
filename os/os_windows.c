@@ -33,7 +33,7 @@ func os_read_entire_file(Arena *a, Str8 path) {
 
   FILE *f = 0;
   arena_scope(a) {
-    f = fopen(cstr_copy_str8(a, path), "rb");
+    f = fopen(cstr_from_str8(a, path), "rb");
   }
 
   if(f == NULL) {
@@ -79,7 +79,7 @@ func os_file_exists(Arena *a, Str8 path) {
   b32 result = 0;
 
   arena_scope(a) {
-    char *cstr_path = cstr_copy_str8(a, path);
+    char *cstr_path = cstr_from_str8(a, path);
     DWORD dwAttrib = GetFileAttributesA(cstr_path);
     result = dwAttrib != INVALID_FILE_ATTRIBUTES;
   }
@@ -114,8 +114,8 @@ func os_move_file(Arena *a, Str8 old_path, Str8 new_path) {
   b32 result = 0;
 
   arena_scope(a) {
-    const char *old_path_cstr = cstr_copy_str8(a, old_path);
-    const char *new_path_cstr = cstr_copy_str8(a, new_path);
+    const char *old_path_cstr = cstr_from_str8(a, old_path);
+    const char *new_path_cstr = cstr_from_str8(a, new_path);
 
     result = MoveFileEx(old_path_cstr, new_path_cstr, MOVEFILE_REPLACE_EXISTING);
   }
@@ -128,7 +128,7 @@ func os_remove_file(Arena *a, Str8 path) {
   b32 result = 1;
 
   arena_scope(a) {
-    const char *path_cstr = cstr_copy_str8(a, path);
+    const char *path_cstr = cstr_from_str8(a, path);
     if(!DeleteFileA(path_cstr)) {
       result = 0;
     }
@@ -142,7 +142,7 @@ func os_library_load(Arena *a, Str8 path) {
   void *lib = 0;
 
   arena_scope(a) {
-    LPCSTR path_cstr = (LPCSTR)cstr_copy_str8(a, path);
+    LPCSTR path_cstr = (LPCSTR)cstr_from_str8(a, path);
     HMODULE dll = LoadLibraryA(path_cstr);
     lib = (void*)dll;
   }
@@ -161,7 +161,7 @@ func os_library_load_func(Arena *a, void* lib, Str8 name) {
 
   arena_scope(a) {
     HMODULE dll_handle = (HMODULE)lib;
-    LPCSTR func_name = (LPCSTR)cstr_copy_str8(a, name);
+    LPCSTR func_name = (LPCSTR)cstr_from_str8(a, name);
     fn = (Void_Func*)GetProcAddress(dll_handle, func_name);
   }
 
@@ -172,7 +172,7 @@ internal b32
 func os_make_dir(Arena *a, Str8 path) {
   b32 result = 0;
   arena_scope(a) {
-    result = _mkdir(cstr_copy_str8(a, path));
+    result = _mkdir(cstr_from_str8(a, path));
   }
 
   if(result < 0) {

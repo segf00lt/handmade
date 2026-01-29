@@ -111,6 +111,7 @@ int main(int argc, char **argv) {
 
   return 0;
   if(!win32_build_hot_reload_no_cradle()) return 1;
+
   if(!win32_build_static()) return 1;
 
   if(!macos_build_virutal_memory_test()) return 1;

@@ -2,7 +2,7 @@
 #define DEVICE_INPUT_H
 
 
-typedef enum KeyboardModifierIndex {
+typedef enum Keyboard_modifier_index {
   KBD_MOD_INDEX_NONE = -1,
 
   KBD_MOD_INDEX_SHIFT,
@@ -11,21 +11,21 @@ typedef enum KeyboardModifierIndex {
   KBD_MOD_INDEX_META,
 
   KBD_MOD_INDEX_MAX,
-} KeyboardModifierIndex;
+} Keyboard_modifier_index;
 
-typedef u32 KeyboardModifier;
-#define KBD_MOD_SHIFT   ((KeyboardModifier)(1 << KBD_MOD_INDEX_SHIFT))
-#define KBD_MOD_CONTROL ((KeyboardModifier)(1 << KBD_MOD_INDEX_CONTROL))
-#define KBD_MOD_ALT     ((KeyboardModifier)(1 << KBD_MOD_INDEX_ALT))
-#define KBD_MOD_META    ((KeyboardModifier)(1 << KBD_MOD_INDEX_META))
+typedef u32 Keyboard_modifier;
+#define KBD_MOD_SHIFT   ((Keyboard_modifier)(1 << KBD_MOD_INDEX_SHIFT))
+#define KBD_MOD_CONTROL ((Keyboard_modifier)(1 << KBD_MOD_INDEX_CONTROL))
+#define KBD_MOD_ALT     ((Keyboard_modifier)(1 << KBD_MOD_INDEX_ALT))
+#define KBD_MOD_META    ((Keyboard_modifier)(1 << KBD_MOD_INDEX_META))
 
-typedef enum MouseButton {
+typedef enum Mouse_button {
   MOUSE_BUTTON_LEFT,
   MOUSE_BUTTON_RIGHT,
   MOUSE_BUTTON_MIDDLE,
-} MouseButton;
+} Mouse_button;
 
-typedef enum KeyboardKey {
+typedef enum Keyboard_key {
   KBD_KEY_NULL = 0,
 
   KBD_KEY_LEFT_SHIFT,
@@ -108,10 +108,10 @@ typedef enum KeyboardKey {
 
   KBD_KEY_MAX,
 
-} KeyboardKey;
+} Keyboard_key;
 
 
-internal b32 is_modifier_key(KeyboardKey key);
+internal b32 is_modifier_key(Keyboard_key key);
 
 
 #endif

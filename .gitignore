@@ -45,3 +45,5 @@ main
 job_system_example
 copy_of_game.txt
 macos_virtual_memory_test
+*.input
+*.state
