@@ -6,29 +6,31 @@
 // This file contains typedefs for the game.
 
 
-typedef struct Game_SoundBuffer Game_SoundBuffer;
-struct Game_SoundBuffer {
+typedef struct Game_sound_buffer Game_sound_buffer;
+struct Game_sound_buffer {
   int samples_per_second;
   int sample_count;
   s16 *samples;
 };
 
-typedef struct Game_RenderBuffer Game_RenderBuffer;
-struct Game_RenderBuffer {
+typedef struct Game_render_buffer Game_render_buffer;
+struct Game_render_buffer {
   u8 *pixels;
   s32 width;
   s32 height;
   u32 stride; // NOTE jfd: This comes from the backbuffer thing
 };
 
-typedef struct Game_Input Game_Input;
-struct Game_Input {
-  KeyboardModifier modifier_mask;
+typedef struct Game_input Game_input;
+struct Game_input {
+  Keyboard_modifier modifier_mask;
   u32 key_pressed[KBD_KEY_MAX];
   b32 key_released[KBD_KEY_MAX];
   Vec2 mouse_pos;
   Vec2 mouse_delta;
 };
+
+TYPEDEF_SLICE(Game_input, Game_input_slice);
 
 typedef struct Game Game;
 struct Game {
@@ -38,9 +40,9 @@ struct Game {
   Arena *frame_arena;
   Arena *temp_arena;
 
-  Game_RenderBuffer render;
-  Game_SoundBuffer sound;
-  Game_Input input;
+  Game_render_buffer render;
+  Game_sound_buffer sound;
+  Game_input input;
 
   s32 test_sound_pitch;
 
@@ -57,17 +59,17 @@ STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
 
 
 
-typedef void  Game_UpdateAndRenderFunc(Game *gp);
-typedef void  Game_GetSoundSamplesFunc(Game *gp);
-typedef Game* Game_InitFunc(Platform *pp);
+typedef void  Game_update_and_render_func(Game *gp);
+typedef void  Game_get_sound_samples_func(Game *gp);
+typedef Game* Game_init_func(Platform *pp);
 
-typedef struct Game_Vtable Game_Vtable;
-struct Game_Vtable {
-  Game_InitFunc            *init;
-  Game_UpdateAndRenderFunc *update_and_render;
-  Game_GetSoundSamplesFunc *get_sound_samples;
+typedef struct Game_vtable Game_vtable;
+struct Game_vtable {
+  Game_init_func            *init;
+  Game_update_and_render_func *update_and_render;
+  Game_get_sound_samples_func *get_sound_samples;
 };
 
-typedef Game_Vtable Game_LoadProcsFunc(void);
+typedef Game_vtable Game_load_procs_func(void);
 
 #endif

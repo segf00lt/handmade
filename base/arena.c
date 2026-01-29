@@ -144,15 +144,15 @@ func arena_pop(Arena *arena, u64 amount) {
   arena_pop_to(arena, new_pos);
 }
 
-internal Arena_Scope
+internal Arena_scope
 func arena_scope_begin(Arena *arena) {
   u64 pos = arena_pos(arena);
-  Arena_Scope scope = { arena, pos };
+  Arena_scope scope = { arena, pos };
   return scope;
 }
 
 internal void
-func arena_scope_end(Arena_Scope scope) {
+func arena_scope_end(Arena_scope scope) {
   arena_pop_to(scope.arena, scope.pos);
 }
 

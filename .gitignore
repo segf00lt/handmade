@@ -44,3 +44,5 @@ semaphore_exercise
 main
 job_system_example
 copy_of_game.txt
+*.input
+*.state

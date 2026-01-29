@@ -20,8 +20,8 @@ struct Arena {
 
 STATIC_ASSERT(sizeof(Arena) <= ARENA_HEADER_SIZE, arena_header_size_check);
 
-typedef struct Arena_Scope Arena_Scope;
-struct Arena_Scope {
+typedef struct Arena_scope Arena_scope;
+struct Arena_scope {
   Arena *arena;
   u64 pos;
 };
@@ -46,10 +46,10 @@ internal void  arena_pop_to(Arena *arena, u64 pos);
 internal void arena_clear(Arena *arena);
 internal void arena_pop(Arena *arena, u64 amount);
 
-internal Arena_Scope arena_scope_begin(Arena *arena);
-internal void arena_scope_end(Arena_Scope scope);
+internal Arena_scope arena_scope_begin(Arena *arena);
+internal void arena_scope_end(Arena_scope scope);
 
-#define arena_scope(a) for(Arena_Scope __scope__##__LINE__ = arena_scope_begin((a)); __scope__##__LINE__.arena != (Arena*)0; arena_scope_end(__scope__##__LINE__), __scope__##__LINE__.arena = (Arena*)0)
+#define arena_scope(a) for(Arena_scope __scope__##__LINE__ = arena_scope_begin((a)); __scope__##__LINE__.arena != (Arena*)0; arena_scope_end(__scope__##__LINE__), __scope__##__LINE__.arena = (Arena*)0)
 
 #define push_array_no_zero_aligned(a, T, n, align) (T*)arena_push((a), sizeof(T)*(n), (align))
 #define push_array_aligned(a, T, n, align) (T*)memory_zero(push_array_no_zero_aligned(a, T, n, align), sizeof(T)*(n))

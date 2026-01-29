@@ -14,7 +14,7 @@
 
 
 internal force_inline void
-func str8_list_append_node_(Str8_List *list, Str8_Node *node) {
+func str8_list_append_node_(Str8_list *list, Str8_node *node) {
   sll_queue_push(list->first, list->last, node);
   list->count++;
   list->total_len += node->str.len;
@@ -40,8 +40,8 @@ func str8_cat(Arena *a, Str8 str1, Str8 str2) {
 }
 
 internal void
-func str8_list_insert_first_str_(Arena *a, Str8_List *list, Str8 str) {
-  Str8_Node *node = push_struct(a, Str8_Node);
+func str8_list_insert_first_str_(Arena *a, Str8_list *list, Str8 str) {
+  Str8_node *node = push_struct(a, Str8_node);
   node->str = str;
   sll_queue_push_front(list->first, list->last, node);
   list->count++;
@@ -49,20 +49,20 @@ func str8_list_insert_first_str_(Arena *a, Str8_List *list, Str8 str) {
 }
 
 internal void
-func str8_list_append_str_(Arena *a, Str8_List *list, Str8 str) {
-  Str8_Node *node = push_struct(a, Str8_Node);
+func str8_list_append_str_(Arena *a, Str8_list *list, Str8 str) {
+  Str8_node *node = push_struct(a, Str8_node);
   node->str = str;
   sll_queue_push(list->first, list->last, node);
   list->count++;
   list->total_len += str.len;
 }
 
-internal Str8_List
-func str8_list_copy(Arena *a, Str8_List list) {
-  Str8_List result = {0};
+internal Str8_list
+func str8_list_copy(Arena *a, Str8_list list) {
+  Str8_list result = {0};
 
-  for(Str8_Node *node = list.first; node; node = node->next) {
-    Str8_Node *new_node = push_array_no_zero(a, Str8_Node, 1);
+  for(Str8_node *node = list.first; node; node = node->next) {
+    Str8_node *new_node = push_array_no_zero(a, Str8_node, 1);
     new_node->str = node->str;
     new_node->next = 0;
     str8_list_append_node_(&result, new_node);
@@ -72,10 +72,10 @@ func str8_list_copy(Arena *a, Str8_List list) {
 }
 
 internal Str8
-func str8_list_join(Arena *a, Str8_List list, Str8 sep) {
+func str8_list_join(Arena *a, Str8_list list, Str8 sep) {
   Str8 result = {0};
 
-  Str8_Node *node = list.first;
+  Str8_node *node = list.first;
 
   if(list.count <= 0) return result;
   if(!node) return result;
@@ -237,13 +237,13 @@ func str8_find_first_whitespace(Str8 haystack) {
   return found;
 }
 
-internal Str8_FindResults
+internal Str8_find_results
 func str8_find_all_chars(Arena *a, Str8 haystack, u8 needle, Arena *output_arena) {
-  Str8_FindResults results = {0};
+  Str8_find_results results = {0};
 
   ASSERT(a != output_arena);
 
-  Arena_Scope scope = arena_scope_begin(a);
+  Arena_scope scope = arena_scope_begin(a);
 
   Arr(s64) begin_indexes;
   Arr(s64) end_indexes;
@@ -276,13 +276,13 @@ func str8_find_all_chars(Arena *a, Str8 haystack, u8 needle, Arena *output_arena
   return results;
 }
 
-internal Str8_FindResults
+internal Str8_find_results
 func str8_find_all(Arena *a, Str8 haystack, Str8 needle, Arena *output_arena) {
-  Str8_FindResults results = {0};
+  Str8_find_results results = {0};
 
   ASSERT(a != output_arena);
 
-  Arena_Scope scope = arena_scope_begin(a);
+  Arena_scope scope = arena_scope_begin(a);
 
   Arr(s64) begin_indexes;
   Arr(s64) end_indexes;
@@ -569,11 +569,11 @@ func str8_chop_last_slash(Str8 str) {
   return str;
 }
 
-internal Str8_List
+internal Str8_list
 func str8_split_by_chars(Arena *a, Str8 str, u8 *sep_chars, s64 n_sep_chars) {
-  Str8_List result = {0};
-  Str8_Node head = {0};
-  Str8_Node *node = &head;
+  Str8_list result = {0};
+  Str8_node head = {0};
+  Str8_node *node = &head;
 
   s64 begin = 0;
 
@@ -593,7 +593,7 @@ func str8_split_by_chars(Arena *a, Str8 str, u8 *sep_chars, s64 n_sep_chars) {
         i += 1;
         begin = i;
       } else {
-        node->next = push_array_no_zero(a, Str8_Node, 1);
+        node->next = push_array_no_zero(a, Str8_node, 1);
         node = node->next;
         node->str.s = str.s + begin;
         node->str.len = i - begin;
@@ -612,7 +612,7 @@ func str8_split_by_chars(Arena *a, Str8 str, u8 *sep_chars, s64 n_sep_chars) {
   }
 
   if(begin < i) {
-    node->next = push_array_no_zero(a, Str8_Node, 1);
+    node->next = push_array_no_zero(a, Str8_node, 1);
     node = node->next;
     node->str.s = str.s + begin;
     node->str.len = i - begin;
@@ -628,16 +628,16 @@ func str8_split_by_chars(Arena *a, Str8 str, u8 *sep_chars, s64 n_sep_chars) {
   return result;
 }
 
-internal force_inline Str8_List
+internal force_inline Str8_list
 func str8_split_by_char(Arena *a, Str8 str, u8 sep_char) {
   return str8_split_by_chars(a, str, &sep_char, 1);
 }
 
-internal Str8_List
+internal Str8_list
 func str8_split_by_str(Arena *a, Str8 str, Str8 sep) {
-  Str8_List result = {0};
-  Str8_Node head = {0};
-  Str8_Node *node = &head;
+  Str8_list result = {0};
+  Str8_node head = {0};
+  Str8_node *node = &head;
 
   s64 begin = 0;
 
@@ -658,7 +658,7 @@ func str8_split_by_str(Arena *a, Str8 str, Str8 sep) {
         i += j;
         begin = i;
       } else {
-        node->next = push_array_no_zero(a, Str8_Node, 1);
+        node->next = push_array_no_zero(a, Str8_node, 1);
         node = node->next;
         node->str.s = str.s + begin;
         node->str.len = i - begin;
@@ -677,7 +677,7 @@ func str8_split_by_str(Arena *a, Str8 str, Str8 sep) {
   }
 
   if(begin < i) {
-    node->next = push_array_no_zero(a, Str8_Node, 1);
+    node->next = push_array_no_zero(a, Str8_node, 1);
     node = node->next;
     node->str.s = str.s + begin;
     node->str.len = i - begin;

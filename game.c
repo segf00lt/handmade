@@ -7,9 +7,9 @@
 
 #ifdef HANDMADE_HOTRELOAD
 
-Platform_GetKeyboardModifiersFunc *platform_get_keyboard_modifiers;
-Platform_DebugReadEntireFileFunc  *platform_debug_read_entire_file;
-Platform_DebugWriteEntireFileFunc *platform_debug_write_entire_file;
+Platform_get_keyboard_modifiers_func *platform_get_keyboard_modifiers;
+Platform_debug_read_entire_file_func  *platform_debug_read_entire_file;
+Platform_debug_write_entire_file_func *platform_debug_write_entire_file;
 
 #endif
 
@@ -20,9 +20,9 @@ Platform_DebugWriteEntireFileFunc *platform_debug_write_entire_file;
 // functions
 
 
-Game_Vtable
+Game_vtable
 func game_load_procs(void) {
-  Game_Vtable vtable = {
+  Game_vtable vtable = {
     .init              = &game_init,
     .update_and_render = &game_update_and_render,
     .get_sound_samples = &game_get_sound_samples,
@@ -35,15 +35,14 @@ Game*
 func game_init(Platform *pp) {
   Arena *game_main_arena = arena_create_ex(pp->game_memory_backbuffer_size, true, pp->game_memory_backbuffer);
 
-  Game *gp = push_struct(game_main_arena, Game);
-  gp->main_arena = game_main_arena;
-
-  u64 game_frame_arena_backbuffer_size = MB(20);
-  u64 game_temp_arena_backbuffer_size  = MB(10);
+  u64 game_frame_arena_backbuffer_size = MB(5);
+  u64 game_temp_arena_backbuffer_size  = MB(5);
 
   void *game_frame_arena_backbuffer = arena_push(game_main_arena, game_frame_arena_backbuffer_size, 1);
   void *game_temp_arena_backbuffer  = arena_push(game_main_arena, game_temp_arena_backbuffer_size,  1);
 
+  Game *gp = push_struct(game_main_arena, Game);
+  gp->main_arena = game_main_arena;
   gp->frame_arena = arena_create_ex(game_frame_arena_backbuffer_size, true, game_frame_arena_backbuffer);
   gp->temp_arena  = arena_create_ex(game_temp_arena_backbuffer_size,  true, game_temp_arena_backbuffer);
 
@@ -79,8 +78,8 @@ func render_weird_gradient(Game *gp, int x_offset, int y_offset) {
       u8 b = (u8)(y + y_offset);
 
       // *pixel++ = (r << 16) | (g << 8) | b;
-      *pixel++ = (r << 16) | (b << 8) | g;
-      // *pixel++ = (r << 8) | (g << 16) | b;
+      // *pixel++ = (r << 16) | (b << 8) | g;
+      *pixel++ = (r << 8) | (g << 16) | b;
     }
 
     row += gp->render.stride;
@@ -90,23 +89,23 @@ func render_weird_gradient(Game *gp, int x_offset, int y_offset) {
 
 
 internal b32
-func was_key_pressed_once(Game *gp, KeyboardKey key) {
+func was_key_pressed_once(Game *gp, Keyboard_key key) {
   return !!(gp->input.key_pressed[key] == 1);
 }
 
 internal b32
-func is_key_pressed(Game *gp, KeyboardKey key) {
+func is_key_pressed(Game *gp, Keyboard_key key) {
   return !!(gp->input.key_pressed[key] > 0);
 }
 
 internal b32
-func was_key_released(Game *gp, KeyboardKey key) {
+func was_key_released(Game *gp, Keyboard_key key) {
   return (gp->input.key_released[key] == true);
 }
 
 internal void
 func output_sound(Game *gp) {
-  Game_SoundBuffer *sound_buffer = &gp->sound;
+  Game_sound_buffer *sound_buffer = &gp->sound;
 
   s16 tone_volume = 600;
   int tone_hz = 256;

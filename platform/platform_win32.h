@@ -13,14 +13,14 @@
 #include <objbase.h>
 
 
-typedef struct PlatformWin32_WindowDimensions PlatformWin32_WindowDimensions;
-struct PlatformWin32_WindowDimensions {
+typedef struct Platform_win32_window_dimensions Platform_win32_window_dimensions;
+struct Platform_win32_window_dimensions {
   s32 width;
   s32 height;
 };
 
-typedef struct PlatformWin32_Backbuffer PlatformWin32_Backbuffer;
-struct PlatformWin32_Backbuffer {
+typedef struct Platform_win32_backbuffer Platform_win32_backbuffer;
+struct Platform_win32_backbuffer {
   BITMAPINFO bitmap_info;
   u8 *bitmap_memory;
   s32 bitmap_height;
@@ -29,8 +29,8 @@ struct PlatformWin32_Backbuffer {
   u32 stride;
 };
 
-typedef struct PlatformWin32_SoundOutput PlatformWin32_SoundOutput;
-struct PlatformWin32_SoundOutput {
+typedef struct Platform_win32_sound_output Platform_win32_sound_output;
+struct Platform_win32_sound_output {
   int samples_per_second;
   DWORD buffer_size;
   u32 running_sample_index; // TODO jfd: should this be in bytes instead?
@@ -39,8 +39,8 @@ struct PlatformWin32_SoundOutput {
   DWORD safety_bytes;
 };
 
-typedef struct PlatformWin32Debug_TimeMarker PlatformWin32Debug_TimeMarker;
-struct PlatformWin32Debug_TimeMarker {
+typedef struct Platform_win32_debug_time_marker Platform_win32_debug_time_marker;
+struct Platform_win32_debug_time_marker {
   DWORD output_play_cursor;
   DWORD output_write_cursor;
   DWORD output_location;
@@ -50,44 +50,58 @@ struct PlatformWin32Debug_TimeMarker {
   DWORD flip_write_cursor;
 };
 
-TYPEDEF_SLICE(PlatformWin32Debug_TimeMarker, PlatformWin32Debug_TimeMarkerSlice);
+typedef struct Platform_win32_debug_loop_recorder Platform_win32_debug_loop_recorder;
+struct Platform_win32_debug_loop_recorder {
+  HANDLE           game_input_file_handle;
+  Game_input_slice recorded_game_input;
+  Str8             recorded_game_state;
+  b32              recording_loop;
+  b32              playing_loop;
+  b32              stop_playing_loop;
+  s64              input_recording_write_index;
+  s64              input_recording_play_index;
+  b32              write_game_state_to_file;
+  b32              read_game_state_from_file;
+};
+
+TYPEDEF_SLICE(Platform_win32_debug_time_marker, Platform_win32_debug_time_marker_slice);
 
 internal LRESULT CALLBACK platform_win32_main_window_callback(HWND window, UINT message, WPARAM w_param, LPARAM l_param);
 
-internal void platform_win32_resize_backbuffer(PlatformWin32_Backbuffer *backbuffer, int window_width, int window_height);
+internal void platform_win32_resize_backbuffer(Platform_win32_backbuffer *backbuffer, int window_width, int window_height);
 
-internal void platform_win32_display_buffer_in_window(PlatformWin32_Backbuffer *backbuffer, HDC device_context, int window_width, int window_height, int x, int y, int width, int height);
+internal void platform_win32_display_buffer_in_window(Platform_win32_backbuffer *backbuffer, HDC device_context, int window_width, int window_height, int x, int y, int width, int height);
 
-internal PlatformWin32_WindowDimensions platform_win32_get_window_dimensions(HWND window_handle);
+internal Platform_win32_window_dimensions platform_win32_get_window_dimensions(HWND window_handle);
 
 internal void platform_win32_load_xinput(void);
 
 #define PLATFORM_WIN32_XINPUT_SET_STATE(name) DWORD name(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
-typedef PLATFORM_WIN32_XINPUT_SET_STATE(PlatformWin32_XInputSetStateFunc);
+typedef PLATFORM_WIN32_XINPUT_SET_STATE(Platform_win32_xinput_set_state_func);
 
 PLATFORM_WIN32_XINPUT_SET_STATE(_platform_win32_xinput_set_state_stub) {
   return 0;
 }
 
 #define PLATFORM_WIN32_XINPUT_GET_STATE(name) DWORD name(DWORD dwUserIndex, XINPUT_STATE *pState)
-typedef PLATFORM_WIN32_XINPUT_GET_STATE(PlatformWin32_XInputGetStateFunc);
+typedef PLATFORM_WIN32_XINPUT_GET_STATE(Platform_win32_xinput_get_state_func);
 
 PLATFORM_WIN32_XINPUT_GET_STATE(_platform_win32_xinput_get_state_stub) {
   return 0;
 }
 
 #define PLATFORM_WIN32_DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPGUID lpGuid, LPDIRECTSOUND* ppDS, LPUNKNOWN  pUnkOuter)
-typedef PLATFORM_WIN32_DIRECT_SOUND_CREATE(PlatformWin32_DirectSoundCreateFunc);
+typedef PLATFORM_WIN32_DIRECT_SOUND_CREATE(Platform_win32_direct_sound_create_func);
 PLATFORM_WIN32_DIRECT_SOUND_CREATE(_platform_win32_direct_sound_create_stub) {
   return 0;
 }
 
-internal Platform_Event* platform_win32_event_push(Arena *a, Platform_EventList *event_list, Platform_EventKind event_kind);
-internal Platform_Event* platform_win32_event_pop(Platform_EventList *event_list);
+internal Platform_event* platform_win32_event_push(Arena *a, Platform_event_list *event_list, Platform_event_kind event_kind);
+internal Platform_event* platform_win32_event_pop(Platform_event_list *event_list);
 
-internal KeyboardKey platform_win32_keyboard_key_from_virtual_keycode(WPARAM virtual_keycode);
+internal Keyboard_key platform_win32_keyboard_key_from_virtual_keycode(WPARAM virtual_keycode);
 
-internal void platform_get_game_input_from_events(Platform_EventList *event_list, Game *gp);
+internal void platform_get_game_input_from_events(Platform_event_list *event_list, Game *gp);
 
 force_inline void platform_win32_sleep_ms(DWORD ms);
 

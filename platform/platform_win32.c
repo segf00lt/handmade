@@ -15,16 +15,18 @@ global Arena *platform_temp_arena;
 global Arena *platform_event_arena;
 global Arena *platform_file_arena;
 
-global PlatformWin32_XInputGetStateFunc *platform_win32_xinput_get_state = _platform_win32_xinput_get_state_stub;
-global PlatformWin32_XInputSetStateFunc *platform_win32_xinput_set_state = _platform_win32_xinput_set_state_stub;
+global Platform_win32_xinput_get_state_func *platform_win32_xinput_get_state = _platform_win32_xinput_get_state_stub;
+global Platform_win32_xinput_set_state_func *platform_win32_xinput_set_state = _platform_win32_xinput_set_state_stub;
 
 #ifdef HANDMADE_HOTRELOAD
 
-HMODULE game_dll;
+global HMODULE game_dll;
 
-Game_InitFunc            *game_init;
-Game_UpdateAndRenderFunc *game_update_and_render;
-Game_GetSoundSamplesFunc *game_get_sound_samples;
+global Game_init_func              *game_init;
+global Game_update_and_render_func *game_update_and_render;
+global Game_get_sound_samples_func *game_get_sound_samples;
+
+global Platform_win32_debug_loop_recorder debug_loop_recorder;
 
 #endif
 
@@ -33,17 +35,17 @@ global b32 debug_paused;
 #endif
 
 global b32 platform_is_running;
-global PlatformWin32_Backbuffer global_backbuffer = {
+global Platform_win32_backbuffer global_backbuffer = {
   .bytes_per_pixel = 4,
 };
 
-global PlatformWin32_SoundOutput _platform_sound_output_stub;
-global PlatformWin32_SoundOutput *platform_sound_output = &_platform_sound_output_stub;
+global Platform_win32_sound_output _platform_sound_output_stub;
+global Platform_win32_sound_output *platform_sound_output = &_platform_sound_output_stub;
 
 global LPDIRECTSOUNDBUFFER platform_sound_buffer; // this is what we write to
 
-global Platform_EventList _platform_event_list_stub;
-global Platform_EventList *platform_event_list = &_platform_event_list_stub;
+global Platform_event_list _platform_event_list_stub;
+global Platform_event_list *platform_event_list = &_platform_event_list_stub;
 
 global s64 platform_win32_perf_counter_frequency;
 
@@ -52,11 +54,11 @@ global s64 platform_win32_perf_counter_frequency;
 // functions
 
 internal
-func PlatformWin32_WindowDimensions platform_win32_get_window_dimensions(HWND window_handle) {
+func Platform_win32_window_dimensions platform_win32_get_window_dimensions(HWND window_handle) {
   RECT client_rect;
   GetClientRect(window_handle, &client_rect);
 
-  PlatformWin32_WindowDimensions window_dimensions = {
+  Platform_win32_window_dimensions window_dimensions = {
     .width = client_rect.right - client_rect.left,
     .height = client_rect.bottom - client_rect.top,
   };
@@ -65,7 +67,7 @@ func PlatformWin32_WindowDimensions platform_win32_get_window_dimensions(HWND wi
 }
 
 internal
-func void platform_win32_resize_backbuffer(PlatformWin32_Backbuffer *backbuffer, int window_width, int window_height) {
+func void platform_win32_resize_backbuffer(Platform_win32_backbuffer *backbuffer, int window_width, int window_height) {
   int width = window_width;
   int height = window_height;
   // TODO jfd: bulletproof this
@@ -95,7 +97,7 @@ func void platform_win32_resize_backbuffer(PlatformWin32_Backbuffer *backbuffer,
 
 internal void
 func platform_win32_display_buffer_in_window(
-  PlatformWin32_Backbuffer *backbuffer,
+  Platform_win32_backbuffer *backbuffer,
   HDC device_context,
   int window_width,
   int window_height,
@@ -117,9 +119,9 @@ func platform_win32_display_buffer_in_window(
 
 }
 
-internal KeyboardModifier
+internal Keyboard_modifier
 func platform_get_keyboard_modifiers(void) {
-  KeyboardModifier modifier_mask = 0;
+  Keyboard_modifier modifier_mask = 0;
 
   if(GetKeyState(VK_CONTROL) & 0x8000) {
     modifier_mask |= KBD_MOD_CONTROL;
@@ -141,9 +143,9 @@ func platform_get_keyboard_modifiers(void) {
 }
 
 
-internal Platform_Event*
-func platform_win32_event_push(Arena *a, Platform_EventList *event_list, Platform_EventKind event_kind) {
-  Platform_Event *event = push_struct_no_zero(a, Platform_Event);
+internal Platform_event*
+func platform_win32_event_push(Arena *a, Platform_event_list *event_list, Platform_event_kind event_kind) {
+  Platform_event *event = push_struct_no_zero(a, Platform_event);
   event->kind = event_kind;
   event->modifier_mask = platform_get_keyboard_modifiers();
   sll_queue_push(event_list->first, event_list->last, event);
@@ -152,18 +154,18 @@ func platform_win32_event_push(Arena *a, Platform_EventList *event_list, Platfor
 }
 
 
-internal Platform_Event*
-func platform_win32_event_pop(Platform_EventList *event_list) {
-  Platform_Event *event = event_list->last;
+internal Platform_event*
+func platform_win32_event_pop(Platform_event_list *event_list) {
+  Platform_event *event = event_list->last;
   sll_queue_pop(event_list->first, event_list->last);
   event_list->count--;
   return event;
 }
 
 
-internal MouseButton
+internal Mouse_button
 func platform_win32_mouse_button_from_virtual_keycode(WPARAM virtual_keycode) {
-  MouseButton button = 0;
+  Mouse_button button = 0;
 
   switch(virtual_keycode) {
     case VK_LBUTTON /* 0x01	Left mouse button */:
@@ -180,9 +182,9 @@ func platform_win32_mouse_button_from_virtual_keycode(WPARAM virtual_keycode) {
   return button;
 }
 
-internal KeyboardKey
+internal Keyboard_key
 func platform_win32_keyboard_key_from_virtual_keycode(WPARAM virtual_keycode) {
-  KeyboardKey key = 0;
+  Keyboard_key key = 0;
 
   switch(virtual_keycode) {
     case VK_CANCEL /* 0x03	Control-break processing */:
@@ -554,12 +556,12 @@ func platform_win32_keyboard_key_from_virtual_keycode(WPARAM virtual_keycode) {
 
 // TODO jfd: mouse clicks and scroll wheel
 internal void
-func platform_get_game_input_from_events(Platform_EventList *event_list, Game *gp) {
-  Game_Input *input = &gp->input;
+func platform_get_game_input_from_events(Platform_event_list *event_list, Game *gp) {
+  Game_input *input = &gp->input;
 
   memory_zero(input->key_released, sizeof(input->key_released));
 
-  for(Platform_Event *event = event_list->first; event; event = event->next) {
+  for(Platform_event *event = event_list->first; event; event = event->next) {
 
     switch(event->kind) {
       case EVENT_KEY_PRESS: {
@@ -621,7 +623,7 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
   switch(message) {
     case WM_SIZE: {
 
-      PlatformWin32_WindowDimensions window_dimensions = platform_win32_get_window_dimensions(window);
+      Platform_win32_window_dimensions window_dimensions = platform_win32_get_window_dimensions(window);
 
       platform_win32_resize_backbuffer(&global_backbuffer, window_dimensions.width, window_dimensions.height);
     } break;
@@ -647,7 +649,7 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
     case WM_KEYUP: {
       u32 virtual_keycode = (u32)wParam;
 
-      KeyboardKey key = platform_win32_keyboard_key_from_virtual_keycode(virtual_keycode);
+      Keyboard_key key = platform_win32_keyboard_key_from_virtual_keycode(virtual_keycode);
 
       u16 key_repeat_count = (u16)lParam & 0x7fff;
       b32 was_down = ((u32)lParam & (1 << 30)) != 0;
@@ -662,7 +664,7 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
         is_repeat = 1;
       }
 
-      Platform_Event *event = platform_win32_event_push(platform_event_arena, platform_event_list, release ? EVENT_KEY_RELEASE : EVENT_KEY_PRESS);
+      Platform_event *event = platform_win32_event_push(platform_event_arena, platform_event_list, release ? EVENT_KEY_RELEASE : EVENT_KEY_PRESS);
 
       // TODO jfd: distinguish right and left modifiers with is_right_sided (???)
 
@@ -671,8 +673,30 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
       event->repeat_count = key_repeat_count;
 
       #ifdef HANDMADE_INTERNAL
-      if(is_down && key == KBD_KEY_F8) {
-        debug_paused = !debug_paused;
+      if(is_down) {
+
+        if(key == KBD_KEY_F8) {
+          debug_paused = !debug_paused;
+        } else if(key == KBD_KEY_F2) {
+          #ifdef HANDMADE_HOTRELOAD
+
+          if(debug_loop_recorder.recording_loop) {
+            debug_loop_recorder.recording_loop = false;
+            debug_loop_recorder.playing_loop = true;
+            debug_loop_recorder.read_game_state_from_file = true;
+          } else if(debug_loop_recorder.playing_loop) {
+            debug_loop_recorder.playing_loop = false;
+            debug_loop_recorder.recording_loop = false;
+            debug_loop_recorder.stop_playing_loop = true;
+          } else {
+            debug_loop_recorder.recording_loop = true;
+            debug_loop_recorder.input_recording_write_index = 0;
+            debug_loop_recorder.write_game_state_to_file = true;
+          }
+
+          #endif
+        }
+
       }
       #endif
 
@@ -699,7 +723,7 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
       s16 x_pos = (s16)LOWORD(lParam);
       s16 y_pos = (s16)HIWORD(lParam);
 
-      Platform_Event *event = platform_win32_event_push(platform_event_arena, platform_event_list, EVENT_MOUSE_MOVE);
+      Platform_event *event = platform_win32_event_push(platform_event_arena, platform_event_list, EVENT_MOUSE_MOVE);
       event->mouse_pos.x = (f32)x_pos;
       event->mouse_pos.y = (f32)y_pos;
 
@@ -707,7 +731,7 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
 
     case WM_MOUSEWHEEL: {
       s16 wheel_delta = HIWORD(wParam);
-      Platform_Event *event = platform_win32_event_push(platform_event_arena, platform_event_list, EVENT_MOUSE_SCROLL);
+      Platform_event *event = platform_win32_event_push(platform_event_arena, platform_event_list, EVENT_MOUSE_SCROLL);
       POINT p;
       p.x = (s32)(s16)LOWORD(lParam);
       p.y = (s32)(s16)HIWORD(lParam);
@@ -734,7 +758,7 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
         color = WHITENESS;
       }
 
-      PlatformWin32_WindowDimensions window_dimensions = platform_win32_get_window_dimensions(window);
+      Platform_win32_window_dimensions window_dimensions = platform_win32_get_window_dimensions(window);
       platform_win32_display_buffer_in_window(&global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, x, y, width, height);
       EndPaint(window, &paint);
     } break;
@@ -750,8 +774,8 @@ internal void
 func platform_win32_load_xinput(void) {
   void *lib = os_library_load(platform_main_arena, str8_lit("Xinput1_4.dll"));
   if(lib) {
-    platform_win32_xinput_get_state = (PlatformWin32_XInputGetStateFunc*)os_library_load_func(platform_main_arena, lib, str8_lit("XInputGetState"));
-    platform_win32_xinput_set_state = (PlatformWin32_XInputSetStateFunc*)os_library_load_func(platform_main_arena, lib, str8_lit("XInputSetState"));
+    platform_win32_xinput_get_state = (Platform_win32_xinput_get_state_func*)os_library_load_func(platform_main_arena, lib, str8_lit("XInputGetState"));
+    platform_win32_xinput_set_state = (Platform_win32_xinput_set_state_func*)os_library_load_func(platform_main_arena, lib, str8_lit("XInputSetState"));
   }
 }
 
@@ -763,8 +787,8 @@ func platform_win32_init_dsound(HWND window_handle, s32 sound_buffer_size, s32 s
 
   if(lib) {
     // NOTE jfd: get a direct sound object
-    PlatformWin32_DirectSoundCreateFunc *direct_sound_create =
-    (PlatformWin32_DirectSoundCreateFunc*)os_library_load_func(platform_main_arena, lib, str8_lit("DirectSoundCreate8"));
+    Platform_win32_direct_sound_create_func *direct_sound_create =
+    (Platform_win32_direct_sound_create_func*)os_library_load_func(platform_main_arena, lib, str8_lit("DirectSoundCreate8"));
 
     LPDIRECTSOUND direct_sound;
 
@@ -838,7 +862,7 @@ func platform_win32_init_dsound(HWND window_handle, s32 sound_buffer_size, s32 s
 }
 
 internal void
-func platform_win32_debug_draw_vertical_line(PlatformWin32_Backbuffer *backbuffer, int x, int top, int bottom, u32 color) {
+func platform_win32_debug_draw_vertical_line(Platform_win32_backbuffer *backbuffer, int x, int top, int bottom, u32 color) {
 
   if(top <= 0) {
     top = 0;
@@ -862,8 +886,8 @@ func platform_win32_debug_draw_vertical_line(PlatformWin32_Backbuffer *backbuffe
 
 internal void
 func platform_win32_debug_draw_sound_buffer_marker(
-  PlatformWin32_Backbuffer *backbuffer,
-  PlatformWin32_SoundOutput *sound_output,
+  Platform_win32_backbuffer *backbuffer,
+  Platform_win32_sound_output *sound_output,
   f32 c,
   int padding_x,
   int top,
@@ -878,9 +902,9 @@ func platform_win32_debug_draw_sound_buffer_marker(
 
 internal void
 func platform_win32_debug_audio_sync_display(
-  PlatformWin32_Backbuffer *backbuffer,
-  PlatformWin32_SoundOutput *sound_output,
-  PlatformWin32Debug_TimeMarkerSlice markers,
+  Platform_win32_backbuffer *backbuffer,
+  Platform_win32_sound_output *sound_output,
+  Platform_win32_debug_time_marker_slice markers,
   int current_marker_index,
   f32 target_seconds_per_frame
 ) {
@@ -891,7 +915,7 @@ func platform_win32_debug_audio_sync_display(
   f32 c = ((f32)backbuffer->bitmap_width - (2*padding_x)) / (f32)platform_sound_output->buffer_size;
 
   for(int marker_index = 0; marker_index < markers.count; marker_index++) {
-    PlatformWin32Debug_TimeMarker *this_marker = &markers.d[marker_index];
+    Platform_win32_debug_time_marker *this_marker = &markers.d[marker_index];
     ASSERT(this_marker->output_play_cursor < sound_output->buffer_size);
     ASSERT(this_marker->output_write_cursor < sound_output->buffer_size);
     ASSERT(this_marker->output_location < sound_output->buffer_size);
@@ -935,7 +959,7 @@ func platform_win32_debug_audio_sync_display(
 
 
 internal void
-func platform_win32_clear_sound_buffer(PlatformWin32_SoundOutput *sound_output) {
+func platform_win32_clear_sound_buffer(Platform_win32_sound_output *sound_output) {
   void *region1;
   DWORD region1_size;
   void *region2;
@@ -960,7 +984,7 @@ func platform_win32_clear_sound_buffer(PlatformWin32_SoundOutput *sound_output) 
 }
 
 internal void
-func platform_win32_fill_sound_buffer(PlatformWin32_SoundOutput *sound_output, DWORD byte_to_lock_at, DWORD bytes_to_write, Game_SoundBuffer *source_buffer) {
+func platform_win32_fill_sound_buffer(Platform_win32_sound_output *sound_output, DWORD byte_to_lock_at, DWORD bytes_to_write, Game_sound_buffer *source_buffer) {
 
   void *region1;
   DWORD region1_size;
@@ -1009,7 +1033,7 @@ internal Str8
 func platform_debug_read_entire_file(Str8 path) {
   Str8 data;
 
-  Arena_Scope scope = arena_scope_begin(platform_file_arena);
+  Arena_scope scope = arena_scope_begin(platform_file_arena);
 
   char *path_cstr = cstr_copy_str8(platform_file_arena, path);
 
@@ -1024,31 +1048,118 @@ func platform_debug_read_entire_file(Str8 path) {
   data.s = push_array_no_zero(platform_file_arena, u8, data.len);
   ASSERT(data.s);
 
-  DWORD bytes_read;
-  b32 read_file_success = ReadFile(file_handle, (void*)data.s, (s32)data.len, &bytes_read, 0);
-  ASSERT(read_file_success);
-  ASSERT((s64)bytes_read == data.len);
+  #if 0
+  u8 *ptr = data.s;
+  s64 total_len = data.len;
+  while(total_len > 0) {
 
+    DWORD dword_len;
+    if(total_len >= (s64)MAX_S32) {
+      dword_len = (DWORD)MAX_S32;
+    } else {
+      dword_len = (DWORD)total_len;
+    }
+
+    DWORD bytes_read;
+    b32 success = ReadFile(file_handle, (void*)ptr, dword_len, &bytes_read, 0);
+    ASSERT(success);
+    ASSERT((s64)bytes_read == dword_len);
+
+    ptr += bytes_read;
+    total_len -= bytes_read;
+
+  }
   CloseHandle(file_handle);
+  #else
+
+  HANDLE file_map_handle =
+  CreateFileMappingA(
+    file_handle,
+    0,
+    PAGE_READONLY,
+    file_size.HighPart,
+    file_size.LowPart,
+    0
+  );
+
+  if(!file_map_handle) {
+    DWORD err = GetLastError();
+    PANICF("file failed map error code %d\n", err);
+  }
+
+  void *file_map_view = MapViewOfFile(file_map_handle, FILE_MAP_READ, 0, 0, 0);
+  memory_copy(data.s, file_map_view, data.len);
+
+  UnmapViewOfFile(file_map_view);
+  CloseHandle(file_map_handle);
+  CloseHandle(file_handle);
+
+  #endif
 
   return data;
 }
 
 internal b32
 func platform_debug_write_entire_file(Str8 data, Str8 path) {
+  b32 success = true;
 
-  Arena_Scope scope = arena_scope_begin(platform_file_arena);
+  Arena_scope scope = arena_scope_begin(platform_file_arena);
 
   char *path_cstr = cstr_copy_str8(platform_file_arena, path);
-  HANDLE file_handle = CreateFileA(path_cstr, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
+  HANDLE file_handle = CreateFileA(path_cstr, GENERIC_WRITE | GENERIC_READ, 0, 0, CREATE_ALWAYS, 0, 0);
 
   arena_scope_end(scope);
 
-  DWORD bytes_written;
-  b32 success = WriteFile(file_handle, (void*)data.s, (DWORD)data.len, &bytes_written, 0);
-  ASSERT((s64)bytes_written == data.len);
+  #if 0
+  u8 *ptr = data.s;
+  s64 total_len = data.len;
+  while(total_len > 0) {
 
+    DWORD dword_len;
+    if(total_len >= (s64)MAX_S32) {
+      dword_len = (DWORD)MAX_S32;
+    } else {
+      dword_len = (DWORD)total_len;
+    }
+
+    DWORD bytes_written;
+    success = WriteFile(file_handle, (void*)ptr, dword_len, &bytes_written, 0);
+    ASSERT((s64)bytes_written == dword_len);
+
+    ptr += bytes_written;
+    total_len -= bytes_written;
+
+  }
   CloseHandle(file_handle);
+  #else
+
+  LARGE_INTEGER file_size;
+  file_size.QuadPart = data.len;
+
+  HANDLE file_map_handle =
+  CreateFileMappingA(
+    file_handle,
+    0,
+    PAGE_READWRITE,
+    file_size.HighPart,
+    file_size.LowPart,
+    0
+  );
+
+  if(!file_map_handle) {
+    DWORD err = GetLastError();
+    PANICF("file failed map error code %d\n", err);
+  }
+
+  void *file_map_view = MapViewOfFile(file_map_handle, FILE_MAP_WRITE, 0, 0, 0);
+  memory_copy(file_map_view, data.s, data.len);
+  FlushViewOfFile(file_map_view, 0);
+
+  UnmapViewOfFile(file_map_view);
+  CloseHandle(file_map_handle);
+  CloseHandle(file_handle);
+
+  #endif
 
   return success;
 }
@@ -1071,26 +1182,28 @@ func platform_win32_file_exists(char *path) {
 internal void
 func platform_win32_load_game(void) {
 
-  for(;;) {
-    if(MoveFileExA("game.dll", "game.dll.live", MOVEFILE_REPLACE_EXISTING)) {
-      break;
-    }
-    DWORD err = GetLastError();
-    if(err != ERROR_SHARING_VIOLATION) {
-      OutputDebugStringA("error when loading game code\n");
-      UNREACHABLE;
-    }
+  if(platform_win32_file_exists("game.dll")) {
+    for(;;) {
+      if(MoveFileExA("game.dll", "game.dll.live", MOVEFILE_REPLACE_EXISTING)) {
+        break;
+      }
+      DWORD err = GetLastError();
+      if(err != ERROR_SHARING_VIOLATION) {
+        OutputDebugStringA("error when loading game code\n");
+        UNREACHABLE;
+      }
 
-    platform_win32_sleep_ms(10);
+      platform_win32_sleep_ms(10);
+    }
   }
 
   game_dll = LoadLibraryA("game.dll.live");
   ASSERT(game_dll);
 
-  Game_LoadProcsFunc *game_load_procs = (Game_LoadProcsFunc*)GetProcAddress(game_dll, "game_load_procs");
+  Game_load_procs_func *game_load_procs = (Game_load_procs_func*)GetProcAddress(game_dll, "game_load_procs");
   ASSERT(game_load_procs);
 
-  Game_Vtable game_vtable = game_load_procs();
+  Game_vtable game_vtable = game_load_procs();
 
   game_init              = game_vtable.init;
   game_update_and_render = game_vtable.update_and_render;
@@ -1144,7 +1257,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
   platform_debug_arena = arena_create(MB(5));
   platform_temp_arena  = arena_create(KB(5));
   platform_event_arena = arena_create(KB(50));
-  platform_file_arena  = arena_create(GB(1));
+  platform_file_arena  = arena_create(MB(100));
 
   // os_win32_load_xinput();
 
@@ -1157,17 +1270,16 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
   Platform platform = {0};
   {
 
-    platform.game_memory_backbuffer_size = GB(4);
+    platform.game_memory_backbuffer_size = MB(100);
     platform.game_memory_backbuffer =
     VirtualAlloc(
-      // TODO jfd: find a way to enforce stable base addresses on macos and linux, for development only
-      (void*)(u64)0x87187898, // NOTE jfd: this is going to be the base address for all the allocations done in the game code
+      (void*)(u64)0x200000000, // NOTE jfd: this is going to be the base address for all the allocations done in the game code
       platform.game_memory_backbuffer_size,
       MEM_RESERVE|MEM_COMMIT,
       PAGE_READWRITE
     );
 
-    platform.vtable = (Platform_Vtable) {
+    platform.vtable = (Platform_vtable) {
       .get_keyboard_modifiers  = &platform_get_keyboard_modifiers,
       .debug_read_entire_file  = &platform_debug_read_entire_file,
       .debug_write_entire_file = &platform_debug_write_entire_file,
@@ -1231,7 +1343,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
       platform_is_running = true;
 
       int debug_time_marker_index = 0;
-      PlatformWin32Debug_TimeMarkerSlice debug_time_markers;
+      Platform_win32_debug_time_marker_slice debug_time_markers;
       slice_init(debug_time_markers, game_update_hz / 2, platform_debug_arena);
 
       LARGE_INTEGER last_counter = platform_win32_get_wall_clock();
@@ -1242,7 +1354,6 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
       DWORD audio_latency_bytes = 0;
       f32 audio_latency_seconds = 0;
       b32 sound_is_valid = false;
-
 
       while(platform_is_running) {
 
@@ -1311,6 +1422,66 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
         #endif
 
         platform_get_game_input_from_events(platform_event_list, gp);
+
+        #ifdef HANDMADE_HOTRELOAD
+        { // input recording
+
+          if(debug_loop_recorder.recording_loop) {
+
+            if(debug_loop_recorder.write_game_state_to_file) {
+              debug_loop_recorder.write_game_state_to_file = false;
+              Str8 game_state_data = { .s = (u8*)(platform.game_memory_backbuffer), .len = (s64)platform.game_memory_backbuffer_size, };
+              ASSERT(platform_debug_write_entire_file(game_state_data, str8_lit("game.state")));
+
+              debug_loop_recorder.game_input_file_handle = CreateFileA("game.input", GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
+              ASSERT(debug_loop_recorder.game_input_file_handle);
+
+            }
+
+            LARGE_INTEGER input_write_offset;
+            input_write_offset.QuadPart = debug_loop_recorder.input_recording_write_index * sizeof(Game_input);
+            debug_loop_recorder.input_recording_write_index++;
+            ASSERT(SetFilePointerEx(debug_loop_recorder.game_input_file_handle, input_write_offset, 0, FILE_BEGIN));
+
+            DWORD bytes_written;
+            ASSERT(WriteFile(debug_loop_recorder.game_input_file_handle, (void*)(&gp->input), sizeof(Game_input), &bytes_written, 0));
+            ASSERT(bytes_written == sizeof(Game_input));
+
+
+          } else if(debug_loop_recorder.playing_loop) {
+
+            if(debug_loop_recorder.read_game_state_from_file) {
+              debug_loop_recorder.read_game_state_from_file = false;
+
+              // TODO jfd: input recording arena
+              debug_loop_recorder.recorded_game_state = platform_debug_read_entire_file(str8_lit("game.state"));
+
+              CloseHandle(debug_loop_recorder.game_input_file_handle);
+
+              Str8 recorded_game_input_data = platform_debug_read_entire_file(str8_lit("game.input"));
+
+              debug_loop_recorder.recorded_game_input.d = (Game_input*)(recorded_game_input_data.s);
+              debug_loop_recorder.recorded_game_input.count = debug_loop_recorder.input_recording_write_index;
+
+              debug_loop_recorder.input_recording_play_index = debug_loop_recorder.input_recording_write_index;
+            }
+
+            if(debug_loop_recorder.input_recording_play_index >= debug_loop_recorder.recorded_game_input.count) {
+              debug_loop_recorder.input_recording_play_index = 0;
+              memory_zero(platform.game_memory_backbuffer, platform.game_memory_backbuffer_size);
+              memory_copy(platform.game_memory_backbuffer, debug_loop_recorder.recorded_game_state.s, debug_loop_recorder.recorded_game_state.len);
+            }
+
+            gp->input = debug_loop_recorder.recorded_game_input.d[debug_loop_recorder.input_recording_play_index++];
+
+          } else if(debug_loop_recorder.stop_playing_loop) {
+            debug_loop_recorder.stop_playing_loop = false;
+
+            memory_zero(&gp->input, sizeof(gp->input));
+          }
+
+        } // input recording
+        #endif
 
         // TODO jfd: move to 60 fps
 
@@ -1391,14 +1562,14 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
           }
 
           // NOTE jfd: get sound samples from game
-          gp->sound = (Game_SoundBuffer){0};
+          gp->sound = (Game_sound_buffer){0};
           gp->sound.samples_per_second = platform_sound_output->samples_per_second;
           gp->sound.sample_count = bytes_to_write / platform_sound_output->bytes_per_sample;
           gp->sound.samples = samples;
           game_get_sound_samples(gp);
 
           #ifdef HANDMADE_INTERNAL
-          PlatformWin32Debug_TimeMarker *marker = &debug_time_markers.d[debug_time_marker_index];
+          Platform_win32_debug_time_marker *marker = &debug_time_markers.d[debug_time_marker_index];
           marker->output_play_cursor = play_cursor;
           marker->output_write_cursor = write_cursor;
           marker->output_location = byte_to_lock_at;
@@ -1457,7 +1628,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
         // NOTE jfd: blit to screen
         HDC device_context;
         defer_loop(device_context = GetDC(window_handle), ReleaseDC(window_handle, device_context)) {
-          PlatformWin32_WindowDimensions window_dimensions = platform_win32_get_window_dimensions(window_handle);
+          Platform_win32_window_dimensions window_dimensions = platform_win32_get_window_dimensions(window_handle);
 
           #ifdef HANDMADE_INTERNAL
           platform_win32_debug_audio_sync_display(&global_backbuffer, platform_sound_output, debug_time_markers, debug_time_marker_index - 1, target_seconds_per_frame);
@@ -1472,7 +1643,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
         DWORD debug_write_cursor;
         if(SUCCEEDED(platform_sound_buffer->lpVtbl->GetCurrentPosition(platform_sound_buffer, &debug_play_cursor, &debug_write_cursor))) {
           ASSERT(debug_time_marker_index < debug_time_markers.count);
-          PlatformWin32Debug_TimeMarker *marker = &debug_time_markers.d[debug_time_marker_index++];
+          Platform_win32_debug_time_marker *marker = &debug_time_markers.d[debug_time_marker_index++];
 
           if(debug_time_marker_index >= debug_time_markers.count) {
             debug_time_marker_index = 0;

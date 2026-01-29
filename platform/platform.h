@@ -8,7 +8,7 @@
 // absolutely must be able to ask the platform for.
 
 
-internal KeyboardModifier platform_get_keyboard_modifiers(void);
+internal Keyboard_modifier platform_get_keyboard_modifiers(void);
 
 internal Str8 platform_debug_read_entire_file(Str8 path);
 internal b32  platform_debug_write_entire_file(Str8 data, Str8 path);
