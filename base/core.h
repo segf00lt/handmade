@@ -163,7 +163,7 @@
 #define PASS          ASSERT(1)
 #define NOOP ((void)0)
 #define STATIC_ASSERT(expr, id) u8 GLUE(id, __LINE__)[(expr)?1:-1]
-#define HERE fprintf(stderr, "HERE\n")
+#define COWABUNGA fprintf(stderr, "COWABUNGA\n")
 
 
 ////////////////////////////////

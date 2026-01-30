@@ -54,11 +54,8 @@ struct Platform_win32_debug_loop_recorder {
   HANDLE           game_state_file_handle;
   HANDLE           game_state_file_map_handle;
   HANDLE           game_input_file_handle;
-  HANDLE           game_input_file_map_handle;
   Game_input_slice recorded_game_input;
   Str8             recorded_game_state;
-  Game_input_slice game_input;
-  Str8             game_state;
   b32              recording_loop;
   b32              playing_loop;
   b32              stop_playing_loop;

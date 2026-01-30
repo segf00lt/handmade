@@ -30,6 +30,8 @@ global b32 debug_paused;
 
 thread_static Context *cp;
 
+global Platform platform;
+
 global Arena *platform_main_arena;
 global Arena *platform_debug_arena;
 global Arena *platform_temp_arena;
@@ -1299,6 +1301,8 @@ func platform_win32_get_seconds_elapsed(LARGE_INTEGER begin, LARGE_INTEGER end) 
   return result;
 }
 
+
+#ifdef HANDMADE_HOTRELOAD
 internal void
 func platform_win32_debug_setup_loop_recorder(void) {
 
@@ -1322,52 +1326,76 @@ func platform_win32_debug_setup_loop_recorder(void) {
     PANICF("file failed map error code %d\n", err);
   }
 
-  debug_loop_recorder.game_state.len = (s64)game_state_file_size.QuadPart;
-  debug_loop_recorder.game_state.s =
+  debug_loop_recorder.recorded_game_state.len = (s64)game_state_file_size.QuadPart;
+  debug_loop_recorder.recorded_game_state.s =
   (u8*)MapViewOfFile(debug_loop_recorder.game_state_file_map_handle, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
 
-  ASSERT(debug_loop_recorder.game_state.s);
-
-  debug_loop_recorder.game_input_file_handle = CreateFileA("game.input", GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
-  LARGE_INTEGER game_input_file_size;
-  ASSERT(GetFileSizeEx(debug_loop_recorder.game_input_file_handle, &game_input_file_size));
-  s64 game_input_count = (s64)(game_input_file_size.QuadPart / sizeof(Game_input));
-
-  debug_loop_recorder.game_input_file_map_handle =
-  CreateFileMappingA(
-    debug_loop_recorder.game_input_file_handle,
-    0,
-    PAGE_READWRITE,
-    game_input_file_size.HighPart,
-    game_input_file_size.LowPart,
-    0
-  );
-
-  if(!debug_loop_recorder.game_input_file_map_handle) {
-    DWORD err = GetLastError();
-    PANICF("file failed map error code %d\n", err);
-  }
-
-  debug_loop_recorder.game_input.count = game_input_count;
-  debug_loop_recorder.game_input.d =
-  (Game_input*)MapViewOfFile(debug_loop_recorder.game_input_file_map_handle, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
-
-  ASSERT(debug_loop_recorder.game_input.d);
+  ASSERT(debug_loop_recorder.recorded_game_state.s);
 
 }
 
 internal void
 func platform_win32_debug_shutdown_loop_recorder(void) {
 
-  UnmapViewOfFile((void*)debug_loop_recorder.game_input.d);
-  CloseHandle(debug_loop_recorder.game_input_file_map_handle);
-  CloseHandle(debug_loop_recorder.game_input_file_handle);
-
-  UnmapViewOfFile((void*)debug_loop_recorder.game_state.s);
+  UnmapViewOfFile((void*)debug_loop_recorder.recorded_game_state.s);
   CloseHandle(debug_loop_recorder.game_state_file_map_handle);
   CloseHandle(debug_loop_recorder.game_state_file_handle);
 
 }
+
+internal void
+func platform_win32_debug_run_loop_recorder(Game *gp) {
+
+  if(debug_loop_recorder.recording_loop) {
+
+    if(debug_loop_recorder.write_game_state_to_file) {
+      debug_loop_recorder.write_game_state_to_file = false;
+      memory_copy(debug_loop_recorder.recorded_game_state.s, platform.game_memory_backbuffer, platform.game_memory_backbuffer_size);
+
+      debug_loop_recorder.game_input_file_handle = CreateFileA("game.input", GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
+      ASSERT(debug_loop_recorder.game_input_file_handle);
+
+    }
+
+    LARGE_INTEGER input_write_offset;
+    input_write_offset.QuadPart = debug_loop_recorder.input_recording_write_index * sizeof(Game_input);
+    debug_loop_recorder.input_recording_write_index++;
+    ASSERT(SetFilePointerEx(debug_loop_recorder.game_input_file_handle, input_write_offset, 0, FILE_BEGIN));
+
+    DWORD bytes_written;
+    ASSERT(WriteFile(debug_loop_recorder.game_input_file_handle, (void*)(&gp->input), sizeof(Game_input), &bytes_written, 0));
+    ASSERT(bytes_written == sizeof(Game_input));
+
+  } else if(debug_loop_recorder.playing_loop) {
+
+    if(debug_loop_recorder.read_game_state_from_file) {
+      debug_loop_recorder.read_game_state_from_file = false;
+
+      CloseHandle(debug_loop_recorder.game_input_file_handle);
+      Str8 recorded_game_input_data = platform_read_entire_file("game.input");
+
+      debug_loop_recorder.recorded_game_input.d = (Game_input*)(recorded_game_input_data.s);
+      debug_loop_recorder.recorded_game_input.count = debug_loop_recorder.input_recording_write_index;
+
+      debug_loop_recorder.input_recording_play_index = debug_loop_recorder.recorded_game_input.count;
+    }
+
+    if(debug_loop_recorder.input_recording_play_index >= debug_loop_recorder.recorded_game_input.count) {
+      debug_loop_recorder.input_recording_play_index = 0;
+      memory_copy(platform.game_memory_backbuffer, debug_loop_recorder.recorded_game_state.s, debug_loop_recorder.recorded_game_state.len);
+    }
+
+    gp->input = debug_loop_recorder.recorded_game_input.d[debug_loop_recorder.input_recording_play_index++];
+
+  } else if(debug_loop_recorder.stop_playing_loop) {
+    debug_loop_recorder.stop_playing_loop = false;
+
+    memory_zero(&gp->input, sizeof(gp->input));
+  }
+
+}
+#endif
+
 
 int CALLBACK
 WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode) {
@@ -1393,7 +1421,6 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
   window_class.hInstance = instance;
   window_class.lpszClassName = "Handmade Hero";
 
-  Platform platform = {0};
   {
 
     platform.game_memory_backbuffer_size = GAME_MEMORY_BACKBUFFER_SIZE;
@@ -1440,7 +1467,6 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
       ASSERT(SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED)));
 
-      // TODO jfd: how do we reliably get this on windows?
       HDC refresh_rate_query_device_context;
       int monitor_refresh_hz = 60;
       refresh_rate_query_device_context = GetDC(window_handle);
@@ -1473,7 +1499,9 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
       platform_is_running = true;
 
+      #ifdef HANDMADE_HOTRELOAD
       platform_win32_debug_setup_loop_recorder();
+      #endif
 
       int debug_time_marker_index = 0;
       Platform_win32_debug_time_marker_slice debug_time_markers;
@@ -1557,116 +1585,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
         platform_get_game_input_from_events(platform_event_list, gp);
 
         #ifdef HANDMADE_HOTRELOAD
-
-        #if 0
-        { // input recording
-
-          if(debug_loop_recorder.recording_loop) {
-
-            if(debug_loop_recorder.write_game_state_to_file) {
-              debug_loop_recorder.write_game_state_to_file = false;
-              memory_copy(debug_loop_recorder.game_state.s, platform.game_memory_backbuffer, platform.game_memory_backbuffer_size);
-            }
-
-            debug_loop_recorder.game_input.d[debug_loop_recorder.input_recording_write_index++] = gp->input;
-            // HERE jfd: The problem with doing it this way is that the input recorder is not resizable.
-            //           You need a way to dynamically map a memory buffer to a file
-
-          } else if(debug_loop_recorder.playing_loop) {
-
-            if(debug_loop_recorder.read_game_state_from_file) {
-              debug_loop_recorder.read_game_state_from_file = false;
-
-              // TODO jfd: input recording arena
-              debug_loop_recorder.recorded_game_state = platform_read_entire_file("game.state");
-
-              CloseHandle(debug_loop_recorder.game_input_file_handle);
-
-              Str8 recorded_game_input_data = platform_read_entire_file("game.input");
-
-              debug_loop_recorder.recorded_game_input.d = (Game_input*)(recorded_game_input_data.s);
-              debug_loop_recorder.recorded_game_input.count = debug_loop_recorder.input_recording_write_index;
-
-              debug_loop_recorder.input_recording_play_index = debug_loop_recorder.input_recording_write_index;
-            }
-
-            if(debug_loop_recorder.input_recording_play_index >= debug_loop_recorder.recorded_game_input.count) {
-              debug_loop_recorder.input_recording_play_index = 0;
-              memory_zero(platform.game_memory_backbuffer, platform.game_memory_backbuffer_size);
-              memory_copy(platform.game_memory_backbuffer, debug_loop_recorder.recorded_game_state.s, debug_loop_recorder.recorded_game_state.len);
-            }
-
-            gp->input = debug_loop_recorder.recorded_game_input.d[debug_loop_recorder.input_recording_play_index++];
-
-          } else if(debug_loop_recorder.stop_playing_loop) {
-            debug_loop_recorder.stop_playing_loop = false;
-
-            memory_zero(&gp->input, sizeof(gp->input));
-          }
-
-        } // input recording
-
-        #else
-
-        { // input recording
-
-          if(debug_loop_recorder.recording_loop) {
-
-            if(debug_loop_recorder.write_game_state_to_file) {
-              debug_loop_recorder.write_game_state_to_file = false;
-              Str8 game_state_data = { .s = (u8*)(platform.game_memory_backbuffer), .len = (s64)platform.game_memory_backbuffer_size, };
-              ASSERT(platform_write_entire_file(game_state_data, "game.state"));
-
-              debug_loop_recorder.game_input_file_handle = CreateFileA("game.input", GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
-              ASSERT(debug_loop_recorder.game_input_file_handle);
-
-            }
-
-            LARGE_INTEGER input_write_offset;
-            input_write_offset.QuadPart = debug_loop_recorder.input_recording_write_index * sizeof(Game_input);
-            debug_loop_recorder.input_recording_write_index++;
-            ASSERT(SetFilePointerEx(debug_loop_recorder.game_input_file_handle, input_write_offset, 0, FILE_BEGIN));
-
-            DWORD bytes_written;
-            ASSERT(WriteFile(debug_loop_recorder.game_input_file_handle, (void*)(&gp->input), sizeof(Game_input), &bytes_written, 0));
-            ASSERT(bytes_written == sizeof(Game_input));
-
-
-          } else if(debug_loop_recorder.playing_loop) {
-
-            if(debug_loop_recorder.read_game_state_from_file) {
-              debug_loop_recorder.read_game_state_from_file = false;
-
-              // TODO jfd: input recording arena
-              debug_loop_recorder.recorded_game_state = platform_read_entire_file("game.state");
-
-              CloseHandle(debug_loop_recorder.game_input_file_handle);
-
-              Str8 recorded_game_input_data = platform_read_entire_file("game.input");
-
-              debug_loop_recorder.recorded_game_input.d = (Game_input*)(recorded_game_input_data.s);
-              debug_loop_recorder.recorded_game_input.count = debug_loop_recorder.input_recording_write_index;
-
-              debug_loop_recorder.input_recording_play_index = debug_loop_recorder.input_recording_write_index;
-            }
-
-            if(debug_loop_recorder.input_recording_play_index >= debug_loop_recorder.recorded_game_input.count) {
-              debug_loop_recorder.input_recording_play_index = 0;
-              memory_zero(platform.game_memory_backbuffer, platform.game_memory_backbuffer_size);
-              memory_copy(platform.game_memory_backbuffer, debug_loop_recorder.recorded_game_state.s, debug_loop_recorder.recorded_game_state.len);
-            }
-
-            gp->input = debug_loop_recorder.recorded_game_input.d[debug_loop_recorder.input_recording_play_index++];
-
-          } else if(debug_loop_recorder.stop_playing_loop) {
-            debug_loop_recorder.stop_playing_loop = false;
-
-            memory_zero(&gp->input, sizeof(gp->input));
-          }
-
-        } // input recording
-        #endif
-
+        platform_win32_debug_run_loop_recorder(gp);
         #endif
 
         // TODO jfd: move to 60 fps
@@ -1862,7 +1781,9 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
       }
 
+      #ifdef HANDMADE_HOTRELOAD
       platform_win32_debug_shutdown_loop_recorder();
+      #endif
 
     } else {
     }
