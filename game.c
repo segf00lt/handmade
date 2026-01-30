@@ -33,16 +33,32 @@ func game_load_procs(void) {
 
 Game*
 func game_init(Platform *pp) {
-  Arena *game_main_arena = arena_create_ex(pp->game_memory_backbuffer_size, true, pp->game_memory_backbuffer);
+  ASSERT(GAME_STATE_SIZE < pp->game_memory_backbuffer_size);
+
+  u64 alloc_size = pp->game_memory_backbuffer_size;
+  u8 *alloc_ptr = (u8*)(pp->game_memory_backbuffer);
+
+  Game *gp = (Game*)alloc_ptr;
+  alloc_ptr += GAME_STATE_SIZE;
+  alloc_size -= GAME_STATE_SIZE;
 
   u64 game_frame_arena_backbuffer_size = MB(5);
   u64 game_temp_arena_backbuffer_size  = MB(5);
+  u64 game_main_arena_backbuffer_size = alloc_size - game_frame_arena_backbuffer_size - game_temp_arena_backbuffer_size;
 
-  void *game_frame_arena_backbuffer = arena_push(game_main_arena, game_frame_arena_backbuffer_size, 1);
-  void *game_temp_arena_backbuffer  = arena_push(game_main_arena, game_temp_arena_backbuffer_size,  1);
+  u8 *game_main_arena_backbuffer = alloc_ptr;
+  alloc_ptr += game_main_arena_backbuffer_size;
+  alloc_size -= game_main_arena_backbuffer_size;
 
-  Game *gp = push_struct(game_main_arena, Game);
-  gp->main_arena = game_main_arena;
+  u8 *game_frame_arena_backbuffer = alloc_ptr;
+  alloc_ptr += game_frame_arena_backbuffer_size;
+  alloc_size -= game_frame_arena_backbuffer_size;
+
+  u8 *game_temp_arena_backbuffer = alloc_ptr;
+  alloc_ptr += game_temp_arena_backbuffer_size;
+  alloc_size -= game_temp_arena_backbuffer_size;
+
+  gp->main_arena  = arena_create_ex(game_main_arena_backbuffer_size, true, game_main_arena_backbuffer);
   gp->frame_arena = arena_create_ex(game_frame_arena_backbuffer_size, true, game_frame_arena_backbuffer);
   gp->temp_arena  = arena_create_ex(game_temp_arena_backbuffer_size,  true, game_temp_arena_backbuffer);
 
@@ -136,16 +152,6 @@ func output_sound(Game *gp) {
 
 void
 func game_update_and_render(Game *gp) {
-
-  if(gp->once) {
-    OutputDebugStringA(cstrf(gp->temp_arena, "gp = %p\n", gp));
-    gp->once = false;
-
-    Str8 test_file_data = platform_read_entire_file("game.c");
-    if(platform_write_entire_file(test_file_data, "copy_of_game.txt")) {
-      OutputDebugStringA("cowabunga file copied\n");
-    }
-  }
 
 
   { /* get keyboard and mouse input */

@@ -15,6 +15,7 @@
 
 #include "base/device_input.h"
 
+#include "base/context.h"
 
 #include "os/os.h"
 
@@ -37,6 +38,8 @@
 #include "base/math.c"
 
 #include "base/device_input.c"
+
+#include "base/context.c"
 
 #include "os/os.c"
 

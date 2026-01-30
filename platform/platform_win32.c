@@ -9,6 +9,9 @@
 /////////////////////////////////
 // globals
 
+#define GAME_MEMORY_BACKBUFFER_SIZE MB(100)
+
+
 #ifdef HANDMADE_HOTRELOAD
 
 global HMODULE game_dll;
@@ -24,6 +27,8 @@ global Platform_win32_debug_loop_recorder debug_loop_recorder;
 #ifdef HANDMADE_INTERNAL
 global b32 debug_paused;
 #endif
+
+thread_static Context *cp;
 
 global Arena *platform_main_arena;
 global Arena *platform_debug_arena;
@@ -1294,6 +1299,76 @@ func platform_win32_get_seconds_elapsed(LARGE_INTEGER begin, LARGE_INTEGER end) 
   return result;
 }
 
+internal void
+func platform_win32_debug_setup_loop_recorder(void) {
+
+  debug_loop_recorder.game_state_file_handle = CreateFileA("game.state", GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
+  LARGE_INTEGER game_state_file_size;
+  ASSERT(GetFileSizeEx(debug_loop_recorder.game_state_file_handle, &game_state_file_size));
+  ASSERT((u64)game_state_file_size.QuadPart == GAME_MEMORY_BACKBUFFER_SIZE);
+
+  debug_loop_recorder.game_state_file_map_handle =
+  CreateFileMappingA(
+    debug_loop_recorder.game_state_file_handle,
+    0,
+    PAGE_READWRITE,
+    game_state_file_size.HighPart,
+    game_state_file_size.LowPart,
+    0
+  );
+
+  if(!debug_loop_recorder.game_state_file_map_handle) {
+    DWORD err = GetLastError();
+    PANICF("file failed map error code %d\n", err);
+  }
+
+  debug_loop_recorder.game_state.len = (s64)game_state_file_size.QuadPart;
+  debug_loop_recorder.game_state.s =
+  (u8*)MapViewOfFile(debug_loop_recorder.game_state_file_map_handle, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+
+  ASSERT(debug_loop_recorder.game_state.s);
+
+  debug_loop_recorder.game_input_file_handle = CreateFileA("game.input", GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
+  LARGE_INTEGER game_input_file_size;
+  ASSERT(GetFileSizeEx(debug_loop_recorder.game_input_file_handle, &game_input_file_size));
+  s64 game_input_count = (s64)(game_input_file_size.QuadPart / sizeof(Game_input));
+
+  debug_loop_recorder.game_input_file_map_handle =
+  CreateFileMappingA(
+    debug_loop_recorder.game_input_file_handle,
+    0,
+    PAGE_READWRITE,
+    game_input_file_size.HighPart,
+    game_input_file_size.LowPart,
+    0
+  );
+
+  if(!debug_loop_recorder.game_input_file_map_handle) {
+    DWORD err = GetLastError();
+    PANICF("file failed map error code %d\n", err);
+  }
+
+  debug_loop_recorder.game_input.count = game_input_count;
+  debug_loop_recorder.game_input.d =
+  (Game_input*)MapViewOfFile(debug_loop_recorder.game_input_file_map_handle, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+
+  ASSERT(debug_loop_recorder.game_input.d);
+
+}
+
+internal void
+func platform_win32_debug_shutdown_loop_recorder(void) {
+
+  UnmapViewOfFile((void*)debug_loop_recorder.game_input.d);
+  CloseHandle(debug_loop_recorder.game_input_file_map_handle);
+  CloseHandle(debug_loop_recorder.game_input_file_handle);
+
+  UnmapViewOfFile((void*)debug_loop_recorder.game_state.s);
+  CloseHandle(debug_loop_recorder.game_state_file_map_handle);
+  CloseHandle(debug_loop_recorder.game_state_file_handle);
+
+}
+
 int CALLBACK
 WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode) {
 
@@ -1321,7 +1396,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
   Platform platform = {0};
   {
 
-    platform.game_memory_backbuffer_size = MB(100);
+    platform.game_memory_backbuffer_size = GAME_MEMORY_BACKBUFFER_SIZE;
     platform.game_memory_backbuffer =
     VirtualAlloc(
       (void*)(u64)0x200000000, // NOTE jfd: this is going to be the base address for all the allocations done in the game code
@@ -1345,11 +1420,6 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
   // TODO jfd 22/01/2026: Redesign arena allocator to be recursive, and allocate from a fixed backing buffer provided by the OS
   Game *gp = game_init(&platform);
 
-  // TODO jfd: how do we reliably get this on windows?
-  int monitor_refresh_hz = 60;
-  int game_update_hz = monitor_refresh_hz / 2;
-  f32 target_seconds_per_frame = 1.0f/(f32)game_update_hz;
-
   if(RegisterClass(&window_class)) {
     HWND window_handle =
     CreateWindowExA(
@@ -1370,6 +1440,18 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
       ASSERT(SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED)));
 
+      // TODO jfd: how do we reliably get this on windows?
+      HDC refresh_rate_query_device_context;
+      int monitor_refresh_hz = 60;
+      refresh_rate_query_device_context = GetDC(window_handle);
+      int platform_win32_refresh_rate = GetDeviceCaps(refresh_rate_query_device_context, VREFRESH);
+      ReleaseDC(window_handle, refresh_rate_query_device_context);
+      if(platform_win32_refresh_rate > 1) {
+        monitor_refresh_hz = platform_win32_refresh_rate;
+      }
+      f32 game_update_hz = (f32)monitor_refresh_hz / 2.0f;
+      f32 target_seconds_per_frame = 1.0f/(f32)game_update_hz;
+
       // NOTE jfd: graphics test
       MSG message;
 
@@ -1378,11 +1460,9 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
       platform_sound_output->buffer_size           = platform_sound_output->samples_per_second * sizeof(s16) * 2;
       platform_sound_output->running_sample_index  = 0  ;
       platform_sound_output->bytes_per_sample      = sizeof(s16)*2;
-      // TODO jfd: get rid of latency_sample_count
-      platform_sound_output->latency_sample_count  = 3*(platform_sound_output->samples_per_second / game_update_hz);
       // TODO jfd: actually compute this variance and see what the lowest reasonable value is
       platform_sound_output->safety_bytes =
-      ((platform_sound_output->bytes_per_sample * platform_sound_output->samples_per_second) / game_update_hz) / 3;
+      ((platform_sound_output->bytes_per_sample * platform_sound_output->samples_per_second) / (DWORD)game_update_hz) / 3;
 
 
       platform_win32_init_dsound(window_handle, platform_sound_output->buffer_size, platform_sound_output->samples_per_second);
@@ -1393,9 +1473,11 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
       platform_is_running = true;
 
+      platform_win32_debug_setup_loop_recorder();
+
       int debug_time_marker_index = 0;
       Platform_win32_debug_time_marker_slice debug_time_markers;
-      slice_init(debug_time_markers, game_update_hz / 2, platform_debug_arena);
+      slice_init(debug_time_markers, 60, platform_debug_arena);
 
       LARGE_INTEGER last_counter = platform_win32_get_wall_clock();
       LARGE_INTEGER flip_wall_clock = platform_win32_get_wall_clock();
@@ -1475,6 +1557,57 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
         platform_get_game_input_from_events(platform_event_list, gp);
 
         #ifdef HANDMADE_HOTRELOAD
+
+        #if 0
+        { // input recording
+
+          if(debug_loop_recorder.recording_loop) {
+
+            if(debug_loop_recorder.write_game_state_to_file) {
+              debug_loop_recorder.write_game_state_to_file = false;
+              memory_copy(debug_loop_recorder.game_state.s, platform.game_memory_backbuffer, platform.game_memory_backbuffer_size);
+            }
+
+            debug_loop_recorder.game_input.d[debug_loop_recorder.input_recording_write_index++] = gp->input;
+            // HERE jfd: The problem with doing it this way is that the input recorder is not resizable.
+            //           You need a way to dynamically map a memory buffer to a file
+
+          } else if(debug_loop_recorder.playing_loop) {
+
+            if(debug_loop_recorder.read_game_state_from_file) {
+              debug_loop_recorder.read_game_state_from_file = false;
+
+              // TODO jfd: input recording arena
+              debug_loop_recorder.recorded_game_state = platform_read_entire_file("game.state");
+
+              CloseHandle(debug_loop_recorder.game_input_file_handle);
+
+              Str8 recorded_game_input_data = platform_read_entire_file("game.input");
+
+              debug_loop_recorder.recorded_game_input.d = (Game_input*)(recorded_game_input_data.s);
+              debug_loop_recorder.recorded_game_input.count = debug_loop_recorder.input_recording_write_index;
+
+              debug_loop_recorder.input_recording_play_index = debug_loop_recorder.input_recording_write_index;
+            }
+
+            if(debug_loop_recorder.input_recording_play_index >= debug_loop_recorder.recorded_game_input.count) {
+              debug_loop_recorder.input_recording_play_index = 0;
+              memory_zero(platform.game_memory_backbuffer, platform.game_memory_backbuffer_size);
+              memory_copy(platform.game_memory_backbuffer, debug_loop_recorder.recorded_game_state.s, debug_loop_recorder.recorded_game_state.len);
+            }
+
+            gp->input = debug_loop_recorder.recorded_game_input.d[debug_loop_recorder.input_recording_play_index++];
+
+          } else if(debug_loop_recorder.stop_playing_loop) {
+            debug_loop_recorder.stop_playing_loop = false;
+
+            memory_zero(&gp->input, sizeof(gp->input));
+          }
+
+        } // input recording
+
+        #else
+
         { // input recording
 
           if(debug_loop_recorder.recording_loop) {
@@ -1534,6 +1667,8 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
         } // input recording
         #endif
 
+        #endif
+
         // TODO jfd: move to 60 fps
 
         gp->render.pixels = global_backbuffer.bitmap_memory;
@@ -1580,8 +1715,9 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
           (platform_sound_output->running_sample_index * platform_sound_output->bytes_per_sample) % platform_sound_output->buffer_size;
 
           DWORD expected_sound_bytes_per_frame =
-          (platform_sound_output->bytes_per_sample * platform_sound_output->samples_per_second) / game_update_hz;
+          (DWORD)((platform_sound_output->bytes_per_sample * platform_sound_output->samples_per_second) / (DWORD)game_update_hz);
 
+          // TODO jfd: find out what the heck casey used this for
           f32 seconds_left_until_flip = (target_seconds_per_frame - from_begin_to_audio_seconds);
           DWORD expected_bytes_until_flip =
           (DWORD)((seconds_left_until_flip/target_seconds_per_frame) * (f32)expected_sound_bytes_per_frame);
@@ -1677,7 +1813,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
         }
 
         // NOTE jfd: blit to screen
-        HDC device_context;
+        HDC device_context = {0};
         defer_loop(device_context = GetDC(window_handle), ReleaseDC(window_handle, device_context)) {
           Platform_win32_window_dimensions window_dimensions = platform_win32_get_window_dimensions(window_handle);
 
@@ -1725,6 +1861,8 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
         last_counter = end_counter;
 
       }
+
+      platform_win32_debug_shutdown_loop_recorder();
 
     } else {
     }
