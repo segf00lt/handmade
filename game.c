@@ -1,6 +1,9 @@
 #ifndef GAME_C
 #define GAME_C
 
+#define TILE_MAP_ROWS    10
+#define TILE_MAP_COLUMNS 18
+#define TILE_SIZE        55
 
 /////////////////////////////////
 // globals
@@ -62,7 +65,7 @@ func game_init(Platform *pp) {
   gp->frame_arena = arena_create_ex(game_frame_arena_backbuffer_size, true, game_frame_arena_backbuffer);
   gp->temp_arena  = arena_create_ex(game_temp_arena_backbuffer_size,  true, game_temp_arena_backbuffer);
 
-  gp->once = true;
+  gp->did_reload = true;
 
   #ifdef HANDMADE_HOTRELOAD
 
@@ -104,34 +107,15 @@ func debug_render_weird_gradient(Game *gp, int x_offset, int y_offset) {
 }
 
 force_inline Color
-func alpha_blend(Color bottom_color, Color top_color) {
+func alpha_blend(Color bottom, Color top) {
 
-  f32 bottom_r = (f32)bottom_color.r / MAX_U8;
-  f32 bottom_g = (f32)bottom_color.g / MAX_U8;
-  f32 bottom_b = (f32)bottom_color.b / MAX_U8;
+  Color final;
+  final.a = 1.0f / (top.a + bottom.a*(1.0f - top.a));
+  final.r = (top.r*top.a + bottom.r*bottom.a*(1.0f - top.a)) * final.a;
+  final.g = (top.g*top.a + bottom.g*bottom.a*(1.0f - top.a)) * final.a;
+  final.b = (top.b*top.a + bottom.b*bottom.a*(1.0f - top.a)) * final.a;
 
-  f32 top_r = (f32)top_color.r / MAX_U8;
-  f32 top_g = (f32)top_color.g / MAX_U8;
-  f32 top_b = (f32)top_color.b / MAX_U8;
-
-  f32 bottom_a = (f32)bottom_color.a / MAX_U8;
-  f32 top_a = (f32)top_color.a / MAX_U8;
-
-
-  f32 final_a = 1.0f / (top_a + bottom_a*(1.0f - top_a));
-
-  f32 final_r = (top_r*top_a + bottom_r*bottom_a*(1.0f - top_a)) * final_a;
-  f32 final_g = (top_g*top_a + bottom_g*bottom_a*(1.0f - top_a)) * final_a;
-  f32 final_b = (top_b*top_a + bottom_b*bottom_a*(1.0f - top_a)) * final_a;
-
-  Color final_color = {
-    (u8)(final_r*(f32)MAX_U8),
-    (u8)(final_g*(f32)MAX_U8),
-    (u8)(final_b*(f32)MAX_U8),
-    (u8)(final_a*(f32)MAX_U8),
-  };
-
-  return final_color;
+  return final;
 }
 
 force_inline Color
@@ -141,11 +125,13 @@ func color_from_pixel(u32 pixel) {
   //  B  G  R  x
   // 00 00 00 00
 
+  f32 color_scale = 1.0f/(f32)MAX_U8;
+
   Color result = {
-    (u8)((pixel & 0xff0000) >> 16),
-    (u8)((pixel & 0x00ff00) >> 8),
-    (u8)((pixel & 0x0000ff)),
-    (u8)((pixel & 0xff000000) >> 24),
+    (f32)((pixel & 0xff0000) >> 16) * color_scale,
+    (f32)((pixel & 0x00ff00) >> 8) * color_scale,
+    (f32)((pixel & 0x0000ff)) * color_scale,
+    (f32)((pixel & 0xff000000) >> 24) * color_scale,
   };
 
   return result;
@@ -158,7 +144,12 @@ func pixel_from_color(Color color) {
   //  B  G  R  x
   // 00 00 00 00
 
-  u32 result = (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
+  u8 a = (u8)(color.a*MAX_U8);
+  u8 r = (u8)(color.r*MAX_U8);
+  u8 g = (u8)(color.g*MAX_U8);
+  u8 b = (u8)(color.b*MAX_U8);
+
+  u32 result = (a << 24) | (r << 16) | (g << 8) | b;
   return result;
 }
 
@@ -276,11 +267,11 @@ func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_
 
 internal void
 func clear_screen(Game *gp) {
-  u32 *pixels = (u32*)gp->render.pixels;
-  s32 total_pixels = gp->render.width * gp->render.height;
+  u64 *pixels = (u64*)gp->render.pixels;
+  s32 total_pixels = (gp->render.width * gp->render.height) >> 1;
 
   for(int i = 0; i < total_pixels; i++) {
-    pixels[i] = (u32)255 << 24;
+    pixels[i] = ((u64)255 << (32 + 24)) | ((u64)255 << 24);
   }
 
 }
@@ -364,48 +355,157 @@ func debug_output_sound(Game *gp) {
 
 }
 
+internal void
+func tile_from_point(f32 x, f32 y, int *tile_x, int *tile_y) {
+
+  f32 canon_x = x / TILE_SIZE + 0.5f;
+  f32 canon_y = y / TILE_SIZE + 0.5f;
+  // TODO jfd: handle negative values in round_f32_to_s32()
+  *tile_x = round_f32_to_s32(canon_x) - 1;
+  *tile_y = round_f32_to_s32(canon_y) - 1;
+
+  *tile_x = (*tile_x >= TILE_MAP_COLUMNS) ? (TILE_MAP_COLUMNS - 1) : MAX(*tile_x, 0);
+  *tile_y = (*tile_y >= TILE_MAP_ROWS)    ? (TILE_MAP_ROWS - 1)    : MAX(*tile_y, 0);
+
+}
+
 shared_function void
 func game_update_and_render(Game *gp) {
-  clear_screen(gp);
 
-  if(gp->once) {
-    gp->once = false;
+  if(gp->did_reload) {
+    gp->did_reload = false;
 
-    gp->rect_x = 400;
-    gp->rect_y = 100;
-    gp->rect_width = 80;
-    gp->rect_height = 65;
+    // gp->should_init_player = true;
+
   }
+
+  { /* run_once */
+
+    if(gp->should_init_player) {
+      gp->should_init_player = false;
+
+      gp->player_x = 400;
+      gp->player_y = 100;
+      gp->player_width = 30;
+      gp->player_height = 30;
+    }
+
+  } /* run_once */
+
+  u8 tile_map[TILE_MAP_ROWS][TILE_MAP_COLUMNS] = {
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  },
+    { 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0,  },
+    { 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0,  },
+    { 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  },
+    { 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0,  },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0,  },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  },
+  };
+  Vec2 tile_map_origin = {
+    0,
+    0,
+  };
+  f32 tile_size = TILE_SIZE;
+  f32 tile_map_width = ARRLEN(tile_map[0]) * tile_size;
+  f32 tile_map_height = ARRLEN(tile_map) * tile_size;
+
+
+  clear_screen(gp);
 
   { /* get keyboard and mouse input */
 
     // TODO jfd: mouse movement and clicks
-    f32 player_speed = 200;
+    f32 player_speed = 4.80f*tile_size;
 
     f32 scaled_player_speed = player_speed * gp->t;
 
+
+    gp->player_vel_x = 0;
+    gp->player_vel_y = 0;
     if(is_key_pressed(gp, KBD_KEY_W)) {
-      gp->rect_y -= scaled_player_speed;
+      gp->player_vel_y -= scaled_player_speed;
     }
     if(is_key_pressed(gp, KBD_KEY_A)) {
-      gp->rect_x -= scaled_player_speed;
+      gp->player_vel_x -= scaled_player_speed;
     }
     if(is_key_pressed(gp, KBD_KEY_S)) {
-      gp->rect_y += scaled_player_speed;
+      gp->player_vel_y += scaled_player_speed;
     }
     if(is_key_pressed(gp, KBD_KEY_D)) {
-      gp->rect_x += scaled_player_speed;
+      gp->player_vel_x += scaled_player_speed;
     }
 
   } /* get keyboard and mouse input */
 
+  int player_tile_x = 0;
+  int player_tile_y = 0;
+
+  { /* update world */
+
+    f32 new_player_x = gp->player_x + gp->player_vel_x;
+    f32 new_player_y = gp->player_y + gp->player_vel_y;
+
+    int cur_player_tile_x;
+    int cur_player_tile_y;
+    tile_from_point(gp->player_x, gp->player_y, &cur_player_tile_x, &cur_player_tile_y);
+
+    int new_player_tile_x;
+    int new_player_tile_y;
+    tile_from_point(new_player_x, new_player_y, &new_player_tile_x, &new_player_tile_y);
+
+    if(tile_map[new_player_tile_y][new_player_tile_x]) {
+
+      if(new_player_tile_x > cur_player_tile_x) {
+
+      } else {
+      }
+
+      if(new_player_tile_y > cur_player_tile_y) {
+      } else {
+      }
+
+    } else {
+      gp->player_x = new_player_x;
+      gp->player_y = new_player_y;
+    }
+
+    player_tile_x = new_player_tile_x;
+    player_tile_y = new_player_tile_y;
+
+  } /* update world */
 
   { /* draw */
 
-    draw_rect_lines(gp, (Color){ 255, 255, 255, 255 }, 1.0f, 20, 20, 80, 80);
+    for(int row = 0; row < TILE_MAP_ROWS; row++) {
+      for(int col = 0; col < TILE_MAP_COLUMNS; col++) {
+        u8 tile_id = tile_map[row][col];
+        f32 color = 0.1f;
+        if(tile_id) {
+          color = 0.8f;
+        }
 
-    draw_rect(gp, (Color){ 0, 99, 250, 255 }, 300, 200, 120, 80);
-    draw_rect(gp, (Color){ 240, 20, 80, 100 }, gp->rect_x, gp->rect_y, gp->rect_width, gp->rect_height);
+        draw_rect(gp, (Color){ color, color, color, 1 }, tile_map_origin.x + col*tile_size, tile_map_origin.y + row*tile_size, tile_size, tile_size);
+      }
+    }
+
+    // draw_rect_lines(gp, (Color){ 1, 1, 1, 1 }, 1.0f, 20, 20, 80, 80);
+
+    draw_rect(gp,
+      (Color){ 0, 0.4f, 0.9f, 1 },
+      tile_map_origin.x + player_tile_x*tile_size,
+      tile_map_origin.y + player_tile_y*tile_size,
+      tile_size, tile_size
+    );
+    draw_rect(gp,
+      (Color){ 0.95f, 0.2f, 0.4f, 0.8f },
+      gp->player_x - 15,
+      gp->player_y - 15,
+      30,
+      30
+    );
 
   } /* draw */
 

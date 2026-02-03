@@ -87,8 +87,8 @@
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 #define CLAMP_BOT(a, b) MAX(a, b)
 #define CLAMP_TOP(a, b) MIN(a, b)
-#define ARRLEN(x) (sizeof(x)/sizeof(*x))
-#define STRLEN(x) ((sizeof(x)/sizeof(*x))-1)
+#define ARRLEN(x) (sizeof((x))/sizeof(*(x)))
+#define STRLEN(x) ((sizeof((x))/sizeof(*(x)))-1)
 #define GLUE_(a,b) a##b
 #define GLUE(a,b) GLUE_(a,b)
 #define DUNNO fprintf(stderr, "======\nDUNNO WHAT HAPPENS ON LINE %i IN %s()\n======\n", __LINE__, __func__)

@@ -107,10 +107,13 @@ int main(int argc, char **argv) {
   NOB_GO_REBUILD_URSELF(argc, argv);
 
 
+  #if 0
+  if(!win32_build_hot_reload()) return 1;
+  #else
   if(!win32_build_hot_reload_no_cradle()) return 1;
+  #endif
 
   return 0;
-  if(!win32_build_hot_reload()) return 1;
 
   if(!win32_build_static()) return 1;
 

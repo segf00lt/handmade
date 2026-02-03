@@ -2,6 +2,7 @@
 #define PLATFORM_WIN32_C
 
 
+
 // NOTE jfd 22/01/2026:
 // This file contains the global variables and function implementations for platform specific code.
 // DO NOT CALL THESE FROM GAME OR APP CODE
@@ -1511,16 +1512,21 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
       LARGE_INTEGER last_counter = platform_win32_get_wall_clock();
       LARGE_INTEGER flip_wall_clock = platform_win32_get_wall_clock();
 
+      #ifdef HANDMADE_PROFILE
       u64 last_cycle_count = __rdtsc(); // NOTE jfd: get timestamp in cycles
+      #endif
 
+      #ifdef HANDMADE_AUDIO_LATENCY_DEBUG
       DWORD audio_latency_bytes = 0;
       f32 audio_latency_seconds = 0;
+      #endif
       b32 sound_is_valid = false;
 
       while(platform_is_running) {
 
         #ifdef HANDMADE_HOTRELOAD
         if(platform_file_exists("game.dll")) {
+          gp->did_reload = true;
           platform_win32_unload_game();
           platform_win32_load_game();
         }
@@ -1675,7 +1681,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
           gp->sound.samples = samples;
           game_get_sound_samples(gp);
 
-          #ifdef HANDMADE_INTERNAL
+          #ifdef HANDMADE_AUDIO_LATENCY_DEBUG
           Platform_win32_debug_time_marker *marker = &debug_time_markers.d[debug_time_marker_index];
           marker->output_play_cursor = play_cursor;
           marker->output_write_cursor = write_cursor;
@@ -1761,7 +1767,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
         LARGE_INTEGER end_counter = platform_win32_get_wall_clock();
 
-        #ifdef HANDMADE_INTERNAL
+        #ifdef HANDMADE_PROFILE
         s64 end_cycle_count = __rdtsc();
         s64 elapsed_cycles = end_cycle_count - last_cycle_count;
         last_cycle_count = end_cycle_count;

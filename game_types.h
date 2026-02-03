@@ -7,10 +7,10 @@
 
 typedef struct Color Color;
 struct Color {
-  u8 r;
-  u8 g;
-  u8 b;
-  u8 a;
+  f32 r;
+  f32 g;
+  f32 b;
+  f32 a;
 };
 
 typedef struct Game_sound_buffer Game_sound_buffer;
@@ -42,6 +42,7 @@ TYPEDEF_SLICE(Game_input, Game_input_slice);
 typedef struct Game Game;
 struct Game {
   f32 t;
+  b32 did_reload;
 
   Arena *main_arena;
   Arena *frame_arena;
@@ -53,17 +54,18 @@ struct Game {
 
   s32 test_sound_pitch;
 
-  int x_offset;
-  int y_offset;
-
-  b32 once;
   f32 t_sine;
 
-  f32 rect_x;
-  f32 rect_y;
-  f32 rect_width;
-  f32 rect_height;
+  f32 player_x;
+  f32 player_y;
+  f32 player_width;
+  f32 player_height;
 
+  f32 player_vel_x;
+  f32 player_vel_y;
+
+  b8 once;
+  b8 should_init_player;
 
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
