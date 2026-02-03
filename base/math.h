@@ -35,5 +35,6 @@ DECL_VEC3(f64);
 typedef Vec3_f32 Vec3;
 
 internal f32 lerp_f32(f32 t, f32 begin, f32 end);
+internal s32 round_f32_to_s32(f32 value);
 
 #endif

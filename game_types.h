@@ -5,6 +5,13 @@
 // NOTE jfd 22/01/2026:
 // This file contains typedefs for the game.
 
+typedef struct Color Color;
+struct Color {
+  u8 r;
+  u8 g;
+  u8 b;
+  u8 a;
+};
 
 typedef struct Game_sound_buffer Game_sound_buffer;
 struct Game_sound_buffer {
@@ -52,11 +59,15 @@ struct Game {
   b32 once;
   f32 t_sine;
 
+  f32 rect_x;
+  f32 rect_y;
+  f32 rect_width;
+  f32 rect_height;
+
 
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
 #define GAME_STATE_SIZE ((u64)MB(1))
-
 
 
 typedef void  Game_update_and_render_func(Game *gp);

@@ -83,7 +83,7 @@ func platform_win32_clear_window_and_get_dimensions(HWND window_handle, HDC devi
     .height = client_rect.bottom - client_rect.top,
   };
 
-  HBRUSH black = (HBRUSH)GetStockObject(BLACK_BRUSH);
+  HBRUSH black = (HBRUSH)GetStockObject(DKGRAY_BRUSH);
   FillRect(device_context, &client_rect, black);
 
   return window_dimensions;
@@ -91,8 +91,8 @@ func platform_win32_clear_window_and_get_dimensions(HWND window_handle, HDC devi
 
 internal void
 func platform_win32_resize_backbuffer(Platform_win32_backbuffer *backbuffer, int window_width, int window_height) {
-  int width = 1368;
-  int height = 760;
+  int width = 960;
+  int height = 540;
 
   // TODO jfd: bulletproof this
   // maybe don't free first, free after, then free first if that fails
@@ -978,6 +978,7 @@ func platform_win32_debug_audio_sync_display(
 
     platform_win32_debug_draw_sound_buffer_marker(backbuffer, sound_output, c, padding_x, top, bottom, this_marker->flip_play_cursor, play_color);
     platform_win32_debug_draw_sound_buffer_marker(backbuffer, sound_output, c, padding_x, top, bottom, this_marker->flip_write_cursor, write_color);
+
   }
 
 }
@@ -1588,8 +1589,8 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
         platform_win32_debug_run_loop_recorder(gp);
         #endif
 
-        // TODO jfd: move to 60 fps
-
+        // TODO jfd: cleanup how we pass render data to and from the game
+        gp->t = target_seconds_per_frame;
         gp->render.pixels = global_backbuffer.bitmap_memory;
         gp->render.width  = global_backbuffer.bitmap_width;
         gp->render.height = global_backbuffer.bitmap_height;
@@ -1736,7 +1737,7 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
         defer_loop(device_context = GetDC(window_handle), ReleaseDC(window_handle, device_context)) {
           Platform_win32_window_dimensions window_dimensions = platform_win32_get_window_dimensions(window_handle);
 
-          #ifdef HANDMADE_INTERNAL
+          #ifdef HANDMADE_DEBUG_SOUND
           platform_win32_debug_audio_sync_display(&global_backbuffer, platform_sound_output, debug_time_markers, debug_time_marker_index - 1, target_seconds_per_frame);
           #endif
 
