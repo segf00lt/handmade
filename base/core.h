@@ -85,6 +85,9 @@
 #define SIGN_EXTEND_s64(x, n) (s64)(((n) >= 64) ? (s64)(x) : (s64)((s64)(x) | (s64)(-((s64)(x) >> ((s64)(n) - 1lu)) << (s64)(n))))
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
+#define CLAMP(value, min, max) ( ((value) < (min)) ? (min) : ( MIN((value), (max)) ) )
+// TODO jfd: fix this wrap macro
+// #define WRAP(value, min, max)  ( ((value) >= (max)) ? (min) : ( ((value) < (min)) ? (max) : (value) ) )
 #define CLAMP_BOT(a, b) MAX(a, b)
 #define CLAMP_TOP(a, b) MIN(a, b)
 #define ARRLEN(x) (sizeof((x))/sizeof(*(x)))

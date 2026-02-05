@@ -17,4 +17,12 @@ func lerp_f32(f32 t, f32 begin, f32 end) {
   return t * (end - begin);
 }
 
+internal f32
+func wrap_f32(f32 value, f32 min, f32 max)
+{
+    f32 range = max - min;
+    f32 result = value - range*floorf((value - min)/range);
+    return result;
+}
+
 #endif

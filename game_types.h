@@ -39,6 +39,11 @@ struct Game_input {
 
 TYPEDEF_SLICE(Game_input, Game_input_slice);
 
+typedef struct Tilemap Tilemap;
+struct Tilemap {
+  u8 *tiles;
+};
+
 typedef struct Game Game;
 struct Game {
   f32 t;
@@ -66,6 +71,12 @@ struct Game {
 
   b8 once;
   b8 should_init_player;
+  b8 should_init_tilemap;
+
+  s32 cur_tilemap_id;
+  Tilemap tilemap;
+  s32 world_row;
+  s32 world_col;
 
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
