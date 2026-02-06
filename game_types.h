@@ -61,13 +61,11 @@ struct Game {
 
   f32 t_sine;
 
-  f32 player_x;
-  f32 player_y;
-  f32 player_width;
-  f32 player_height;
+  Vec2 player_pos;
+  f32  player_width;
+  f32  player_height;
 
-  f32 player_vel_x;
-  f32 player_vel_y;
+  Vec2 player_vel;
 
   b8 once;
   b8 should_init_player;

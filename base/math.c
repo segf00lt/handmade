@@ -39,6 +39,15 @@ func wrap_f32(f32 value, f32 min, f32 max)
 }
 
 force_inline Vec2
+func wrap_vec2(Vec2 v, Vec2 min, Vec2 max) {
+  Vec2 result = {
+    wrap_f32(v.x, min.x, max.x),
+    wrap_f32(v.y, min.y, max.y),
+  };
+  return result;
+}
+
+force_inline Vec2
 func max_vec2(Vec2 a, Vec2 b) {
   Vec2 result = {
     .x = max_f32(a.x, b.x),

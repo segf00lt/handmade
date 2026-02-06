@@ -200,10 +200,10 @@ func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_
 
   u8 *row = gp->render.pixels;
 
-  for(int y = begin_y; y < begin_y + round_f32_to_s32(line_thickness); y++) {
+  for(int y = begin_y; y < begin_y + round_f32_to_s32(line_thickness) && y < gp->render.height; y++) {
     u32 *pixel_row = (u32*)(row + y * gp->render.stride);
 
-    for(int x = begin_x; x < end_x; x++) {
+    for(int x = begin_x; x < end_x && x < gp->render.width; x++) {
 
       Color cur_color = color_from_pixel(pixel_row[x]);
 
@@ -217,10 +217,10 @@ func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_
   }
 
 
-  for(int y = begin_y + round_f32_to_s32(line_thickness); y < end_y - round_f32_to_s32(line_thickness); y++) {
+  for(int y = begin_y + round_f32_to_s32(line_thickness); y < end_y - round_f32_to_s32(line_thickness) && y < gp->render.height; y++) {
     u32 *pixel_row = (u32*)(row + y * gp->render.stride);
 
-    for(int x = begin_x; x < begin_x + round_f32_to_s32(line_thickness); x++) {
+    for(int x = begin_x; x < begin_x + round_f32_to_s32(line_thickness) && x < gp->render.width; x++) {
 
       Color cur_color = color_from_pixel(pixel_row[x]);
 
@@ -231,7 +231,7 @@ func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_
       pixel_row[x] = final_pixel_color;
     }
 
-    for(int x = end_x - round_f32_to_s32(line_thickness); x < end_x; x++) {
+    for(int x = end_x - round_f32_to_s32(line_thickness); x < end_x && x < gp->render.width; x++) {
 
       Color cur_color = color_from_pixel(pixel_row[x]);
 
@@ -244,7 +244,7 @@ func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_
 
   }
 
-  for(int y = end_y - round_f32_to_s32(line_thickness); y < end_y; y++) {
+  for(int y = end_y - round_f32_to_s32(line_thickness); y < end_y && y < gp->render.height; y++) {
     u32 *pixel_row = (u32*)(row + y * gp->render.stride);
 
     for(int x = begin_x; x < end_x; x++) {
@@ -353,34 +353,26 @@ func debug_output_sound(Game *gp) {
 
 }
 
-force_inline s32
-func get_tile_id(Game *gp, s32 col, s32 row) {
-  s32 tile_id = col + TILEMAP_COLUMNS * row;
-  tile_id = CLAMP(tile_id, 0, TILEMAP_COLUMNS*TILEMAP_ROWS - 1);
-  return tile_id;
-}
-
 force_inline u8
 func get_tile(Game *gp, s32 col, s32 row) {
-  s32 tile_id = get_tile_id(gp, col, row);
+  s32 tile_id = col + TILEMAP_COLUMNS * row;
+  tile_id = CLAMP(tile_id, 0, TILEMAP_COLUMNS*TILEMAP_ROWS - 1);
   u8 tile = gp->tilemap.tiles[tile_id];
 
   return tile;
 }
 
-internal void
-func tile_from_point(Game *gp, f32 x, f32 y, int *tile_col, int *tile_row) {
+internal Vec2_s32
+func tile_from_point(Game *gp, Vec2 v) {
 
-  Vec2 canon = scale_vec2((Vec2){ x, y }, 1.0f/TILEMAP_TILE_SIZE);
+  Vec2 canon = scale_vec2(v, 1.0f/TILEMAP_TILE_SIZE);
 
-  Vec2 whole_part = truncate_vec2(canon);
+  Vec2_s32 result = {
+    (s32)canon.x,
+    (s32)canon.y,
+  };
 
-  int tile_col_val = (int)whole_part.x;
-  int tile_row_val = (int)whole_part.y;
-
-  *tile_col = tile_col_val;
-  *tile_row = tile_row_val;
-
+  return result;
 }
 
 shared_function void
@@ -389,7 +381,7 @@ func game_update_and_render(Game *gp) {
   if(gp->did_reload) {
     gp->did_reload = false;
 
-    // gp->should_init_player = true;
+    gp->should_init_player = true;
     // gp->should_init_tilemap = true;
 
   }
@@ -407,10 +399,12 @@ func game_update_and_render(Game *gp) {
     if(gp->should_init_player) {
       gp->should_init_player = false;
 
-      gp->player_x = 400;
-      gp->player_y = 100;
-      gp->player_width = 15;
-      gp->player_height = 15;
+      gp->player_pos = (Vec2) {
+        4,
+        2,
+      };
+      gp->player_width = CM(150);
+      gp->player_height = CM(150);
     }
 
     if(gp->should_init_tilemap) {
@@ -433,20 +427,19 @@ func game_update_and_render(Game *gp) {
 
     f32 scaled_player_speed = player_speed * gp->t;
 
+    gp->player_vel = (Vec2){0};
 
-    gp->player_vel_x = 0;
-    gp->player_vel_y = 0;
     if(is_key_pressed(gp, KBD_KEY_W)) {
-      gp->player_vel_y -= scaled_player_speed;
+      gp->player_vel.y -= scaled_player_speed;
     }
     if(is_key_pressed(gp, KBD_KEY_A)) {
-      gp->player_vel_x -= scaled_player_speed;
+      gp->player_vel.x -= scaled_player_speed;
     }
     if(is_key_pressed(gp, KBD_KEY_S)) {
-      gp->player_vel_y += scaled_player_speed;
+      gp->player_vel.y += scaled_player_speed;
     }
     if(is_key_pressed(gp, KBD_KEY_D)) {
-      gp->player_vel_x += scaled_player_speed;
+      gp->player_vel.x += scaled_player_speed;
     }
 
   } /* get keyboard and mouse input */
@@ -456,41 +449,53 @@ func game_update_and_render(Game *gp) {
 
   { /* update world */
 
-    f32 new_player_x = gp->player_x + gp->player_vel_x;
-    f32 new_player_y = gp->player_y + gp->player_vel_y;
+    Vec2 cur_player_pos = gp->player_pos;
+    Vec2 new_player_pos = add_vec2(gp->player_pos, gp->player_vel);
 
-    { /* update cur tilemap */
+    Vec2_s32 new_player_tile = tile_from_point(gp, new_player_pos);
 
-      s32 world_col = gp->world_col;
-      s32 world_row = gp->world_row;
+    b8 changed_tilemap = false;
 
-      if(new_player_x < 0) {
-        world_col--;
-      } else if(new_player_x >= TILEMAP_WIDTH) {
-        world_col++;
+    s32 world_col = gp->world_col;
+    s32 world_row = gp->world_row;
+
+    if(new_player_pos.x < 0) {
+      new_player_pos.x = TILEMAP_WIDTH + new_player_pos.x;
+      world_col--;
+    } else if(new_player_pos.x >= TILEMAP_WIDTH) {
+      new_player_pos.x = new_player_pos.x - TILEMAP_WIDTH;
+      world_col++;
+    }
+
+    if(new_player_pos.y < 0) {
+      new_player_pos.y = TILEMAP_HEIGHT + new_player_pos.y;
+      world_row--;
+    } else if(new_player_pos.y >= TILEMAP_HEIGHT) {
+      new_player_pos.y = new_player_pos.y - TILEMAP_HEIGHT;
+      world_row++;
+    }
+
+    changed_tilemap = (world_col != gp->world_col || world_row != gp->world_row);
+
+    // NOTE jfd 06/02/2026: Best to ignore collisions when transitioning between tilemaps.
+    // Alternatively, if you did want to handle them, you would basically have the 3x3 grid of tilemaps
+    // be what we read from when processing this. But I think for the case where the world is made up of rooms,
+    // or large open spaces, this is fine, just avoid placing geometry on only one side of a tilemap boundary.
+    if(changed_tilemap) {
+
+      if(world_col < 0) {
+        world_col = WORLD_COLUMNS - 1;
+      } else if(world_col >= WORLD_COLUMNS) {
+        world_col = 0;
       }
 
-      if(new_player_y < 0) {
-        world_row--;
-      } else if(new_player_y >= TILEMAP_HEIGHT) {
-        world_row++;
+      if(world_row < 0) {
+        world_row = WORLD_ROWS - 1;
+      } else if(world_row >= WORLD_ROWS) {
+        world_row = 0;
       }
 
-      b8 changed_tilemap = (world_col != gp->world_col || world_row != gp->world_row);
-
-      if(changed_tilemap) {
-
-        if(world_col < 0) {
-          world_col = WORLD_COLUMNS - 1;
-        } else if(world_col >= WORLD_COLUMNS) {
-          world_col = 0;
-        }
-
-        if(world_row < 0) {
-          world_row = WORLD_ROWS - 1;
-        } else if(world_row >= WORLD_ROWS) {
-          world_row = 0;
-        }
+      { /* set new tilemap */
 
         u8 *tiles = (u8*)(tilemap_tiles[world_row][world_col]);
 
@@ -502,43 +507,34 @@ func game_update_and_render(Game *gp) {
         gp->world_row = world_row;
         gp->world_col = world_col;
 
-      }
+      } /* set new tilemap */
 
-    } /* update cur tilemap */
+    } else {
 
-    { /* tilemap collisions */
+      { /* tilemap collisions */
 
-      int cur_player_tile_col;
-      int cur_player_tile_row;
-      tile_from_point(gp, gp->player_x, gp->player_y, &cur_player_tile_col, &cur_player_tile_row);
+        if(get_tile(gp, new_player_tile.x, new_player_tile.y)) {
 
-      int new_player_tile_col;
-      int new_player_tile_row;
-      tile_from_point(gp, new_player_x, new_player_y, &new_player_tile_col, &new_player_tile_row);
+          if(new_player_pos.x > cur_player_pos.x) {
+          } else {
+          }
 
-      if(get_tile(gp, new_player_tile_col, new_player_tile_row)) {
+          if(new_player_pos.y > cur_player_pos.y) {
+          } else {
+          }
 
-        if(new_player_tile_col > cur_player_tile_col) {
+          new_player_pos = gp->player_pos;
 
-        } else {
         }
 
-        if(new_player_tile_row > cur_player_tile_row) {
-        } else {
-        }
+      } /* tilemap collisions */
 
-      } else {
-        new_player_x = wrap_f32(new_player_x, 0.0f, TILEMAP_WIDTH);
-        new_player_y = wrap_f32(new_player_y, 0.0f, TILEMAP_HEIGHT);
-        gp->player_x = new_player_x;
-        gp->player_y = new_player_y;
-      }
+    }
 
-      player_tile_col = new_player_tile_col;
-      player_tile_row = new_player_tile_row;
+    gp->player_pos = new_player_pos;
 
-    } /* tilemap collisions */
-
+    player_tile_col = new_player_tile.x;
+    player_tile_row = new_player_tile.y;
 
   } /* update world */
 
@@ -557,31 +553,60 @@ func game_update_and_render(Game *gp) {
           color = (Color){ 0.0f, 0.8f, 0.4f, 1 };
         }
 
-        draw_rect(gp, color, col*TILEMAP_TILE_SIZE, row*TILEMAP_TILE_SIZE, TILEMAP_TILE_SIZE, TILEMAP_TILE_SIZE);
+        Vec2 tile_screen_point = { (f32)col, (f32)row };
+        tile_screen_point = scale_vec2(tile_screen_point, TILEMAP_TILE_SIZE * PIXELS_PER_METER);
+        Vec2 tile_screen_size = scale_vec2((Vec2){ TILEMAP_TILE_SIZE, TILEMAP_TILE_SIZE }, PIXELS_PER_METER);
+
+        draw_rect(gp,
+          color,
+          tile_screen_point.x,
+          tile_screen_point.y,
+          tile_screen_size.x,
+          tile_screen_size.y
+        );
+
       }
     }
 
     // draw_rect_lines(gp, (Color){ 1, 1, 1, 1 }, 1.0f, 20, 20, 80, 80);
 
-    draw_rect(gp,
-      (Color){ 0, 0.4f, 0.9f, 1 },
-      player_tile_col*TILEMAP_TILE_SIZE,
-      player_tile_row*TILEMAP_TILE_SIZE,
-      TILEMAP_TILE_SIZE, TILEMAP_TILE_SIZE
-    );
-    draw_rect(gp,
-      (Color){ 0.95f, 0.8f, 0.0f, 1.0f },
-      gp->player_x - 0.5f*gp->player_width*0.2f, // NOTE jfd: I am shocked I forgot to divide by 2 :O
-      gp->player_y - 0.5f*gp->player_height*0.2f,
-      gp->player_width*0.2f,
-      gp->player_height*0.2f
-    );
+    #if 1
+    {
+      Vec2 tile_screen_point = { (f32)player_tile_col, (f32)player_tile_row };
+      tile_screen_point = scale_vec2(tile_screen_point, TILEMAP_TILE_SIZE * PIXELS_PER_METER);
+      Vec2 tile_screen_size = scale_vec2((Vec2){ TILEMAP_TILE_SIZE, TILEMAP_TILE_SIZE }, PIXELS_PER_METER);
+      draw_rect_lines(gp,
+        (Color){ 0, 0.4f, 0.9f, 1 },
+        2.0f,
+        tile_screen_point.x,
+        tile_screen_point.y,
+        tile_screen_size.x,
+        tile_screen_size.y
+      );
+    }
+    #endif
+
+    Vec2 player_screen_pos = scale_vec2(gp->player_pos, PIXELS_PER_METER);
+    Vec2 player_rect_screen_size = scale_vec2((Vec2){ gp->player_width, gp->player_height }, PIXELS_PER_METER);
+    Vec2 half_player_screen_size = scale_vec2(player_rect_screen_size, 0.5f);
+    Vec2 player_rect_screen_pos = sub_vec2(player_screen_pos, half_player_screen_size);
+    Vec2 player_center_rect_screen_pos = sub_vec2(player_screen_pos, scale_vec2(half_player_screen_size, 0.2f));
+    Vec2 player_center_rect_screen_size = scale_vec2(player_rect_screen_size, 0.2f);
+
     draw_rect(gp,
       (Color){ 0.95f, 0.2f, 0.4f, 0.8f },
-      gp->player_x - 0.5f*gp->player_width,
-      gp->player_y - 0.5f*gp->player_height,
-      gp->player_width,
-      gp->player_height
+      player_rect_screen_pos.x,
+      player_rect_screen_pos.y,
+      player_rect_screen_size.x,
+      player_rect_screen_size.y
+    );
+
+    draw_rect(gp,
+      (Color){ 0.95f, 0.8f, 0.0f, 1.0f },
+      player_center_rect_screen_pos.x,
+      player_center_rect_screen_pos.y,
+      player_center_rect_screen_size.x,
+      player_center_rect_screen_size.y
     );
 
   } /* draw */
