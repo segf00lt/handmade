@@ -356,7 +356,7 @@ func debug_output_sound(Game *gp) {
 force_inline s32
 func get_tile_id(Game *gp, s32 col, s32 row) {
   s32 tile_id = col + TILEMAP_COLUMNS * row;
-  tile_id = CLAMP(tile_id, 0, TILEMAP_COLUMNS*TILEMAP_ROWS);
+  tile_id = CLAMP(tile_id, 0, TILEMAP_COLUMNS*TILEMAP_ROWS - 1);
   return tile_id;
 }
 
