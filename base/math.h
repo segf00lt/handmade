@@ -35,8 +35,12 @@ TYPEDEF_VEC3(f64);
 
 typedef Vec3_f32 Vec3;
 
-internal f32 lerp_f32(f32 t, f32 begin, f32 end);
-internal s32 round_f32_to_s32(f32 value);
-internal f32 wrap_f32(f32 value, f32 min, f32 max);
+force_inline f32 lerp_f32(f32 t, f32 begin, f32 end);
+force_inline s32 round_f32_to_s32(f32 value);
+force_inline f32 wrap_f32(f32 value, f32 min, f32 max);
+
+force_inline Vec2 scale_vec2(Vec2 v, f32 a);
+force_inline Vec2 truncate_vec2(Vec2 v);
+force_inline Vec2 add_value_vec2(Vec2 v, f32 a);
 
 #endif

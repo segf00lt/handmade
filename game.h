@@ -16,7 +16,8 @@
 #define TILEMAP_HEIGHT           (TILEMAP_TILE_SIZE*(f32)TILEMAP_ROWS)
 
 // #define PLAYER_MOVE_SPEED        (5.250f*TILEMAP_TILE_SIZE)
-#define PLAYER_MOVE_SPEED        (7.250f*TILEMAP_TILE_SIZE)
+// #define PLAYER_MOVE_SPEED        (1.250f*TILEMAP_TILE_SIZE)
+#define PLAYER_MOVE_SPEED        (20.250f*TILEMAP_TILE_SIZE)
 
 shared_function Game_vtable game_load_procs(void);
 shared_function Game*       game_init(Platform *pp);
