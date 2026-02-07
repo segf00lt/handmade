@@ -12,14 +12,14 @@
 #define CM(x) ((f32)(x) * 1.0e-2f)
 #define MM(x) ((f32)(x) * 1.0e-3f)
 
-#define WORLD_ROWS               3
-#define WORLD_COLUMNS            3
+#define WORLD_CHUNKS_X_COUNT           3
+#define WORLD_CHUNKS_Y_COUNT           3
 
-#define TILEMAP_ROWS             20
-#define TILEMAP_COLUMNS          36
-#define TILEMAP_TILE_SIZE        M(2)
-#define TILEMAP_WIDTH            (TILEMAP_TILE_SIZE*(f32)TILEMAP_COLUMNS)
-#define TILEMAP_HEIGHT           (TILEMAP_TILE_SIZE*(f32)TILEMAP_ROWS)
+#define CHUNK_TILES_X_COUNT            36
+#define CHUNK_TILES_Y_COUNT            20
+#define TILE_SIZE_METERS               M(2.0f)
+#define CHUNK_WIDTH_METERS             (TILE_SIZE_METERS*(f32)CHUNK_TILES_X_COUNT)
+#define CHUNK_HEIGHT_METERS            (TILE_SIZE_METERS*(f32)CHUNK_TILES_Y_COUNT)
 
 #define PLAYER_MOVE_SPEED        (M(20)) /* meters per second */
 
@@ -37,7 +37,5 @@ shared_function void        game_get_sound_samples(Game *gp); // NOTE jfd: This 
 internal b32 is_key_pressed(Game *gp, Keyboard_key key);
 internal b32 was_key_pressed_once(Game *gp, Keyboard_key key);
 internal b32 was_key_released(Game *gp, Keyboard_key key);
-
-internal void set_tilemap(Game *gp, u8 *tiles, Vec2 origin);
 
 #endif

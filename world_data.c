@@ -1,6 +1,6 @@
 
 
-global u8 tilemap_tiles[WORLD_ROWS][WORLD_COLUMNS][TILEMAP_ROWS][TILEMAP_COLUMNS] = {
+global u8 world_tiles[WORLD_CHUNKS_Y_COUNT][WORLD_CHUNKS_X_COUNT][CHUNK_TILES_Y_COUNT][CHUNK_TILES_X_COUNT] = {
   {
     {
       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,  },

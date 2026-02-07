@@ -33,15 +33,22 @@ struct Game_input {
   Keyboard_modifier modifier_mask;
   u32 key_pressed[KBD_KEY_MAX];
   b32 key_released[KBD_KEY_MAX];
-  Vec2 mouse_pos;
-  Vec2 mouse_delta;
+  v2 mouse_pos;
+  v2 mouse_delta;
 };
 
 TYPEDEF_SLICE(Game_input, Game_input_slice);
 
-typedef struct Tilemap Tilemap;
-struct Tilemap {
+typedef struct Chunk Chunk;
+struct Chunk {
   u8 *tiles;
+};
+
+typedef struct World_pos World_pos;
+struct World_pos {
+  v2_s32 chunk;
+  v2_s32 tile;
+  v2 tile_rel;
 };
 
 typedef struct Game Game;
@@ -61,20 +68,15 @@ struct Game {
 
   f32 t_sine;
 
-  Vec2 player_pos;
-  f32  player_width;
-  f32  player_height;
-
-  Vec2 player_vel;
+  World_pos player_pos;
+  f32       player_width;
+  f32       player_height;
+  v2        player_vel;
 
   b8 once;
   b8 should_init_player;
-  b8 should_init_tilemap;
 
-  s32 cur_tilemap_id;
-  Tilemap tilemap;
-  s32 world_row;
-  s32 world_col;
+  Chunk chunk;
 
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);

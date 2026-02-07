@@ -26,8 +26,8 @@ struct Platform_event {
   b16 is_repeat;
   u16 repeat_count;
   u32 character;
-  Vec2 mouse_pos;
-  Vec2 scroll_delta;
+  v2 mouse_pos;
+  v2 scroll_delta;
 };
 
 typedef struct Platform_event_list Platform_event_list;

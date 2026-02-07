@@ -38,98 +38,344 @@ func wrap_f32(f32 value, f32 min, f32 max)
     return result;
 }
 
-force_inline Vec2
-func wrap_vec2(Vec2 v, Vec2 min, Vec2 max) {
-  Vec2 result = {
+force_inline v2
+func wrap_v2(v2 v, v2 min, v2 max) {
+  v2 result = {
     wrap_f32(v.x, min.x, max.x),
     wrap_f32(v.y, min.y, max.y),
   };
   return result;
 }
 
-force_inline Vec2
-func max_vec2(Vec2 a, Vec2 b) {
-  Vec2 result = {
-    .x = max_f32(a.x, b.x),
-    .y = max_f32(a.y, b.y),
+force_inline v2
+func max_v2(v2 a, v2 b) {
+  v2 result = {
+    max_f32(a.x, b.x),
+    max_f32(a.y, b.y),
   };
 
   return result;
 }
 
-force_inline Vec2
-func abs_vec2(Vec2 v) {
-  Vec2 result = {
-    .x = abs_f32(v.x),
-    .y = abs_f32(v.y),
+force_inline v2
+func abs_v2(v2 v) {
+  v2 result = {
+    abs_f32(v.x),
+    abs_f32(v.y),
   };
   return result;
 }
 
-force_inline Vec2
-func scale_vec2(Vec2 v, f32 a) {
-  Vec2 result = {
-    .x = v.x * a,
-    .y = v.y * a,
-  };
-
-  return result;
-}
-
-force_inline Vec2
-func truncate_vec2(Vec2 v) {
+force_inline v2
+func truncate_v2(v2 v) {
   // TODO jfd: this kind of truncation is undefined behaviour
-  Vec2 result = {
-    .x = (f32)(s32)v.x,
-    .y = (f32)(s32)v.y,
+  v2 result = {
+    (f32)(s32)v.x,
+    (f32)(s32)v.y,
   };
   return result;
 }
 
-force_inline Vec2
-func add_value_vec2(Vec2 v, f32 a) {
-  Vec2 result = {
-    .x = v.x + a,
-    .y = v.y + a,
+force_inline v2
+func add_v2(v2 a, v2 b) {
+  v2 result = {
+    a.x + b.x,
+    a.y + b.y,
   };
   return result;
 }
 
-force_inline Vec2
-func add_vec2(Vec2 a, Vec2 b) {
-  Vec2 result = {
-    .x = a.x + b.x,
-    .y = a.y + b.y,
-  };
-  return result;
-}
-
-force_inline Vec2
-func sub_vec2(Vec2 a, Vec2 b) {
-  Vec2 result = {
-    .x = a.x - b.x,
-    .y = a.y - b.y,
+force_inline v2
+func sub_v2(v2 a, v2 b) {
+  v2 result = {
+    a.x - b.x,
+    a.y - b.y,
   };
   return result;
 }
 
 
-force_inline Vec2
-func mul_vec2(Vec2 a, Vec2 b) {
-  Vec2 result = {
-    .x = a.x * b.x,
-    .y = a.y * b.y,
+force_inline v2
+func mul_v2(v2 a, v2 b) {
+  v2 result = {
+    a.x * b.x,
+    a.y * b.y,
   };
   return result;
 }
 
-force_inline Vec2
-func div_vec2(Vec2 a, Vec2 b) {
-  Vec2 result = {
-    .x = a.x / b.x,
-    .y = a.y / b.y,
+force_inline v2
+func div_v2(v2 a, v2 b) {
+  v2 result = {
+    a.x / b.x,
+    a.y / b.y,
   };
   return result;
 }
+
+force_inline v2
+func scale_v2(v2 v, f32 a) {
+  v2 result = {
+    v.x * a,
+    v.y * a,
+  };
+
+  return result;
+}
+
+force_inline v2
+func lt_v2(v2 a, v2 b) {
+  v2 result = {
+    (f32)(a.x < b.x),
+    (f32)(a.y < b.y),
+  };
+  return result;
+}
+
+force_inline v2
+func gte_v2(v2 a, v2 b) {
+  v2 result = {
+    (f32)(a.x >= b.x),
+    (f32)(a.y >= b.y),
+  };
+  return result;
+}
+
+force_inline v2
+func lte_v2(v2 a, v2 b) {
+  v2 result = {
+    (f32)(a.x <= b.x),
+    (f32)(a.y <= b.y),
+  };
+  return result;
+}
+
+force_inline v2
+func gt_v2(v2 a, v2 b) {
+  v2 result = {
+    (f32)(a.x > b.x),
+    (f32)(a.y > b.y),
+  };
+  return result;
+}
+
+force_inline v2
+func add_value_v2(v2 v, f32 a) {
+  v2 result = {
+    v.x + a,
+    v.y + a,
+  };
+  return result;
+}
+
+/////////////////////////////////////////
+// v2_s16
+
+force_inline v2_s16
+func add_v2_s16(v2_s16 a, v2_s16 b) {
+  v2_s16 result = {
+    a.x + b.x,
+    a.y + b.y,
+  };
+  return result;
+}
+
+force_inline v2_s16
+func sub_v2_s16(v2_s16 a, v2_s16 b) {
+  v2_s16 result = {
+    a.x - b.x,
+    a.y - b.y,
+  };
+  return result;
+}
+
+force_inline v2_s16
+func mul_v2_s16(v2_s16 a, v2_s16 b) {
+  v2_s16 result = {
+    a.x * b.x,
+    a.y * b.y,
+  };
+  return result;
+}
+
+force_inline v2_s16
+func div_v2_s16(v2_s16 a, v2_s16 b) {
+  v2_s16 result = {
+    a.x / b.x,
+    a.y / b.y,
+  };
+  return result;
+}
+
+force_inline v2_s16
+func scale_v2_s16(v2_s16 v, s16 a) {
+  v2_s16 result = {
+    v.x * a,
+    v.y * a,
+  };
+  return result;
+}
+
+force_inline v2_s16
+func lt_v2_s16(v2_s16 a, v2_s16 b) {
+  v2_s16 result = {
+    a.x < b.x,
+    a.y < b.y,
+  };
+  return result;
+}
+
+force_inline v2_s16
+func gte_v2_s16(v2_s16 a, v2_s16 b) {
+  v2_s16 result = {
+    a.x >= b.x,
+    a.y >= b.y,
+  };
+  return result;
+}
+
+force_inline v2_s16
+func lte_v2_s16(v2_s16 a, v2_s16 b) {
+  v2_s16 result = {
+    a.x <= b.x,
+    a.y <= b.y,
+  };
+  return result;
+}
+
+force_inline v2_s16
+func gt_v2_s16(v2_s16 a, v2_s16 b) {
+  v2_s16 result = {
+    a.x > b.x,
+    a.y > b.y,
+  };
+  return result;
+}
+
+force_inline v2_s16
+func add_value_v2_s16(v2_s16 v, s16 a) {
+  v2_s16 result = {
+    v.x + a,
+    v.y + a,
+  };
+  return result;
+}
+
+/////////////////////////////////////////
+// v2_s32
+
+force_inline v2_s32
+func add_v2_s32(v2_s32 a, v2_s32 b) {
+  v2_s32 result = {
+    a.x + b.x,
+    a.y + b.y,
+  };
+  return result;
+}
+
+force_inline v2_s32
+func sub_v2_s32(v2_s32 a, v2_s32 b) {
+  v2_s32 result = {
+    a.x - b.x,
+    a.y - b.y,
+  };
+  return result;
+}
+
+force_inline v2_s32
+func mul_v2_s32(v2_s32 a, v2_s32 b) {
+  v2_s32 result = {
+    a.x * b.x,
+    a.y * b.y,
+  };
+  return result;
+}
+
+force_inline v2_s32
+func div_v2_s32(v2_s32 a, v2_s32 b) {
+  v2_s32 result = {
+    a.x / b.x,
+    a.y / b.y,
+  };
+  return result;
+}
+
+force_inline v2_s32
+func scale_v2_s32(v2_s32 v, s32 a) {
+  v2_s32 result = {
+    v.x * a,
+    v.y * a,
+  };
+  return result;
+}
+
+force_inline v2_s32
+func lt_v2_s32(v2_s32 a, v2_s32 b) {
+  v2_s32 result = {
+    a.x < b.x,
+    a.y < b.y,
+  };
+  return result;
+}
+
+force_inline v2_s32
+func gte_v2_s32(v2_s32 a, v2_s32 b) {
+  v2_s32 result = {
+    a.x >= b.x,
+    a.y >= b.y,
+  };
+  return result;
+}
+
+force_inline v2_s32
+func lte_v2_s32(v2_s32 a, v2_s32 b) {
+  v2_s32 result = {
+    a.x <= b.x,
+    a.y <= b.y,
+  };
+  return result;
+}
+
+force_inline v2_s32
+func gt_v2_s32(v2_s32 a, v2_s32 b) {
+  v2_s32 result = {
+    a.x > b.x,
+    a.y > b.y,
+  };
+  return result;
+}
+
+force_inline v2_s32
+func add_value_v2_s32(v2_s32 v, s32 a) {
+  v2_s32 result = {
+    v.x + a,
+    v.y + a,
+  };
+  return result;
+}
+
+
+//////////////////////////////////////
+// casting
+
+
+force_inline v2_s32
+func cast_v2_f32_to_s32(v2 v) {
+  v2_s32 result = {
+    (s32)v.x,
+    (s32)v.y,
+  };
+  return result;
+}
+
+force_inline v2
+func cast_v2_s32_to_f32(v2_s32 v) {
+  v2 result = {
+    (f32)v.x,
+    (f32)v.y,
+  };
+  return result;
+}
+
 
 #endif
