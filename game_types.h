@@ -44,10 +44,15 @@ struct Chunk {
   u8 *tiles;
 };
 
-typedef struct World_pos World_pos;
-struct World_pos {
+typedef struct Chunk_pos Chunk_pos;
+struct Chunk_pos {
   v2_s32 chunk;
   v2_s32 tile;
+};
+
+typedef struct World_pos World_pos;
+struct World_pos {
+  v2_u32 tile;
   v2 tile_rel;
 };
 

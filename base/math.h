@@ -79,7 +79,20 @@ force_inline v2_s32 lte_v2_s32(v2_s32 a, v2_s32 b);
 force_inline v2_s32 gt_v2_s32(v2_s32 a, v2_s32 b);
 force_inline v2_s32 add_value_v2_s32(v2_s32 v, s32 a);
 
+force_inline v2_u32 add_v2_u32(v2_u32 a, v2_u32 b);
+force_inline v2_u32 sub_v2_u32(v2_u32 a, v2_u32 b);
+force_inline v2_u32 mul_v2_u32(v2_u32 a, v2_u32 b);
+force_inline v2_u32 div_v2_u32(v2_u32 a, v2_u32 b);
+force_inline v2_u32 scale_v2_u32(v2_u32 v, u32 a);
+force_inline v2_u32 lt_v2_u32(v2_u32 a, v2_u32 b);
+force_inline v2_u32 gte_v2_u32(v2_u32 a, v2_u32 b);
+force_inline v2_u32 lte_v2_u32(v2_u32 a, v2_u32 b);
+force_inline v2_u32 gt_v2_u32(v2_u32 a, v2_u32 b);
+force_inline v2_u32 add_value_v2_u32(v2_u32 v, u32 a);
+
 force_inline v2_s32 cast_v2_f32_to_s32(v2 v);
-force_inline v2 cast_v2_s32_to_f32(v2_s32 v);
+force_inline v2_u32 cast_v2_f32_to_u32(v2 v);
+force_inline v2     cast_v2_u32_to_f32(v2_u32 v);
+force_inline v2     cast_v2_s32_to_f32(v2_s32 v);
 
 #endif

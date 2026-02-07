@@ -12,18 +12,17 @@
 #define CM(x) ((f32)(x) * 1.0e-2f)
 #define MM(x) ((f32)(x) * 1.0e-3f)
 
-#define WORLD_CHUNKS_X_COUNT           3
-#define WORLD_CHUNKS_Y_COUNT           3
+#define WORLD_CHUNKS_X_COUNT           1
+#define WORLD_CHUNKS_Y_COUNT           1
 
-#define CHUNK_TILES_X_COUNT            36
-#define CHUNK_TILES_Y_COUNT            20
+#define CHUNK_SIZE                     256
+#define CHUNK_MASK                     0xff
 #define TILE_SIZE_METERS               M(2.0f)
-#define CHUNK_WIDTH_METERS             (TILE_SIZE_METERS*(f32)CHUNK_TILES_X_COUNT)
-#define CHUNK_HEIGHT_METERS            (TILE_SIZE_METERS*(f32)CHUNK_TILES_Y_COUNT)
+#define CHUNK_SIZE_METERS             (TILE_SIZE_METERS*(f32)CHUNK_SIZE)
 
 #define PLAYER_MOVE_SPEED        (M(20)) /* meters per second */
 
-#define PIXELS_PER_METER (13.5f)
+#define PIXELS_PER_METER (3.5f)
 #define METERS_PER_PIXEL (1.0f/PIXELS_PER_METER)
 #define METERS_TO_PIXELS(x) ((f32)((f32)(x)*PIXELS_PER_METER))
 #define PIXELS_TO_METERS(x) ((f32)((f32)(x)*METERS_PER_PIXEL))

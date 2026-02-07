@@ -355,9 +355,121 @@ func add_value_v2_s32(v2_s32 v, s32 a) {
 }
 
 
+/////////////////////////////////////////
+// v2_u32
+
+force_inline v2_u32
+func add_v2_u32(v2_u32 a, v2_u32 b) {
+  v2_u32 result = {
+    a.x + b.x,
+    a.y + b.y,
+  };
+  return result;
+}
+
+force_inline v2_u32
+func sub_v2_u32(v2_u32 a, v2_u32 b) {
+  v2_u32 result = {
+    a.x - b.x,
+    a.y - b.y,
+  };
+  return result;
+}
+
+force_inline v2_u32
+func mul_v2_u32(v2_u32 a, v2_u32 b) {
+  v2_u32 result = {
+    a.x * b.x,
+    a.y * b.y,
+  };
+  return result;
+}
+
+force_inline v2_u32
+func div_v2_u32(v2_u32 a, v2_u32 b) {
+  v2_u32 result = {
+    a.x / b.x,
+    a.y / b.y,
+  };
+  return result;
+}
+
+force_inline v2_u32
+func scale_v2_u32(v2_u32 v, u32 a) {
+  v2_u32 result = {
+    v.x * a,
+    v.y * a,
+  };
+  return result;
+}
+
+force_inline v2_u32
+func lt_v2_u32(v2_u32 a, v2_u32 b) {
+  v2_u32 result = {
+    a.x < b.x,
+    a.y < b.y,
+  };
+  return result;
+}
+
+force_inline v2_u32
+func gte_v2_u32(v2_u32 a, v2_u32 b) {
+  v2_u32 result = {
+    a.x >= b.x,
+    a.y >= b.y,
+  };
+  return result;
+}
+
+force_inline v2_u32
+func lte_v2_u32(v2_u32 a, v2_u32 b) {
+  v2_u32 result = {
+    a.x <= b.x,
+    a.y <= b.y,
+  };
+  return result;
+}
+
+force_inline v2_u32
+func gt_v2_u32(v2_u32 a, v2_u32 b) {
+  v2_u32 result = {
+    a.x > b.x,
+    a.y > b.y,
+  };
+  return result;
+}
+
+force_inline v2_u32
+func add_value_v2_u32(v2_u32 v, u32 a) {
+  v2_u32 result = {
+    v.x + a,
+    v.y + a,
+  };
+  return result;
+}
+
+
 //////////////////////////////////////
 // casting
 
+force_inline v2_u32
+func cast_v2_f32_to_u32(v2 v) {
+  v2_u32 result = {
+    (u32)v.x,
+    (u32)v.y,
+  };
+  return result;
+}
+
+
+force_inline v2
+func cast_v2_u32_to_f32(v2_u32 v) {
+  v2 result = {
+    (f32)v.x,
+    (f32)v.y,
+  };
+  return result;
+}
 
 force_inline v2_s32
 func cast_v2_f32_to_s32(v2 v) {

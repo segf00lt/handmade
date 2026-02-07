@@ -607,9 +607,9 @@ func platform_get_game_input_from_events(Platform_event_list *event_list, Game *
             input->modifier_mask |= KBD_MOD_ALT;
           } break;
           default: {
-            input->key_pressed[event->key] += 1 + event->repeat_count;
           } break;
         }
+        input->key_pressed[event->key] += 1 + event->repeat_count;
 
       } break;
       case EVENT_KEY_RELEASE: {
@@ -625,10 +625,10 @@ func platform_get_game_input_from_events(Platform_event_list *event_list, Game *
             input->modifier_mask &= ~KBD_MOD_ALT;
           } break;
           default: {
-            input->key_pressed[event->key] = 0;
-            input->key_released[event->key] = true;
           } break;
         }
+        input->key_pressed[event->key] = 0;
+        input->key_released[event->key] = true;
 
       } break;
       case EVENT_MOUSE_MOVE: {
