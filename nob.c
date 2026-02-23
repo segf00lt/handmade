@@ -1,6 +1,7 @@
 #define NOB_IMPLEMENTATION
 #include "nob.h"
 
+
 int win32_build_hot_reload_no_cradle(void) {
   Nob_Cmd cmd = {0};
 
@@ -14,14 +15,22 @@ int win32_build_hot_reload_no_cradle(void) {
     "/DHANDMADE_INTERNAL",
     "/DHANDMADE_HOTRELOAD",
     "/LD",
-    "handmade_module.c",
+    "handmade_hotreload_build.c",
+    "user32.lib",
+    "gdi32.lib",
+    "Dsound.lib",
+    "dxguid.lib",
+    "winmm.lib",
+    "ole32.lib",
     "/link",
     "/INCREMENTAL:NO",
     "/PDB:handmade_module.pdb",
-    "/OUT:game.dll",
+    "/OUT:game.dll.tmp",
     ""
   );
   if(!nob_cmd_run_sync_and_reset(&cmd)) return 0;
+
+  nob_rename("game.dll.tmp", "game.dll");
 
   return 1;
 }
@@ -35,16 +44,11 @@ int win32_build_hot_reload(void) {
     "/wd4100",
     "/Zi",
     "/Od",
-    "/DHANDMADE_INTERNAL",
     "/DHANDMADE_HOTRELOAD",
+    "/DMODULE=\\\"game\\\"",
     "/Fe:handmade.exe",
-    "handmade_cradle.c",
+    "hotreload/cradle_win32.c",
     "user32.lib",
-    "gdi32.lib",
-    "Dsound.lib",
-    "dxguid.lib",
-    "winmm.lib",
-    "ole32.lib",
     "/link",
     "/INCREMENTAL:NO",
     ""
@@ -54,7 +58,7 @@ int win32_build_hot_reload(void) {
   return win32_build_hot_reload_no_cradle();
 }
 
-int win32_build_static(void) {
+int win32_build(void) {
   Nob_Cmd cmd = {0};
   nob_cmd_append(&cmd,
     "cl",
@@ -65,7 +69,7 @@ int win32_build_static(void) {
     "/Od",
     "/DHANDMADE_INTERNAL",
     "/Fe:handmade.exe",
-    "handmade.c",
+    "handmade_build.c",
     "user32.lib",
     "gdi32.lib",
     "Dsound.lib",
@@ -107,7 +111,7 @@ int main(int argc, char **argv) {
   NOB_GO_REBUILD_URSELF(argc, argv);
 
 
-  #if 0
+  #if 1
   if(!win32_build_hot_reload()) return 1;
   #else
   if(!win32_build_hot_reload_no_cradle()) return 1;
@@ -115,7 +119,7 @@ int main(int argc, char **argv) {
 
   return 0;
 
-  if(!win32_build_static()) return 1;
+  if(!win32_build()) return 1;
 
   if(!macos_build_virutal_memory_test()) return 1;
 

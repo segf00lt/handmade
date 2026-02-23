@@ -9,6 +9,11 @@
 ////////////////////////////////
 //~ rjf: Codebase Keywords
 
+#if OS_LINUX
+#define _POSIX_C_SOURCE 200809L
+#endif
+
+
 #define internal      static
 #define global        static
 #define local_persist static
@@ -287,7 +292,7 @@ typedef uint64_t b64;
 typedef void* void_ptr;
 typedef char* char_ptr;
 
-typedef void Void_Func(void);
+typedef void Void_func(void);
 
 typedef enum Weekday {
   WEEKDAY_SUN = 0,

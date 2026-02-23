@@ -13,7 +13,7 @@ func arena_create_ex(u64 size, b32 cannot_chain, void *backing_buffer) {
     cannot_chain = 1;
     has_backing_buffer = 1;
   } else {
-    base = os_alloc(size);
+    base = platform_alloc(size);
     ASSERT(base);
   }
 
@@ -39,12 +39,12 @@ func arena_destroy(Arena *arena) {
 
   for(Arena *a = arena->free_last, *prev = 0; a != 0; a = prev) {
     prev = a->prev;
-    os_free((void*)a);
+    platform_free((void*)a);
   }
 
   for(Arena *a = arena->cur, *prev = 0; a != 0; a = prev) {
     prev = a->prev;
-    os_free((void*)a);
+    platform_free((void*)a);
   }
 
 }

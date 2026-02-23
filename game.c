@@ -5,14 +5,6 @@
 /////////////////////////////////
 // globals
 
-#ifdef HANDMADE_HOTRELOAD
-
-Platform_get_keyboard_modifiers_func *platform_get_keyboard_modifiers;
-Platform_read_entire_file_func  *platform_read_entire_file;
-Platform_write_entire_file_func *platform_write_entire_file;
-
-#endif
-
 #include "world_data.c"
 
 global Chunk world_chunks[WORLD_CHUNKS_Y_COUNT][WORLD_CHUNKS_X_COUNT];
@@ -21,23 +13,13 @@ global Chunk world_chunks[WORLD_CHUNKS_Y_COUNT][WORLD_CHUNKS_X_COUNT];
 // functions
 
 
-shared_function Game_vtable
-func game_load_procs(void) {
-  Game_vtable vtable = {
-    .init              = &game_init,
-    .update_and_render = &game_update_and_render,
-    .get_sound_samples = &game_get_sound_samples,
-  };
 
-  return vtable;
-}
-
-shared_function Game*
+internal Game*
 func game_init(Platform *pp) {
-  ASSERT(GAME_STATE_SIZE < pp->game_memory_backbuffer_size);
+  ASSERT(GAME_STATE_SIZE < pp->backbuffer_size);
 
-  u64 alloc_size = pp->game_memory_backbuffer_size;
-  u8 *alloc_ptr = (u8*)(pp->game_memory_backbuffer);
+  u64 alloc_size = pp->backbuffer_size;
+  u8 *alloc_ptr = (u8*)(pp->backbuffer);
 
   Game *gp = (Game*)alloc_ptr;
   alloc_ptr += GAME_STATE_SIZE;
@@ -56,7 +38,7 @@ func game_init(Platform *pp) {
   u8 *game_temp_arena_backbuffer = alloc_ptr;
   alloc_ptr += game_temp_arena_backbuffer_size;
 
-  ASSERT(alloc_ptr <= ((u8*)pp->game_memory_backbuffer + pp->game_memory_backbuffer_size));
+  ASSERT(alloc_ptr <= ((u8*)pp->backbuffer + pp->backbuffer_size));
 
   gp->main_arena  = arena_create_ex(game_main_arena_backbuffer_size, true, game_main_arena_backbuffer);
   gp->frame_arena = arena_create_ex(game_frame_arena_backbuffer_size, true, game_frame_arena_backbuffer);
@@ -64,14 +46,6 @@ func game_init(Platform *pp) {
 
   gp->did_reload = true;
   gp->once = true;
-
-  #ifdef HANDMADE_HOTRELOAD
-
-  platform_get_keyboard_modifiers  = pp->vtable.get_keyboard_modifiers;
-  platform_read_entire_file  = pp->vtable.read_entire_file;
-  platform_write_entire_file = pp->vtable.write_entire_file;
-
-  #endif
 
   return gp;
 }
@@ -436,13 +410,11 @@ func tile_from_world_pos(Game *gp, World_pos pos) {
   return tile;
 }
 
-shared_function void
+internal void
 func game_update_and_render(Game *gp) {
 
   if(gp->did_reload) {
     gp->did_reload = false;
-
-    // gp->should_init_player = true;
 
     world_chunks[0][0] = world_chunk_00;
 
@@ -452,15 +424,7 @@ func game_update_and_render(Game *gp) {
 
   if(gp->once) {
     gp->once = false;
-    gp->should_init_player = false;
-
-
-    {
-      gp->camera_offset = (v2) {
-        0,
-
-      };
-    }
+    gp->should_init_player = true;
 
   }
 
@@ -629,7 +593,7 @@ func game_update_and_render(Game *gp) {
 
 }
 
-shared_function void
+internal void
 func game_get_sound_samples(Game *gp) {
 
   // TODO jfd: allow sample offsets here for more robust platform options

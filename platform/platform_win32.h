@@ -65,18 +65,6 @@ struct Platform_win32_debug_loop_recorder {
   b32              read_game_state_from_file;
 };
 
-TYPEDEF_SLICE(Platform_win32_debug_time_marker, Platform_win32_debug_time_marker_slice);
-
-internal LRESULT CALLBACK platform_win32_main_window_callback(HWND window, UINT message, WPARAM w_param, LPARAM l_param);
-
-internal void platform_win32_resize_backbuffer(Platform_win32_backbuffer *backbuffer, int window_width, int window_height);
-
-internal void platform_win32_display_buffer_in_window(Platform_win32_backbuffer *backbuffer, HDC device_context, int window_width, int window_height, int x, int y, int width, int height);
-
-internal Platform_win32_window_dimensions platform_win32_get_window_dimensions(HWND window_handle);
-
-internal void platform_win32_load_xinput(void);
-
 #define PLATFORM_WIN32_XINPUT_SET_STATE(name) DWORD name(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
 typedef PLATFORM_WIN32_XINPUT_SET_STATE(Platform_win32_xinput_set_state_func);
 
@@ -97,12 +85,97 @@ PLATFORM_WIN32_DIRECT_SOUND_CREATE(_platform_win32_direct_sound_create_stub) {
   return 0;
 }
 
+TYPEDEF_SLICE(Platform_win32_debug_time_marker);
+
+
+typedef struct Platform_win32 Platform_win32;
+struct Platform_win32 {
+
+  Platform_win32_debug_loop_recorder debug_loop_recorder;
+
+  b32 debug_paused;
+
+  Platform platform;
+
+  Arena *platform_main_arena;
+  Arena *platform_debug_arena;
+  Arena *platform_temp_arena;
+  Arena *platform_event_arena;
+  Arena *platform_file_arena;
+
+  Platform_win32_xinput_set_state_func *platform_win32_xinput_set_state;
+  Platform_win32_xinput_get_state_func *platform_win32_xinput_get_state;
+
+  b32 platform_is_running;
+  Platform_win32_backbuffer global_backbuffer;
+
+  Platform_win32_sound_output _platform_sound_output_stub;
+  Platform_win32_sound_output *platform_sound_output;
+
+  LPDIRECTSOUNDBUFFER platform_sound_buffer; // this is what we write to
+
+  Platform_event_list _platform_event_list_stub;
+  Platform_event_list *platform_event_list;
+
+  s64 platform_win32_perf_counter_frequency;
+  b32 sleep_is_granular;
+
+  WNDCLASSA window_class;
+  HWND window_handle;
+
+  HDC refresh_rate_query_device_context;
+  int monitor_refresh_hz;
+  int platform_win32_refresh_rate;
+
+  f32 game_update_hz;
+  f32 target_seconds_per_frame;
+
+  MSG message;
+
+  int debug_time_marker_index;
+  Platform_win32_debug_time_marker_slice debug_time_markers;
+
+  LARGE_INTEGER last_counter;
+  LARGE_INTEGER flip_wall_clock;
+
+  #ifdef HANDMADE_PROFILE
+  u64 last_cycle_count
+  #endif
+
+  #ifdef HANDMADE_AUDIO_LATENCY_DEBUG
+  DWORD audio_latency_bytes;
+  f32 audio_latency_seconds;
+  #endif
+  b32 sound_is_valid;
+  s16 *samples;
+
+  b32 do_reload;
+
+  Game *gp;
+
+};
+
+
+internal Platform_win32* platform_win32_init(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode);
+internal void platform_win32_main(void);
+
+
+internal LRESULT CALLBACK platform_win32_main_window_callback(HWND window, UINT message, WPARAM w_param, LPARAM l_param);
+
+internal void platform_win32_resize_backbuffer(Platform_win32_backbuffer *backbuffer, int window_width, int window_height);
+
+internal void platform_win32_display_buffer_in_window(Platform_win32_backbuffer *backbuffer, HDC device_context, int window_width, int window_height, int x, int y, int width, int height);
+
+internal Platform_win32_window_dimensions platform_win32_get_window_dimensions(HWND window_handle);
+
+internal void platform_win32_load_xinput(void);
+
 internal Platform_event* platform_win32_event_push(Arena *a, Platform_event_list *event_list, Platform_event_kind event_kind);
 internal Platform_event* platform_win32_event_pop(Platform_event_list *event_list);
 
 internal Keyboard_key platform_win32_keyboard_key_from_virtual_keycode(WPARAM virtual_keycode);
 
-internal void platform_get_game_input_from_events(Platform_event_list *event_list, Game *gp);
+internal void platform_win32_get_game_input_from_events(Platform_event_list *event_list, Game *gp);
 
 force_inline LARGE_INTEGER platform_win32_get_wall_clock(void);
 

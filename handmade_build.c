@@ -1,11 +1,14 @@
 
 #include "base/base_include.h"
 
+#include "platform/platform.h"
+
+#include "game.h"
+
 #include "platform/platform_include.h"
 
 
 
-#include "game.h"
 
 #include "base/base_include.c"
 

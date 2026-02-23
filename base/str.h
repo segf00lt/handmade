@@ -34,6 +34,21 @@ struct Str8_find_results {
   s64 count;
 };
 
+typedef struct Str8_array Str8_array;
+struct Str8_array {
+  Str8 *d;
+  s64 count;
+  s64 cap;
+  Arena *arena;
+};
+
+typedef struct Str8_slice Str8_slice;
+struct Str8_slice {
+  Str8 *d;
+  s64 count;
+};
+
+
 #define str8_lit(strlit) ((Str8){ .s = (u8*)(strlit), .len = sizeof(strlit) - 1 })
 
 #define str8_match_lit(a_lit, b) str8_match(str8_lit(a_lit), b)
@@ -49,6 +64,8 @@ internal Str8_find_results str8_find_all_chars(Arena *scratch, Str8 haystack, u8
 internal Str8_find_results str8_find_all(Arena *scratch, Str8 haystack, Str8 needle, Arena *output_arena);
 
 internal Str8 str8_cat(Arena *a, Str8 str1, Str8 str2);
+
+internal Str8 str8_escaped(Arena *a, Str8 str);
 
 internal b32 str8_is_cident(Str8 str);
 internal b32 str8_is_alpha(Str8 str);
@@ -69,6 +86,11 @@ internal Str8 str8_to_upper(Arena *a, Str8 str);
 internal Str8 str8_to_lower(Arena *a, Str8 str);
 
 internal Str8 str8_slice(Str8 str, s64 begin, s64 end);
+
+internal Str8 str8_get_line(Str8 str, s64 start_pos);
+
+internal Str8 str8_get_line_no_strip(Str8 str, s64 start_pos);
+internal Str8 str8_strip_whitespace(Str8 str);
 
 #define is_space(c) (!!('\0' <= (c) && (c) <= ' '))
 #define is_upper(c) (!!('A' <= (c) && (c) <= 'Z'))
@@ -95,8 +117,7 @@ internal Str8 str8_chop_last_slash(Str8 str);
 #define str8_list_append_node(list, node) str8_list_append_node_(&(list), node)
 internal void str8_list_append_node_(Str8_list *list, Str8_node *node);
 
-#define str8_list_append_str(a, list, str) str8_list_append_str_(a, &(list), str)
-internal void str8_list_append_str_(Arena *a, Str8_list *list, Str8 str);
+internal void str8_list_append_str(Arena *a, Str8_list *list, Str8 str);
 
 internal Str8 str8_list_join(Arena *a, Str8_list list, Str8 sep);
 

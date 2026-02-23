@@ -16,7 +16,8 @@ struct __Slice_header {
   s64 count;
 };
 
-#define TYPEDEF_ARRAY(T, name) \
+
+#define TYPEDEF_ARRAY_NAME(T, name) \
 typedef struct name name; \
 struct name {                 \
   T *d;                           \
@@ -25,12 +26,25 @@ struct name {                 \
   Arena *arena;                   \
 };                                \
 
-#define TYPEDEF_SLICE(T, name) \
+#define TYPEDEF_SLICE_NAME(T, name) \
 typedef struct name name; \
 struct name {                 \
   T *d;                           \
   s64 count;                      \
 };                                \
+
+#define TYPEDEF_ARRAY(T) TYPEDEF_ARRAY_NAME(T, T##_array)
+#define TYPEDEF_SLICE(T) TYPEDEF_SLICE_NAME(T, T##_slice)
+
+#define IS_ARRAY(T) \
+(member_offset(T, d) == member_offset(__Arr_header, d) && \
+ member_offset(T, count) == member_offset(__Arr_header, count) && \
+ member_offset(T, cap) == member_offset(__Arr_header, cap) && \
+ member_offset(T, arena) == member_offset(__Arr_header, arena))
+
+#define IS_SLICE(T) \
+(member_offset(T, d) == member_offset(__Arr_header, d) && \
+ member_offset(T, count) == member_offset(__Arr_header, count))
 
 #define ARRAY_DEFAULT_CAP 64
 
@@ -50,8 +64,9 @@ struct name {                 \
 #define arr_stride(array) ((s64)sizeof(*((array).d)))
 #define arr_ptr_stride(array) ((s64)sizeof(*((array)->d)))
 
-#define arr_init(array, arena) arr_init_(header_ptr_from_arr((array)), arena, arr_stride(array), ARRAY_DEFAULT_CAP)
-#define arr_init_ex(array, arena, cap) arr_init_(header_ptr_from_arr((array)), arena, arr_stride(array), (cap))
+#define arr_init(array, arena) arr_init_(header_ptr_from_arr((array)), (arena), arr_stride(array), ARRAY_DEFAULT_CAP)
+#define arr_init_ex(array, arena, cap) arr_init_(header_ptr_from_arr((array)), (arena), arr_stride(array), (cap))
+#define arr_init_pro(array, arena, cap, stride) arr_init_(header_ptr_from_arr((array)), (arena), (stride), (cap))
 
 #define dict_init(dict, arena) dict_init_ex(dict, arena, DICT_DEFAULT_CAP)
 #define dict_init_ex(dict, arena, cap) (memory_zero(&((dict).nil_item), sizeof(*&(dict).nil_item)), arr_init_(header_ptr_from_arr((dict)), arena, dict_stride(dict), cap))
@@ -100,9 +115,5 @@ internal void  arr_init_(__Arr_header *arr, Arena *arena, s64 stride, s64 cap);
 internal void* arr_push_no_zero_(__Arr_header *arr, s64 stride, s64 push_count);
 
 internal void  slice_init_(__Slice_header *slice, Arena *arena, s64 stride, s64 count);
-
-internal u64 hash_key(Str8 key);
-internal s64 arr_dict_put_(__Arr_header *dict_array, u64 stride, u64 key_offset, Str8 new_key);
-internal s64 arr_dict_get_(__Arr_header *dict_array, u64 stride, u64 key_offset, Str8 key);
 
 #endif
