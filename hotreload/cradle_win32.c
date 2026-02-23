@@ -20,17 +20,23 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
     Module_main_func *module_main = 0;
 
     {
+
       DWORD attrs = GetFileAttributesA(MODULE".dll");
       int result = (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY));
       if(!result) {
-        OutputDebugStringA(MODULE".dll not found\n");
-        return 1;
+        attrs = GetFileAttributesA(MODULE".dll.live");
+        result = (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY));
+        if(!result) {
+          OutputDebugStringA(MODULE".dll.live not found\n");
+          return 1;
+        }
+      } else {
+        if(!MoveFileEx(MODULE".dll", MODULE".dll.live", MOVEFILE_REPLACE_EXISTING)) {
+          OutputDebugStringA("module file rename failed\n");
+          return 1;
+        }
       }
-    }
 
-    if(!MoveFileEx(MODULE".dll", MODULE".dll.live", MOVEFILE_REPLACE_EXISTING)) {
-      OutputDebugStringA("module file rename failed\n");
-      return 1;
     }
 
     module = LoadLibraryA(MODULE".dll.live");
@@ -63,6 +69,11 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
       break;
     }
 
+  }
+
+  if(!MoveFileEx(MODULE".dll.live", MODULE".dll", MOVEFILE_REPLACE_EXISTING)) {
+    OutputDebugStringA("module file rename failed\n");
+    return 1;
   }
 
   return 0;

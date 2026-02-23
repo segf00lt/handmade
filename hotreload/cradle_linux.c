@@ -81,6 +81,11 @@ int main(int argc, char **argv) {
 
   }
 
+  if(rename(MODULE".so.live", MODULE".so") != 0) {
+    printf("module file rename failed\n");
+    return 1;
+  }
+
   return 0;
 }
 

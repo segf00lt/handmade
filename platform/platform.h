@@ -53,7 +53,7 @@ internal        void*             platform_alloc(u64 bytes);
 internal        void              platform_free(void *ptr);
 internal        Str8              platform_read_entire_file(Arena *a, char *path);
 internal        b32               platform_write_entire_file(Str8 data, char *path);
-internal        b32               platform_file_exists(char *path);
+force_inline    b32               platform_file_exists(char *path);
 internal        b32               platform_make_dir(char *dir_path);
 internal        Str8              platform_get_current_dir(Arena *a);
 internal        b32               platform_set_current_dir(char *dir_path);

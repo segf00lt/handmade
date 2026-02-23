@@ -45,7 +45,8 @@ func game_init(Platform *pp) {
   gp->temp_arena  = arena_create_ex(game_temp_arena_backbuffer_size,  true, game_temp_arena_backbuffer);
 
   gp->did_reload = true;
-  gp->once = true;
+
+  init_player(gp);
 
   return gp;
 }
@@ -343,9 +344,9 @@ func recanonicalize_coord(Game *gp, u32 *tile, f32 *tile_rel) {
   ASSERT(*tile_rel <= TILE_SIZE_METERS);
 }
 
-internal World_pos
-func recanonicalize_pos(Game *gp, World_pos pos) {
-  World_pos result = pos;
+internal Tile_map_pos
+func recanonicalize_pos(Game *gp, Tile_map_pos pos) {
+  Tile_map_pos result = pos;
 
   recanonicalize_coord(gp, &result.tile.x, &result.tile_rel.x);
   recanonicalize_coord(gp, &result.tile.y, &result.tile_rel.y);
@@ -354,7 +355,7 @@ func recanonicalize_pos(Game *gp, World_pos pos) {
 }
 
 internal Chunk_pos
-func chunk_pos_from_world_pos(Game *gp, World_pos pos) {
+func chunk_pos_from_tile_map_pos(Game *gp, Tile_map_pos pos) {
   Chunk_pos result;
 
   u32 abs_tile_x = pos.tile.x;
@@ -368,9 +369,9 @@ func chunk_pos_from_world_pos(Game *gp, World_pos pos) {
   return result;
 }
 
-internal World_pos
-func world_pos_from_point(Game *gp, f32 x, f32 y) {
-  World_pos result = {0};
+internal Tile_map_pos
+func tile_map_pos_from_point(Game *gp, f32 x, f32 y) {
+  Tile_map_pos result = {0};
   v2 v = { x, y };
 
   v2 tile = truncate_v2(scale_v2(v, 1.0f/TILE_SIZE_METERS));
@@ -400,14 +401,21 @@ func get_tile_of_chunk(Game *gp, Chunk *chunk, s32 tile_x, s32 tile_y) {
 }
 
 force_inline u8
-func tile_from_world_pos(Game *gp, World_pos pos) {
+func tile_from_tile_map_pos(Game *gp, Tile_map_pos pos) {
   u8 tile = 0;
 
-  Chunk_pos chunk_pos = chunk_pos_from_world_pos(gp, pos);
+  Chunk_pos chunk_pos = chunk_pos_from_tile_map_pos(gp, pos);
   Chunk *chunk = get_chunk(gp, chunk_pos.chunk.x, chunk_pos.chunk.y);
   tile = get_tile_of_chunk(gp, chunk, chunk_pos.tile.x, chunk_pos.tile.y);
 
   return tile;
+}
+
+internal void
+func init_player(Game *gp) {
+  gp->player_pos = tile_map_pos_from_point(gp, 4, 2);
+  gp->player_width = CM(150);
+  gp->player_height = CM(150);
 }
 
 internal void
@@ -418,7 +426,7 @@ func game_update_and_render(Game *gp) {
 
     world_chunks[0][0] = world_chunk_00;
 
-    gp->once = true;
+    gp->once = false;
 
   }
 
@@ -435,10 +443,7 @@ func game_update_and_render(Game *gp) {
     if(gp->should_init_player) {
       gp->should_init_player = false;
 
-
-      gp->player_pos = world_pos_from_point(gp, 4, 2);
-      gp->player_width = CM(150);
-      gp->player_height = CM(150);
+      init_player(gp);
     }
 
   } /* run_once */
@@ -477,13 +482,13 @@ func game_update_and_render(Game *gp) {
 
   { /* update world */
 
-    World_pos new_pos = gp->player_pos;
+    Tile_map_pos new_pos = gp->player_pos;
     new_pos.tile_rel = add_v2(new_pos.tile_rel, gp->player_vel);
     new_pos = recanonicalize_pos(gp, new_pos);
 
     { /* tile collisions */
 
-      if(tile_from_world_pos(gp, new_pos)) {
+      if(tile_from_tile_map_pos(gp, new_pos)) {
         new_pos = gp->player_pos;
       }
 
@@ -498,10 +503,10 @@ func game_update_and_render(Game *gp) {
 
   { /* draw */
 
-    World_pos player_world_pos = gp->player_pos;
+    Tile_map_pos player_tile_map_pos = gp->player_pos;
 
-    v2 player_tile_rel = { player_world_pos.tile_rel.x, player_world_pos.tile_rel.y };
-    v2 player_tile = { (f32)(player_world_pos.tile.x & 0xff), (f32)(player_world_pos.tile.y & CHUNK_MASK) };
+    v2 player_tile_rel = { player_tile_map_pos.tile_rel.x, player_tile_map_pos.tile_rel.y };
+    v2 player_tile = { (f32)(player_tile_map_pos.tile.x & 0xff), (f32)(player_tile_map_pos.tile.y & CHUNK_MASK) };
     v2 player_pos = add_v2(player_tile_rel, scale_v2(player_tile, TILE_SIZE_METERS));
 
     v2 camera_pos = {
@@ -599,6 +604,7 @@ func game_get_sound_samples(Game *gp) {
   // TODO jfd: allow sample offsets here for more robust platform options
 
   debug_silence(gp);
+  // TODO jfd 23/02/26: there is some popping in the sound, not sure if it has to do with hot-reloading
   // debug_output_sound(gp);
 
 }

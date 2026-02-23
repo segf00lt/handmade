@@ -73,8 +73,8 @@ struct Chunk_pos {
   v2_s32 tile;
 };
 
-typedef struct World_pos World_pos;
-struct World_pos {
+typedef struct Tile_map_pos Tile_map_pos;
+struct Tile_map_pos {
   v2_u32 tile;
   v2 tile_rel;
 };
@@ -96,7 +96,7 @@ struct Game {
 
   f32 t_sine;
 
-  World_pos player_pos;
+  Tile_map_pos player_pos;
   f32       player_width;
   f32       player_height;
   v2        player_vel;
@@ -122,5 +122,7 @@ internal void        game_get_sound_samples(Game *gp); // NOTE jfd: This has to 
 internal b32 is_key_pressed(Game *gp, Keyboard_key key);
 internal b32 was_key_pressed_once(Game *gp, Keyboard_key key);
 internal b32 was_key_released(Game *gp, Keyboard_key key);
+
+internal void init_player(Game *gp);
 
 #endif

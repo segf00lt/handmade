@@ -1185,7 +1185,7 @@ func platform_win32_get_last_file_write_time(char *path) {
   return result;
 }
 
-internal b32
+force_inline b32
 func platform_file_exists(char *path) {
   DWORD attrs = GetFileAttributesA(path);
   b32 result = (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY));
