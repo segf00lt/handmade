@@ -446,11 +446,21 @@ func game_update_and_render(Game *gp) {
 
     world_chunks[0][0] = world_chunk_00;
 
+    gp->once = true;
+
   }
 
   if(gp->once) {
     gp->once = false;
-    gp->should_init_player = true;
+    gp->should_init_player = false;
+
+
+    {
+      gp->camera_offset = (v2) {
+        0,
+
+      };
+    }
 
   }
 
@@ -478,7 +488,7 @@ func game_update_and_render(Game *gp) {
     f32 scaled_player_speed = player_speed * gp->t;
 
     if(is_key_pressed(gp, KBD_KEY_LEFT_SHIFT)) {
-      scaled_player_speed *= 0.4f;
+      scaled_player_speed *= 0.2f;
     }
 
     gp->player_vel = (v2){0};
@@ -524,10 +534,19 @@ func game_update_and_render(Game *gp) {
 
   { /* draw */
 
+    World_pos player_world_pos = gp->player_pos;
+
+    v2 player_tile_rel = { player_world_pos.tile_rel.x, player_world_pos.tile_rel.y };
+    v2 player_tile = { (f32)(player_world_pos.tile.x & 0xff), (f32)(player_world_pos.tile.y & CHUNK_MASK) };
+    v2 player_pos = add_v2(player_tile_rel, scale_v2(player_tile, TILE_SIZE_METERS));
+
+    v2 camera_pos = {
+      player_pos.x - ((f32)gp->render.width)*METERS_PER_PIXEL*0.5f,
+      player_pos.y - ((f32)gp->render.height)*METERS_PER_PIXEL*0.5f,
+    };
+
     clear_screen(gp);
 
-    // for(u32 row = 0; row < CHUNK_SIZE; row++) {
-    //   for(u32 col = 0; col < CHUNK_SIZE; col++) {
     for(u32 row = 0; row < CHUNK_SIZE; row++) {
       for(u32 col = 0; col < CHUNK_SIZE; col++) {
         u8 tile = get_tile_of_chunk(gp, &world_chunk_00, col, row);
@@ -539,11 +558,13 @@ func game_update_and_render(Game *gp) {
           color = (Color){ 0.0f, 0.8f, 0.4f, 1 };
         }
 
-        // HERE
-        // TODO jfd: allow for a free moving 2d camera
-        v2 tile_screen_point = { (f32)col, (f32)((row & CHUNK_MASK)) };
-        tile_screen_point    = scale_v2(tile_screen_point, TILE_SIZE_METERS * PIXELS_PER_METER);
-        // tile_screen_point    = add_v2(tile_screen_point, (v2){ 0, (CHUNK_SIZE_METERS*PIXELS_PER_METER - (f32)gp->render.height)});
+
+        v2 tile_screen_point = { (f32)col * TILE_SIZE_METERS, (f32)((row & CHUNK_MASK)) * TILE_SIZE_METERS };
+        tile_screen_point = sub_v2(tile_screen_point, camera_pos);
+        tile_screen_point    = scale_v2(tile_screen_point, PIXELS_PER_METER);
+        tile_screen_point.y = gp->render.height - tile_screen_point.y - TILE_SIZE_METERS*PIXELS_PER_METER;
+
+
         v2 tile_screen_size  = scale_v2((v2){ TILE_SIZE_METERS, TILE_SIZE_METERS }, PIXELS_PER_METER);
 
         draw_rect(gp,
@@ -559,10 +580,12 @@ func game_update_and_render(Game *gp) {
 
     // draw_rect_lines(gp, (Color){ 1, 1, 1, 1 }, 1.0f, 20, 20, 80, 80);
 
-    #if 1
+    #if 0
     {
-      v2 tile_screen_point = { (f32)player_tile_col, (f32)(CHUNK_SIZE - 1 - (player_tile_row & CHUNK_MASK)) };
-      tile_screen_point    = scale_v2(tile_screen_point, TILE_SIZE_METERS * PIXELS_PER_METER);
+      v2 tile_screen_point = { (f32)player_tile_col * TILE_SIZE_METERS, (f32)(player_tile_row & CHUNK_MASK) * TILE_SIZE_METERS };
+      tile_screen_point = sub_v2(tile_screen_point, camera_pos);
+      tile_screen_point    = scale_v2(tile_screen_point, PIXELS_PER_METER);
+      tile_screen_point.y = gp->render.height - tile_screen_point.y - TILE_SIZE_METERS*PIXELS_PER_METER;
       v2 tile_screen_size  = scale_v2((v2){ TILE_SIZE_METERS, TILE_SIZE_METERS }, PIXELS_PER_METER);
       draw_rect_lines(gp,
         (Color){ 0, 0.4f, 0.9f, 1 },
@@ -575,13 +598,8 @@ func game_update_and_render(Game *gp) {
     }
     #endif
 
-    World_pos player_pos = gp->player_pos;
-
-    v2 screen_tile_rel = { player_pos.tile_rel.x, TILE_SIZE_METERS - player_pos.tile_rel.y };
-    v2_u32 screen_tile = { player_pos.tile.x & 0xff, CHUNK_SIZE - 1 - (player_pos.tile.y & CHUNK_MASK) };
-
-    v2 player_screen_pos = scale_v2(add_v2(screen_tile_rel, scale_v2(cast_v2_u32_to_f32(screen_tile), TILE_SIZE_METERS)), PIXELS_PER_METER);
-    player_screen_pos    = add_value_v2(player_screen_pos, -(CHUNK_SIZE*PIXELS_PER_METER - gp->render.height));
+    v2 player_screen_pos = scale_v2(sub_v2(player_pos, camera_pos), PIXELS_PER_METER);
+    player_screen_pos.y = gp->render.height - player_screen_pos.y;
 
     v2 player_rect_screen_size        = scale_v2((v2){ gp->player_width, gp->player_height }, PIXELS_PER_METER);
     v2 half_player_screen_size        = scale_v2(player_rect_screen_size, 0.5f);

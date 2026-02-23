@@ -83,6 +83,8 @@ struct Game {
 
   Chunk chunk;
 
+  v2 camera_offset;
+
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
 #define GAME_STATE_SIZE ((u64)MB(1))

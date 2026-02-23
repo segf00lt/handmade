@@ -20,9 +20,9 @@
 #define TILE_SIZE_METERS               M(2.0f)
 #define CHUNK_SIZE_METERS             (TILE_SIZE_METERS*(f32)CHUNK_SIZE)
 
-#define PLAYER_MOVE_SPEED        (M(20)) /* meters per second */
+#define PLAYER_MOVE_SPEED        (M(40)) /* meters per second */
 
-#define PIXELS_PER_METER (3.5f)
+#define PIXELS_PER_METER (13.5f)
 #define METERS_PER_PIXEL (1.0f/PIXELS_PER_METER)
 #define METERS_TO_PIXELS(x) ((f32)((f32)(x)*PIXELS_PER_METER))
 #define PIXELS_TO_METERS(x) ((f32)((f32)(x)*METERS_PER_PIXEL))
