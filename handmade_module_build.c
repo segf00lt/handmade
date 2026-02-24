@@ -6,14 +6,7 @@
 #include "game/game_types.h"
 #include "game/game.h"
 
-#include "platform/platform_include.h"
-
-
-
-
 #include "base/base_include.c"
 
 #include "game/game.c"
-
-#include "platform/platform_include.c"
 

@@ -31,6 +31,13 @@ func arena_create_ex(u64 size, b32 cannot_chain, void *backing_buffer) {
   return arena;
 }
 
+internal Arena*
+func arena_create_from_arena(u64 size, Arena *arena) {
+  void *backing_buffer = arena_push(arena, MAX(size, ARENA_HEADER_SIZE), 1);
+  Arena *result = arena_create_ex(MAX(size, ARENA_HEADER_SIZE), 1, backing_buffer);
+  return result;
+}
+
 internal void
 func arena_destroy(Arena *arena) {
   ASSERT(arena);

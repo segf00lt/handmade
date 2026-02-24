@@ -36,6 +36,7 @@ global read_only u64 ARENA_DEFAULT_SIZE = KB(64);
 #endif
 
 internal Arena* arena_create_ex(u64 size, b32 cannot_chain, void *backing_buffer);
+internal Arena* arena_create_from_arena(u64 size, Arena *arena);
 
 internal void arena_destroy(Arena *arena);
 

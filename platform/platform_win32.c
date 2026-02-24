@@ -2,7 +2,6 @@
 #define PLATFORM_WIN32_C
 
 
-
 // NOTE jfd 22/01/2026:
 // This file contains the global variables and function implementations for platform specific code.
 // DO NOT CALL THESE FROM GAME OR APP CODE
@@ -12,7 +11,69 @@
 
 #define GAME_MEMORY_BACKBUFFER_SIZE MB(100)
 
-Platform_win32 *pp;
+global Platform_win32_debug_loop_recorder debug_loop_recorder;
+
+global b32 debug_paused;
+
+global Platform platform;
+
+global Arena *platform_main_arena;
+global Arena *platform_debug_arena;
+global Arena *platform_temp_arena;
+global Arena *platform_event_arena;
+global Arena *platform_file_arena;
+
+global Platform_win32_xinput_set_state_func *platform_win32_xinput_set_state;
+global Platform_win32_xinput_get_state_func *platform_win32_xinput_get_state;
+
+global b32 platform_is_running;
+global Platform_win32_backbuffer global_backbuffer;
+
+global Platform_win32_sound_output _platform_sound_output_stub;
+global Platform_win32_sound_output *platform_sound_output;
+
+global LPDIRECTSOUNDBUFFER platform_sound_buffer; // this is what we write to
+
+global Platform_event_list _platform_event_list_stub;
+global Platform_event_list *platform_event_list;
+
+global s64 platform_win32_perf_counter_frequency;
+global b32 sleep_is_granular;
+
+global HDC refresh_rate_query_device_context;
+global int monitor_refresh_hz;
+global int platform_win32_refresh_rate;
+
+global f32 game_update_hz;
+global f32 platform_target_seconds_per_frame;
+
+
+global int debug_time_marker_index;
+global Platform_win32_debug_time_marker_slice debug_time_markers;
+
+global LARGE_INTEGER last_counter;
+global LARGE_INTEGER flip_wall_clock;
+
+#ifdef HANDMADE_PROFILE
+global u64 last_cycle_count
+#endif
+
+#ifdef HANDMADE_AUDIO_LATENCY_DEBUG
+global DWORD audio_latency_bytes;
+global f32 audio_latency_seconds;
+#endif
+global b32 sound_is_valid;
+global s16 *samples;
+
+
+#ifdef HANDMADE_HOTRELOAD
+typedef Game* Game_init_proc(Platform *);
+typedef void  Game_service_proc(Game *);
+HMODULE            game_module;
+Game_init_proc    *game_init;
+Game_service_proc *game_update_and_render;
+Game_service_proc *game_get_sound_samples;
+#endif
 
 
 /////////////////////////////////
@@ -104,29 +165,6 @@ func platform_win32_display_buffer_in_window(
     SRCCOPY
   );
 
-}
-
-internal Keyboard_modifier
-func platform_get_keyboard_modifiers(void) {
-  Keyboard_modifier modifier_mask = 0;
-
-  if(GetKeyState(VK_CONTROL) & 0x8000) {
-    modifier_mask |= KBD_MOD_CONTROL;
-  }
-
-  if(GetKeyState(VK_SHIFT) & 0x8000) {
-    modifier_mask |= KBD_MOD_SHIFT;
-  }
-
-  if(GetKeyState(VK_MENU) & 0x8000) {
-    modifier_mask |= KBD_MOD_ALT;
-  }
-
-  if((GetKeyState(VK_LWIN) & 0x8000) || (GetKeyState(VK_RWIN) & 0x8000)) {
-    modifier_mask |= KBD_MOD_META;
-  }
-
-  return modifier_mask;
 }
 
 
@@ -599,7 +637,7 @@ func platform_win32_get_game_input_from_events(Platform_event_list *event_list, 
   // TODO jfd: remove this
   event_list->count = 0;
   event_list->first = event_list->last = 0;
-  arena_clear(pp->platform_event_arena);
+  arena_clear(platform_event_arena);
 
 }
 
@@ -612,13 +650,13 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
 
       Platform_win32_window_dimensions window_dimensions = platform_win32_get_window_dimensions(window);
 
-      platform_win32_resize_backbuffer(&pp->global_backbuffer, window_dimensions.width, window_dimensions.height);
+      platform_win32_resize_backbuffer(&global_backbuffer, window_dimensions.width, window_dimensions.height);
     } break;
     case WM_DESTROY: {
-      pp->platform_is_running = false;
+      platform_is_running = false;
     } break;
     case WM_CLOSE: {
-      pp->platform_is_running = false;
+      platform_is_running = false;
     } break;
     case WM_ACTIVATEAPP: {
     } break;
@@ -651,7 +689,7 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
         is_repeat = 1;
       }
 
-      Platform_event *event = platform_win32_event_push(pp->platform_event_arena, pp->platform_event_list, release ? EVENT_KEY_RELEASE : EVENT_KEY_PRESS);
+      Platform_event *event = platform_win32_event_push(platform_event_arena, platform_event_list, release ? EVENT_KEY_RELEASE : EVENT_KEY_PRESS);
 
       // TODO jfd: distinguish right and left modifiers with is_right_sided (???)
 
@@ -663,23 +701,30 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
       if(is_down) {
 
         if(key == KBD_KEY_F8) {
-          pp->debug_paused = !pp->debug_paused;
-        } else if(key == KBD_KEY_F2) {
+          debug_paused = !debug_paused;
           #ifdef HANDMADE_HOTRELOAD
 
-          if(pp->debug_loop_recorder.recording_loop) {
-            pp->debug_loop_recorder.recording_loop = false;
-            pp->debug_loop_recorder.playing_loop = true;
-            pp->debug_loop_recorder.read_game_state_from_file = true;
-          } else if(pp->debug_loop_recorder.playing_loop) {
-            pp->debug_loop_recorder.playing_loop = false;
-            pp->debug_loop_recorder.recording_loop = false;
-            pp->debug_loop_recorder.stop_playing_loop = true;
+        } else if(key == KBD_KEY_F2) {
+
+          if(debug_loop_recorder.recording_loop) {
+            debug_loop_recorder.recording_loop = false;
+            debug_loop_recorder.playing_loop = true;
+            debug_loop_recorder.read_game_state_from_file = true;
+          } else if(debug_loop_recorder.playing_loop) {
+            debug_loop_recorder.playing_loop = false;
+            debug_loop_recorder.recording_loop = false;
+            debug_loop_recorder.stop_playing_loop = true;
           } else {
-            pp->debug_loop_recorder.recording_loop = true;
-            pp->debug_loop_recorder.input_recording_write_index = 0;
-            pp->debug_loop_recorder.write_game_state_to_file = true;
+            debug_loop_recorder.recording_loop = true;
+            debug_loop_recorder.input_recording_write_index = 0;
+            debug_loop_recorder.write_game_state_to_file = true;
           }
+
+        } else if(key == KBD_KEY_F3) {
+          // TODO jfd: play loop
+          // debug_loop_recorder.recording_loop = false;
+          // debug_loop_recorder.playing_loop = true;
+          // debug_loop_recorder.read_game_state_from_file = true;
 
           #endif
         }
@@ -710,7 +755,7 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
       s16 x_pos = (s16)LOWORD(lParam);
       s16 y_pos = (s16)HIWORD(lParam);
 
-      Platform_event *event = platform_win32_event_push(pp->platform_event_arena, pp->platform_event_list, EVENT_MOUSE_MOVE);
+      Platform_event *event = platform_win32_event_push(platform_event_arena, platform_event_list, EVENT_MOUSE_MOVE);
       event->mouse_pos.x = (f32)x_pos;
       event->mouse_pos.y = (f32)y_pos;
 
@@ -718,7 +763,7 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
 
     case WM_MOUSEWHEEL: {
       s16 wheel_delta = HIWORD(wParam);
-      Platform_event *event = platform_win32_event_push(pp->platform_event_arena, pp->platform_event_list, EVENT_MOUSE_SCROLL);
+      Platform_event *event = platform_win32_event_push(platform_event_arena, platform_event_list, EVENT_MOUSE_SCROLL);
       POINT p;
       p.x = (s32)(s16)LOWORD(lParam);
       p.y = (s32)(s16)HIWORD(lParam);
@@ -742,7 +787,7 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
       int width = paint.rcPaint.right - x;
       int height = paint.rcPaint.bottom - y;
 
-      platform_win32_display_buffer_in_window(&pp->global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, x, y, width, height);
+      platform_win32_display_buffer_in_window(&global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, x, y, width, height);
       EndPaint(window, &paint);
     } break;
     default: {
@@ -753,50 +798,14 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
   return result;
 }
 
-internal void*
-func platform_alloc(u64 bytes) {
-  void *ptr = VirtualAlloc(0, bytes, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-  ASSERT(ptr);
-  return ptr;
-}
-
-internal void
-func platform_free(void *ptr) {
-  ASSERT(ptr);
-  VirtualFree(ptr, 0, MEM_RELEASE);
-}
-
-internal void*
-func platform_library_load(char *path) {
-  void *result = 0;
-  HMODULE module = LoadLibraryA(path);
-  ASSERT(module);
-  result = (void*)module;
-  return result;
-}
-
-internal void
-func platform_library_unload(void *lib) {
-  ASSERT(lib);
-  FreeLibrary((HMODULE)lib);
-}
-
-internal Void_func*
-func platform_library_load_function(void *lib, char *name) {
-  ASSERT(lib); // TODO jfd 23/02/26: these asserts need to be something more robust for shipping
-  Void_func *result = (Void_func*)GetProcAddress((HMODULE)lib, name);
-  ASSERT(result);
-  return result;
-}
-
 
 
 internal void
 func platform_win32_load_xinput(void) {
   void *lib = platform_library_load("Xinput1_4.dll");
   if(lib) {
-    pp->platform_win32_xinput_get_state = (Platform_win32_xinput_get_state_func*)platform_library_load_function(lib, "XInputGetState");
-    pp->platform_win32_xinput_set_state = (Platform_win32_xinput_set_state_func*)platform_library_load_function(lib, "XInputSetState");
+    platform_win32_xinput_get_state = (Platform_win32_xinput_get_state_func*)platform_library_load_function(lib, "XInputGetState");
+    platform_win32_xinput_set_state = (Platform_win32_xinput_set_state_func*)platform_library_load_function(lib, "XInputSetState");
   }
 }
 
@@ -868,7 +877,7 @@ func platform_win32_init_dsound(HWND window_handle, s32 sound_buffer_size, s32 s
       buffer_description.dwBufferBytes = sound_buffer_size;
       buffer_description.lpwfxFormat = &wave_format;
 
-      HRESULT hr = direct_sound->lpVtbl->CreateSoundBuffer(direct_sound, &buffer_description, &pp->platform_sound_buffer, 0);
+      HRESULT hr = direct_sound->lpVtbl->CreateSoundBuffer(direct_sound, &buffer_description, &platform_sound_buffer, 0);
       if(SUCCEEDED(hr)) {
         OutputDebugStringA("created secondary buffer\n");
       } else {
@@ -935,7 +944,7 @@ func platform_win32_debug_audio_sync_display(
   int padding_y = 20;
 
   int line_height = 64;
-  f32 c = ((f32)backbuffer->bitmap_width - (2*padding_x)) / (f32)pp->platform_sound_output->buffer_size;
+  f32 c = ((f32)backbuffer->bitmap_width - (2*padding_x)) / (f32)platform_sound_output->buffer_size;
 
   for(int marker_index = 0; marker_index < markers.count; marker_index++) {
     Platform_win32_debug_time_marker *this_marker = &markers.d[marker_index];
@@ -989,8 +998,8 @@ func platform_win32_clear_sound_buffer(Platform_win32_sound_output *sound_output
   void *region2;
   DWORD region2_size;
 
-  if(SUCCEEDED(pp->platform_sound_buffer->lpVtbl->Lock(
-    pp->platform_sound_buffer,
+  if(SUCCEEDED(platform_sound_buffer->lpVtbl->Lock(
+    platform_sound_buffer,
     0,
     sound_output->buffer_size,
     &region1,
@@ -1003,7 +1012,7 @@ func platform_win32_clear_sound_buffer(Platform_win32_sound_output *sound_output
     memory_zero(region1, region1_size);
     memory_zero(region2, region2_size);
 
-    pp->platform_sound_buffer->lpVtbl->Unlock(pp->platform_sound_buffer, region1, region1_size, region2, region2_size);
+    platform_sound_buffer->lpVtbl->Unlock(platform_sound_buffer, region1, region1_size, region2, region2_size);
   }
 }
 
@@ -1015,8 +1024,8 @@ func platform_win32_fill_sound_buffer(Platform_win32_sound_output *sound_output,
   void *region2;
   DWORD region2_size;
 
-  if(SUCCEEDED(pp->platform_sound_buffer->lpVtbl->Lock(
-    pp->platform_sound_buffer,
+  if(SUCCEEDED(platform_sound_buffer->lpVtbl->Lock(
+    platform_sound_buffer,
     byte_to_lock_at,
     bytes_to_write,
     &region1,
@@ -1046,136 +1055,12 @@ func platform_win32_fill_sound_buffer(Platform_win32_sound_output *sound_output,
       ++sound_output->running_sample_index;
     }
 
-    pp->platform_sound_buffer->lpVtbl->Unlock(pp->platform_sound_buffer, region1, region1_size, region2, region2_size);
+    platform_sound_buffer->lpVtbl->Unlock(platform_sound_buffer, region1, region1_size, region2, region2_size);
 
   } /* if(Lock()) */
 
 }
 
-
-internal Str8
-func platform_read_entire_file(Arena *arena, char *path) {
-  Str8 data;
-
-  HANDLE file_handle = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
-  LARGE_INTEGER file_size;
-  b32 got_size = GetFileSizeEx(file_handle, &file_size);
-  ASSERT(got_size);
-  data.len = file_size.QuadPart;
-
-  data.s = push_array_no_zero(arena, u8, data.len);
-  ASSERT(data.s);
-
-  #if 0
-  u8 *ptr = data.s;
-  s64 total_len = data.len;
-  while(total_len > 0) {
-
-    DWORD dword_len;
-    if(total_len >= (s64)MAX_S32) {
-      dword_len = (DWORD)MAX_S32;
-    } else {
-      dword_len = (DWORD)total_len;
-    }
-
-    DWORD bytes_read;
-    b32 success = ReadFile(file_handle, (void*)ptr, dword_len, &bytes_read, 0);
-    ASSERT(success);
-    ASSERT((s64)bytes_read == dword_len);
-
-    ptr += bytes_read;
-    total_len -= bytes_read;
-
-  }
-  CloseHandle(file_handle);
-  #else
-
-  HANDLE file_map_handle =
-  CreateFileMappingA(
-    file_handle,
-    0,
-    PAGE_READONLY,
-    file_size.HighPart,
-    file_size.LowPart,
-    0
-  );
-
-  if(!file_map_handle) {
-    DWORD err = GetLastError();
-    PANICF("file failed map error code %d\n", err);
-  }
-
-  void *file_map_view = MapViewOfFile(file_map_handle, FILE_MAP_READ, 0, 0, 0);
-  memory_copy(data.s, file_map_view, data.len);
-
-  UnmapViewOfFile(file_map_view);
-  CloseHandle(file_map_handle);
-  CloseHandle(file_handle);
-
-  #endif
-
-  return data;
-}
-
-internal b32
-func platform_write_entire_file(Str8 data, char *path) {
-  b32 success = true;
-
-  HANDLE file_handle = CreateFileA(path, GENERIC_WRITE | GENERIC_READ, 0, 0, CREATE_ALWAYS, 0, 0);
-
-  #if 0
-  u8 *ptr = data.s;
-  s64 total_len = data.len;
-  while(total_len > 0) {
-
-    DWORD dword_len;
-    if(total_len >= (s64)MAX_S32) {
-      dword_len = (DWORD)MAX_S32;
-    } else {
-      dword_len = (DWORD)total_len;
-    }
-
-    DWORD bytes_written;
-    success = WriteFile(file_handle, (void*)ptr, dword_len, &bytes_written, 0);
-    ASSERT((s64)bytes_written == dword_len);
-
-    ptr += bytes_written;
-    total_len -= bytes_written;
-
-  }
-  CloseHandle(file_handle);
-  #else
-
-  LARGE_INTEGER file_size;
-  file_size.QuadPart = data.len;
-
-  HANDLE file_map_handle =
-  CreateFileMappingA(
-    file_handle,
-    0,
-    PAGE_READWRITE,
-    file_size.HighPart,
-    file_size.LowPart,
-    0
-  );
-
-  if(!file_map_handle) {
-    DWORD err = GetLastError();
-    PANICF("file failed map error code %d\n", err);
-  }
-
-  void *file_map_view = MapViewOfFile(file_map_handle, FILE_MAP_WRITE, 0, 0, 0);
-  memory_copy(file_map_view, data.s, data.len);
-  FlushViewOfFile(file_map_view, 0);
-
-  UnmapViewOfFile(file_map_view);
-  CloseHandle(file_map_handle);
-  CloseHandle(file_handle);
-
-  #endif
-
-  return success;
-}
 
 internal FILETIME
 func platform_win32_get_last_file_write_time(char *path) {
@@ -1185,61 +1070,6 @@ func platform_win32_get_last_file_write_time(char *path) {
   return result;
 }
 
-force_inline b32
-func platform_file_exists(char *path) {
-  DWORD attrs = GetFileAttributesA(path);
-  b32 result = (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY));
-  return result;
-}
-
-internal Str8
-func platform_get_current_dir(Arena *a) {
-  DWORD buf_size = GetCurrentDirectory(0, NULL);
-  ASSERT(buf_size > 0);
-
-  char *buf = push_array_no_zero(a, char, buf_size);
-  ASSERT(GetCurrentDirectory(buf_size, buf) != 0);
-
-  Str8 result = { .s = (u8*)buf, .len = buf_size - 1 };
-
-  return result;
-}
-
-internal b32
-func platform_set_current_dir(char *dir_path) {
-  b32 result = 0;
-
-  result = SetCurrentDirectory(dir_path);
-
-  return result;
-}
-
-internal b32
-func platform_move_file(char *old_path, char *new_path) {
-  b32 result = 0;
-
-  result = MoveFileEx(old_path, new_path, MOVEFILE_REPLACE_EXISTING);
-
-  return result;
-}
-
-internal b32
-func platform_remove_file(char *path) {
-  b32 result = !!(DeleteFileA(path));
-
-  return result;
-}
-
-force_inline b32
-func platform_make_dir(char *dir_path) {
-  b32 result = CreateDirectoryA(dir_path, 0);
-  return result;
-}
-
-force_inline void
-func platform_sleep_ms(u32 ms) {
-  Sleep((DWORD)ms);
-}
 
 force_inline LARGE_INTEGER
 func platform_win32_get_wall_clock(void) {
@@ -1251,7 +1081,7 @@ func platform_win32_get_wall_clock(void) {
 force_inline f32
 func platform_win32_get_seconds_elapsed(LARGE_INTEGER begin, LARGE_INTEGER end) {
   f32 result =
-  (f32)(end.QuadPart - begin.QuadPart) / (f32)pp->platform_win32_perf_counter_frequency;
+  (f32)(end.QuadPart - begin.QuadPart) / (f32)platform_win32_perf_counter_frequency;
 
   return result;
 }
@@ -1261,14 +1091,14 @@ func platform_win32_get_seconds_elapsed(LARGE_INTEGER begin, LARGE_INTEGER end) 
 internal void
 func platform_win32_debug_setup_loop_recorder(void) {
 
-  pp->debug_loop_recorder.game_state_file_handle = CreateFileA("game.state", GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
+  debug_loop_recorder.game_state_file_handle = CreateFileA("game.state", GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
   LARGE_INTEGER game_state_file_size;
-  ASSERT(GetFileSizeEx(pp->debug_loop_recorder.game_state_file_handle, &game_state_file_size));
+  ASSERT(GetFileSizeEx(debug_loop_recorder.game_state_file_handle, &game_state_file_size));
   ASSERT((u64)game_state_file_size.QuadPart == GAME_MEMORY_BACKBUFFER_SIZE);
 
-  pp->debug_loop_recorder.game_state_file_map_handle =
+  debug_loop_recorder.game_state_file_map_handle =
   CreateFileMappingA(
-    pp->debug_loop_recorder.game_state_file_handle,
+    debug_loop_recorder.game_state_file_handle,
     0,
     PAGE_READWRITE,
     game_state_file_size.HighPart,
@@ -1276,74 +1106,74 @@ func platform_win32_debug_setup_loop_recorder(void) {
     0
   );
 
-  if(!pp->debug_loop_recorder.game_state_file_map_handle) {
+  if(!debug_loop_recorder.game_state_file_map_handle) {
     DWORD err = GetLastError();
     PANICF("file failed map error code %d\n", err);
   }
 
-  pp->debug_loop_recorder.recorded_game_state.len = (s64)game_state_file_size.QuadPart;
-  pp->debug_loop_recorder.recorded_game_state.s =
-  (u8*)MapViewOfFile(pp->debug_loop_recorder.game_state_file_map_handle, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+  debug_loop_recorder.recorded_game_state.len = (s64)game_state_file_size.QuadPart;
+  debug_loop_recorder.recorded_game_state.s =
+  (u8*)MapViewOfFile(debug_loop_recorder.game_state_file_map_handle, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
 
-  ASSERT(pp->debug_loop_recorder.recorded_game_state.s);
+  ASSERT(debug_loop_recorder.recorded_game_state.s);
 
 }
 
 internal void
 func platform_win32_debug_shutdown_loop_recorder(void) {
 
-  UnmapViewOfFile((void*)pp->debug_loop_recorder.recorded_game_state.s);
-  CloseHandle(pp->debug_loop_recorder.game_state_file_map_handle);
-  CloseHandle(pp->debug_loop_recorder.game_state_file_handle);
+  UnmapViewOfFile((void*)debug_loop_recorder.recorded_game_state.s);
+  CloseHandle(debug_loop_recorder.game_state_file_map_handle);
+  CloseHandle(debug_loop_recorder.game_state_file_handle);
 
 }
 
 internal void
 func platform_win32_debug_run_loop_recorder(Game *gp) {
 
-  if(pp->debug_loop_recorder.recording_loop) {
+  if(debug_loop_recorder.recording_loop) {
 
-    if(pp->debug_loop_recorder.write_game_state_to_file) {
-      pp->debug_loop_recorder.write_game_state_to_file = false;
-      memory_copy(pp->debug_loop_recorder.recorded_game_state.s, pp->platform.backbuffer, pp->platform.backbuffer_size);
+    if(debug_loop_recorder.write_game_state_to_file) {
+      debug_loop_recorder.write_game_state_to_file = false;
+      memory_copy(debug_loop_recorder.recorded_game_state.s, platform.backbuffer, platform.backbuffer_size);
 
-      pp->debug_loop_recorder.game_input_file_handle = CreateFileA("game.input", GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
-      ASSERT(pp->debug_loop_recorder.game_input_file_handle);
+      debug_loop_recorder.game_input_file_handle = CreateFileA("game.input", GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
+      ASSERT(debug_loop_recorder.game_input_file_handle);
 
     }
 
     LARGE_INTEGER input_write_offset;
-    input_write_offset.QuadPart = pp->debug_loop_recorder.input_recording_write_index * sizeof(Game_input);
-    pp->debug_loop_recorder.input_recording_write_index++;
-    ASSERT(SetFilePointerEx(pp->debug_loop_recorder.game_input_file_handle, input_write_offset, 0, FILE_BEGIN));
+    input_write_offset.QuadPart = debug_loop_recorder.input_recording_write_index * sizeof(Game_input);
+    debug_loop_recorder.input_recording_write_index++;
+    ASSERT(SetFilePointerEx(debug_loop_recorder.game_input_file_handle, input_write_offset, 0, FILE_BEGIN));
 
     DWORD bytes_written;
-    ASSERT(WriteFile(pp->debug_loop_recorder.game_input_file_handle, (void*)(&gp->input), sizeof(Game_input), &bytes_written, 0));
+    ASSERT(WriteFile(debug_loop_recorder.game_input_file_handle, (void*)(&gp->input), sizeof(Game_input), &bytes_written, 0));
     ASSERT(bytes_written == sizeof(Game_input));
 
-  } else if(pp->debug_loop_recorder.playing_loop) {
+  } else if(debug_loop_recorder.playing_loop) {
 
-    if(pp->debug_loop_recorder.read_game_state_from_file) {
-      pp->debug_loop_recorder.read_game_state_from_file = false;
+    if(debug_loop_recorder.read_game_state_from_file) {
+      debug_loop_recorder.read_game_state_from_file = false;
 
-      CloseHandle(pp->debug_loop_recorder.game_input_file_handle);
-      Str8 recorded_game_input_data = platform_read_entire_file(pp->platform_file_arena, "game.input");
+      CloseHandle(debug_loop_recorder.game_input_file_handle);
+      Str8 recorded_game_input_data = platform_read_entire_file(platform_file_arena, "game.input");
 
-      pp->debug_loop_recorder.recorded_game_input.d = (Game_input*)(recorded_game_input_data.s);
-      pp->debug_loop_recorder.recorded_game_input.count = pp->debug_loop_recorder.input_recording_write_index;
+      debug_loop_recorder.recorded_game_input.d = (Game_input*)(recorded_game_input_data.s);
+      debug_loop_recorder.recorded_game_input.count = debug_loop_recorder.input_recording_write_index;
 
-      pp->debug_loop_recorder.input_recording_play_index = pp->debug_loop_recorder.recorded_game_input.count;
+      debug_loop_recorder.input_recording_play_index = debug_loop_recorder.recorded_game_input.count;
     }
 
-    if(pp->debug_loop_recorder.input_recording_play_index >= pp->debug_loop_recorder.recorded_game_input.count) {
-      pp->debug_loop_recorder.input_recording_play_index = 0;
-      memory_copy(pp->platform.backbuffer, pp->debug_loop_recorder.recorded_game_state.s, pp->debug_loop_recorder.recorded_game_state.len);
+    if(debug_loop_recorder.input_recording_play_index >= debug_loop_recorder.recorded_game_input.count) {
+      debug_loop_recorder.input_recording_play_index = 0;
+      memory_copy(platform.backbuffer, debug_loop_recorder.recorded_game_state.s, debug_loop_recorder.recorded_game_state.len);
     }
 
-    gp->input = pp->debug_loop_recorder.recorded_game_input.d[pp->debug_loop_recorder.input_recording_play_index++];
+    gp->input = debug_loop_recorder.recorded_game_input.d[debug_loop_recorder.input_recording_play_index++];
 
-  } else if(pp->debug_loop_recorder.stop_playing_loop) {
-    pp->debug_loop_recorder.stop_playing_loop = false;
+  } else if(debug_loop_recorder.stop_playing_loop) {
+    debug_loop_recorder.stop_playing_loop = false;
 
     memory_zero(&gp->input, sizeof(gp->input));
   }
@@ -1351,228 +1181,287 @@ func platform_win32_debug_run_loop_recorder(Game *gp) {
 }
 #endif
 
-
-internal Platform_win32*
-func platform_win32_init(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode) {
-  pp = VirtualAlloc(0, sizeof(Platform_win32), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-  ASSERT(pp);
-
-  LARGE_INTEGER performance_counter_frequency_result;
-  QueryPerformanceFrequency(&performance_counter_frequency_result);
-  pp->platform_win32_perf_counter_frequency = performance_counter_frequency_result.QuadPart;
-
-  UINT scheduler_granularity_ms = 1;
-  pp->sleep_is_granular = timeBeginPeriod(scheduler_granularity_ms);
-
-  pp->platform_main_arena  = arena_create(MB(100));
-  pp->platform_debug_arena = arena_create(MB(5));
-  pp->platform_temp_arena  = arena_create(KB(5));
-  pp->platform_event_arena = arena_create(KB(50));
-  pp->platform_file_arena  = arena_create(MB(100));
-
-  pp->window_class = (WNDCLASSA){0};
-  pp->window_class.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
-  pp->window_class.lpfnWndProc = platform_win32_main_window_callback;
-  pp->window_class.hInstance = instance;
-  pp->window_class.lpszClassName = "Handmade Hero";
-
-  pp->global_backbuffer.bytes_per_pixel = 4;
-  pp->platform_event_list = &pp->_platform_event_list_stub;
+#ifdef HANDMADE_HOTRELOAD
+internal void
+func platform_win32_load_game_code(void) {
 
   {
 
-    pp->platform.backbuffer_size = GAME_MEMORY_BACKBUFFER_SIZE;
-    pp->platform.backbuffer =
-    VirtualAlloc(
-      (void*)(u64)0x200000000, // NOTE jfd: this is going to be the base address for all the allocations done in the game code
-      pp->platform.backbuffer_size,
-      MEM_RESERVE|MEM_COMMIT,
-      PAGE_READWRITE
-    );
-
-  }
-
-  pp->gp = game_init(&pp->platform);
-
-  if(RegisterClass(&pp->window_class)) {
-    pp->window_handle =
-    CreateWindowExA(
-      0,
-      pp->window_class.lpszClassName,
-      "Handmade Hero",
-      WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-      100,
-      50,
-      1500,
-      900,
-      0,
-      0,
-      instance,
-      0);
-
-    if(pp->window_handle) {
-
-      ASSERT(SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED)));
-
-      pp->monitor_refresh_hz = 60;
-      pp->refresh_rate_query_device_context = GetDC(pp->window_handle);
-      pp->platform_win32_refresh_rate = GetDeviceCaps(pp->refresh_rate_query_device_context, VREFRESH);
-      ReleaseDC(pp->window_handle, pp->refresh_rate_query_device_context);
-      if(pp->platform_win32_refresh_rate > 1) {
-        pp->monitor_refresh_hz = pp->platform_win32_refresh_rate;
+    DWORD attrs = GetFileAttributesA("game.dll");
+    int result = (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY));
+    if(!result) {
+      attrs = GetFileAttributesA("game.dll.live");
+      result = (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY));
+      if(!result) {
+        OutputDebugStringA("game.dll.live not found\n");
+        UNREACHABLE;
       }
-      pp->game_update_hz = (f32)pp->monitor_refresh_hz / 2.0f;
-      pp->target_seconds_per_frame = 1.0f/(f32)pp->game_update_hz;
-
-      // NOTE jfd: graphics test
-
-      // NOTE jfd: sound test
-      pp->platform_sound_output = &pp->_platform_sound_output_stub;
-      pp->platform_sound_output->samples_per_second    = THOUSAND(48);
-      pp->platform_sound_output->buffer_size           = pp->platform_sound_output->samples_per_second * sizeof(s16) * 2;
-      pp->platform_sound_output->running_sample_index  = 0  ;
-      pp->platform_sound_output->bytes_per_sample      = sizeof(s16)*2;
-      // TODO jfd: actually compute this variance and see what the lowest reasonable value is
-      pp->platform_sound_output->safety_bytes =
-      ((pp->platform_sound_output->bytes_per_sample * pp->platform_sound_output->samples_per_second) / (DWORD)pp->game_update_hz) / 3;
-
-
-      platform_win32_init_dsound(pp->window_handle, pp->platform_sound_output->buffer_size, pp->platform_sound_output->samples_per_second);
-      platform_win32_clear_sound_buffer(pp->platform_sound_output);
-      pp->platform_sound_buffer->lpVtbl->Play(pp->platform_sound_buffer, 0, 0, DSBPLAY_LOOPING);
-
-      pp->samples = (s16*)push_array_no_zero(pp->platform_main_arena, u8, pp->platform_sound_output->buffer_size);
-
-      pp->platform_is_running = true;
-      pp->gp->did_reload = true;
-
-      #ifdef HANDMADE_HOTRELOAD
-      platform_win32_debug_setup_loop_recorder();
-      #endif
-
-      pp->debug_time_marker_index = 0;
-      slice_init(pp->debug_time_markers, 60, pp->platform_debug_arena);
-
-      pp->last_counter = platform_win32_get_wall_clock();
-      pp->flip_wall_clock = platform_win32_get_wall_clock();
-
-      #ifdef HANDMADE_PROFILE
-      pp->last_cycle_count = __rdtsc(); // NOTE jfd: get timestamp in cycles
-      #endif
-
-      #ifdef HANDMADE_AUDIO_LATENCY_DEBUG
-      pp->audio_latency_bytes = 0;
-      pp->audio_latency_seconds = 0;
-      #endif
-      pp->sound_is_valid = false;
-
-
     } else {
+      if(!MoveFileEx("game.dll", "game.dll.live", MOVEFILE_REPLACE_EXISTING)) {
+        OutputDebugStringA("module file rename failed\n");
+        UNREACHABLE;
+      }
     }
 
-  } else {
-    // TODO jfd: logging
   }
 
-  return pp;
+  game_module = LoadLibraryA("game.dll.live");
+  if(!game_module) {
+    OutputDebugStringA("failed to load module\n");
+    UNREACHABLE;
+  }
+
+  game_init = (Game_init_proc*)GetProcAddress(game_module, "game_init");
+  ASSERT(game_init);
+
+  game_update_and_render = (Game_service_proc*)GetProcAddress(game_module, "game_update_and_render");
+  ASSERT(game_update_and_render);
+
+  game_get_sound_samples = (Game_service_proc*)GetProcAddress(game_module, "game_get_sound_samples");
+  ASSERT(game_get_sound_samples);
+
 }
 
-
 internal void
-func platform_win32_main(void) {
-  Game *gp = pp->gp;
+func platform_win32_unload_game_code(void) {
+  FreeLibrary(game_module);
+  game_module = 0;
+  game_init = 0;
+  game_update_and_render = 0;
+  game_get_sound_samples = 0;
+}
+#endif
 
-  while(pp->platform_is_running) {
+
+int CALLBACK
+WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode) {
+
+  WNDCLASSA window_class = {0};
+  HWND window_handle = {0};
+  MSG message = {0};
+
+  Game *gp = 0;
+
+  { /* init */
+
+    LARGE_INTEGER performance_counter_frequency_result;
+    QueryPerformanceFrequency(&performance_counter_frequency_result);
+    platform_win32_perf_counter_frequency = performance_counter_frequency_result.QuadPart;
+
+    UINT scheduler_granularity_ms = 1;
+    sleep_is_granular = timeBeginPeriod(scheduler_granularity_ms);
+
+    platform_main_arena  = arena_create(MB(100));
+    platform_debug_arena = arena_create(MB(5));
+    platform_temp_arena  = arena_create(KB(5));
+    platform_event_arena = arena_create(KB(50));
+    platform_file_arena  = arena_create(MB(100));
+
+    window_class = (WNDCLASSA){0};
+    window_class.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
+    window_class.lpfnWndProc = platform_win32_main_window_callback;
+    window_class.hInstance = instance;
+    window_class.lpszClassName = "Handmade Hero";
+
+    global_backbuffer.bytes_per_pixel = 4;
+    platform_event_list = &_platform_event_list_stub;
+
+    {
+
+      platform.backbuffer_size = GAME_MEMORY_BACKBUFFER_SIZE;
+      platform.backbuffer =
+      VirtualAlloc(
+        (void*)(u64)0x200000000, // NOTE jfd: this is going to be the base address for all the allocations done in the game code
+        platform.backbuffer_size,
+        MEM_RESERVE|MEM_COMMIT,
+        PAGE_READWRITE
+      );
+
+    }
 
     #ifdef HANDMADE_HOTRELOAD
-    if(platform_file_exists("game.dll")) {
-      pp->do_reload = true;
-      gp->did_reload = true;
-      break;
-    }
+    platform_win32_load_game_code();
     #endif
 
-    // NOTE jfd: get input messages
-    while(PeekMessageA(&pp->message, pp->window_handle, 0, 0, PM_REMOVE)) {
-      if(pp->message.message == WM_QUIT) {
-        pp->platform_is_running = false;
-      }
-      TranslateMessage(&pp->message); // NOTE jfd: has to do with keyboard messages
-      DispatchMessage(&pp->message);
+    gp = game_init(&platform);
 
-    }
 
-    #ifdef HANDMADE_INTERNAL
-    if(pp->debug_paused) {
-      continue;
-    }
-    #endif
+    if(RegisterClass(&window_class)) {
+      window_handle =
+      CreateWindowExA(
+        0,
+        window_class.lpszClassName,
+        "Handmade Hero",
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+        100,
+        50,
+        1500,
+        900,
+        0,
+        0,
+        instance,
+        0);
 
-    // TODO jfd: Implement gamepad input
-    #if 0
-    { /* get gamepad input */
+      if(window_handle) {
 
-      for(DWORD controller_index = 0; controller_index < XUSER_MAX_COUNT; controller_index++) {
-        XINPUT_STATE controller_state;
-        if(os_win32_xinput_get_state(controller_index, &controller_state) == ERROR_SUCCESS) {
-          // NOTE jfd: this controller is plugged in
-          XINPUT_GAMEPAD *gamepad = &controller_state.Gamepad;
+        ASSERT(SUCCEEDED(CoInitializeEx(0, COINIT_MULTITHREADED)));
 
-          b8 dpad_up    = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_UP);
-          b8 dpad_down  = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN);
-          b8 dpad_left  = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT);
-          b8 dpad_right = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT);
-
-          b8 start_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_START);
-          b8 back_button  = !!(gamepad->wButtons & XINPUT_GAMEPAD_BACK);
-
-          b8 left_thumb     = !!(gamepad->wButtons & XINPUT_GAMEPAD_LEFT_THUMB);
-          b8 right_thumb    = !!(gamepad->wButtons & XINPUT_GAMEPAD_RIGHT_THUMB);
-          b8 left_shoulder  = !!(gamepad->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER);
-          b8 right_shoulder = !!(gamepad->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER);
-
-          b8 a_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_A);
-          b8 b_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_B);
-          b8 x_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_X);
-          b8 y_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_Y);
-
-          s16 left_stick_x = gamepad->sThumbLX;
-          s16 left_stick_y = gamepad->sThumbLY;
-          s16 right_stick_x = gamepad->sThumbRX;
-          s16 right_stick_y = gamepad->sThumbRY;
-
-        } else {
-          // NOTE jfd: this controller is not available
+        monitor_refresh_hz = 60;
+        refresh_rate_query_device_context = GetDC(window_handle);
+        platform_win32_refresh_rate = GetDeviceCaps(refresh_rate_query_device_context, VREFRESH);
+        ReleaseDC(window_handle, refresh_rate_query_device_context);
+        if(platform_win32_refresh_rate > 1) {
+          monitor_refresh_hz = platform_win32_refresh_rate;
         }
+        game_update_hz = (f32)monitor_refresh_hz / 2.0f;
+        platform_target_seconds_per_frame = 1.0f/(f32)game_update_hz;
+
+        // NOTE jfd: graphics test
+
+        // NOTE jfd: sound test
+        platform_sound_output = &_platform_sound_output_stub;
+        platform_sound_output->samples_per_second    = THOUSAND(48);
+        platform_sound_output->buffer_size           = platform_sound_output->samples_per_second * sizeof(s16) * 2;
+        platform_sound_output->running_sample_index  = 0  ;
+        platform_sound_output->bytes_per_sample      = sizeof(s16)*2;
+        // TODO jfd: actually compute this variance and see what the lowest reasonable value is
+        platform_sound_output->safety_bytes =
+        ((platform_sound_output->bytes_per_sample * platform_sound_output->samples_per_second) / (DWORD)game_update_hz) / 3;
+
+
+        platform_win32_init_dsound(window_handle, platform_sound_output->buffer_size, platform_sound_output->samples_per_second);
+        platform_win32_clear_sound_buffer(platform_sound_output);
+        platform_sound_buffer->lpVtbl->Play(platform_sound_buffer, 0, 0, DSBPLAY_LOOPING);
+
+        samples = (s16*)push_array_no_zero(platform_main_arena, u8, platform_sound_output->buffer_size);
+
+        platform_is_running = true;
+        gp->did_reload = true;
+
+        #ifdef HANDMADE_HOTRELOAD
+        platform_win32_debug_setup_loop_recorder();
+        #endif
+
+        debug_time_marker_index = 0;
+        slice_init(debug_time_markers, 60, platform_debug_arena);
+
+        last_counter = platform_win32_get_wall_clock();
+        flip_wall_clock = platform_win32_get_wall_clock();
+
+        #ifdef HANDMADE_PROFILE
+        last_cycle_count = __rdtsc(); // NOTE jfd: get timestamp in cycles
+        #endif
+
+        #ifdef HANDMADE_AUDIO_LATENCY_DEBUG
+        audio_latency_bytes = 0;
+        audio_latency_seconds = 0;
+        #endif
+        sound_is_valid = false;
+
+
+      } else {
       }
 
-    } /* get gamepad input */
-    #endif
+    } else {
+      // TODO jfd: logging
+    }
 
-    platform_win32_get_game_input_from_events(pp->platform_event_list, gp);
+  } /* init */
 
-    #ifdef HANDMADE_HOTRELOAD
-    platform_win32_debug_run_loop_recorder(gp);
-    #endif
+  { /* main */
 
-    // TODO jfd: cleanup how we pass render data to and from the game
-    gp->t = pp->target_seconds_per_frame;
-    gp->render.pixels = pp->global_backbuffer.bitmap_memory;
-    gp->render.width  = pp->global_backbuffer.bitmap_width;
-    gp->render.height = pp->global_backbuffer.bitmap_height;
-    gp->render.stride = pp->global_backbuffer.stride;
 
-    game_update_and_render(gp);
+    while(platform_is_running) {
 
-    // LARGE_INTEGER audio_wall_clock = platform_win32_get_wall_clock();
-    // f32 from_begin_to_audio_seconds = platform_win32_get_seconds_elapsed(pp->flip_wall_clock, audio_wall_clock);
+      #ifdef HANDMADE_HOTRELOAD
+      if(platform_file_exists("game.dll")) {
+        platform_win32_unload_game_code();
+        platform_win32_load_game_code();
+        gp->did_reload = true;
+      }
+      #endif
 
-    DWORD play_cursor;
-    DWORD write_cursor;
+      // NOTE jfd: get input messages
+      while(PeekMessageA(&message, window_handle, 0, 0, PM_REMOVE)) {
+        if(message.message == WM_QUIT) {
+          platform_is_running = false;
+        }
+        TranslateMessage(&message); // NOTE jfd: has to do with keyboard messages
+        DispatchMessage(&message);
 
-    if(SUCCEEDED(pp->platform_sound_buffer->lpVtbl->GetCurrentPosition(pp->platform_sound_buffer, &play_cursor, &write_cursor))) {
+      }
 
-      /* NOTE jfd:
+      #ifdef HANDMADE_INTERNAL
+      if(debug_paused) {
+        continue;
+      }
+      #endif
+
+      // TODO jfd: Implement gamepad input
+      #if 0
+      { /* get gamepad input */
+
+        for(DWORD controller_index = 0; controller_index < XUSER_MAX_COUNT; controller_index++) {
+          XINPUT_STATE controller_state;
+          if(os_win32_xinput_get_state(controller_index, &controller_state) == ERROR_SUCCESS) {
+            // NOTE jfd: this controller is plugged in
+            XINPUT_GAMEPAD *gamepad = &controller_state.Gamepad;
+
+            b8 dpad_up    = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_UP);
+            b8 dpad_down  = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN);
+            b8 dpad_left  = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT);
+            b8 dpad_right = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT);
+
+            b8 start_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_START);
+            b8 back_button  = !!(gamepad->wButtons & XINPUT_GAMEPAD_BACK);
+
+            b8 left_thumb     = !!(gamepad->wButtons & XINPUT_GAMEPAD_LEFT_THUMB);
+            b8 right_thumb    = !!(gamepad->wButtons & XINPUT_GAMEPAD_RIGHT_THUMB);
+            b8 left_shoulder  = !!(gamepad->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER);
+            b8 right_shoulder = !!(gamepad->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER);
+
+            b8 a_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_A);
+            b8 b_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_B);
+            b8 x_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_X);
+            b8 y_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_Y);
+
+            s16 left_stick_x = gamepad->sThumbLX;
+            s16 left_stick_y = gamepad->sThumbLY;
+            s16 right_stick_x = gamepad->sThumbRX;
+            s16 right_stick_y = gamepad->sThumbRY;
+
+          } else {
+            // NOTE jfd: this controller is not available
+          }
+        }
+
+      } /* get gamepad input */
+      #endif
+
+      platform_win32_get_game_input_from_events(platform_event_list, gp);
+
+      #ifdef HANDMADE_HOTRELOAD
+      platform_win32_debug_run_loop_recorder(gp);
+      #endif
+
+      // TODO jfd: cleanup how we pass render data to and from the game
+      gp->t = platform_target_seconds_per_frame;
+      gp->render.pixels = global_backbuffer.bitmap_memory;
+      gp->render.width  = global_backbuffer.bitmap_width;
+      gp->render.height = global_backbuffer.bitmap_height;
+      gp->render.stride = global_backbuffer.stride;
+
+      game_update_and_render(gp);
+
+      // LARGE_INTEGER audio_wall_clock = platform_win32_get_wall_clock();
+      // f32 from_begin_to_audio_seconds = platform_win32_get_seconds_elapsed(flip_wall_clock, audio_wall_clock);
+
+      DWORD play_cursor;
+      DWORD write_cursor;
+
+      if(SUCCEEDED(platform_sound_buffer->lpVtbl->GetCurrentPosition(platform_sound_buffer, &play_cursor, &write_cursor))) {
+
+        /* NOTE jfd:
            Here is how sound output computation works.
 
            We define a safety value that is the number of samples we think our game update loop
@@ -1590,185 +1479,172 @@ func platform_win32_main(void) {
            so we will write one frame's worth of audio plus the safety margin's worth of guard samples.
         */
 
-      if(!pp->sound_is_valid) {
-        // NOTE jfd: On the first sound buffer write we need to set the running sample index for the sound
-        //           output to be the place where the sound card is letting us write to.
-        pp->platform_sound_output->running_sample_index = write_cursor / pp->platform_sound_output->bytes_per_sample;
-        pp->sound_is_valid = true;
-      }
+        if(!sound_is_valid) {
+          // NOTE jfd: On the first sound buffer write we need to set the running sample index for the sound
+          //           output to be the place where the sound card is letting us write to.
+          platform_sound_output->running_sample_index = write_cursor / platform_sound_output->bytes_per_sample;
+          sound_is_valid = true;
+        }
 
-      DWORD byte_to_lock_at =
-      (pp->platform_sound_output->running_sample_index * pp->platform_sound_output->bytes_per_sample) % pp->platform_sound_output->buffer_size;
+        DWORD byte_to_lock_at =
+        (platform_sound_output->running_sample_index * platform_sound_output->bytes_per_sample) % platform_sound_output->buffer_size;
 
-      DWORD expected_sound_bytes_per_frame =
-      (DWORD)((pp->platform_sound_output->bytes_per_sample * pp->platform_sound_output->samples_per_second) / (DWORD)pp->game_update_hz);
+        DWORD expected_sound_bytes_per_frame =
+        (DWORD)((platform_sound_output->bytes_per_sample * platform_sound_output->samples_per_second) / (DWORD)game_update_hz);
 
-      // TODO jfd: find out what the heck casey used this for
-      // f32 seconds_left_until_flip = (pp->target_seconds_per_frame - from_begin_to_audio_seconds);
-      // DWORD expected_bytes_until_flip =
-      // (DWORD)((seconds_left_until_flip/pp->target_seconds_per_frame) * (f32)expected_sound_bytes_per_frame);
+        // TODO jfd: find out what the heck casey used this for
+        // f32 seconds_left_until_flip = (target_seconds_per_frame - from_begin_to_audio_seconds);
+        // DWORD expected_bytes_until_flip =
+        // (DWORD)((seconds_left_until_flip/target_seconds_per_frame) * (f32)expected_sound_bytes_per_frame);
 
-      DWORD expected_frame_boundary_byte = play_cursor + expected_sound_bytes_per_frame;
+        DWORD expected_frame_boundary_byte = play_cursor + expected_sound_bytes_per_frame;
 
-      DWORD safe_write_cursor = write_cursor;
-      if(safe_write_cursor < play_cursor) {
-        safe_write_cursor += pp->platform_sound_output->buffer_size;
-      }
-      ASSERT(safe_write_cursor >= play_cursor);
-      safe_write_cursor += pp->platform_sound_output->safety_bytes;
-      b32 audio_card_is_low_latency = (safe_write_cursor < expected_frame_boundary_byte);
+        DWORD safe_write_cursor = write_cursor;
+        if(safe_write_cursor < play_cursor) {
+          safe_write_cursor += platform_sound_output->buffer_size;
+        }
+        ASSERT(safe_write_cursor >= play_cursor);
+        safe_write_cursor += platform_sound_output->safety_bytes;
+        b32 audio_card_is_low_latency = (safe_write_cursor < expected_frame_boundary_byte);
 
-      DWORD target_cursor = 0;
-      if(audio_card_is_low_latency) {
-        target_cursor = expected_frame_boundary_byte + expected_sound_bytes_per_frame;
+        DWORD target_cursor = 0;
+        if(audio_card_is_low_latency) {
+          target_cursor = expected_frame_boundary_byte + expected_sound_bytes_per_frame;
+        } else {
+          target_cursor = write_cursor + expected_sound_bytes_per_frame + platform_sound_output->safety_bytes;
+        }
+        target_cursor %= platform_sound_output->buffer_size;
+
+        DWORD bytes_to_write = 0;
+        if(byte_to_lock_at > target_cursor) {
+          bytes_to_write = (platform_sound_output->buffer_size - byte_to_lock_at);
+          bytes_to_write += target_cursor;
+        } else {
+          bytes_to_write = target_cursor - byte_to_lock_at;
+        }
+
+        // NOTE jfd: get sound samples from game
+        gp->sound = (Game_sound_buffer){0};
+        gp->sound.samples_per_second = platform_sound_output->samples_per_second;
+        gp->sound.sample_count = bytes_to_write / platform_sound_output->bytes_per_sample;
+        gp->sound.samples = samples;
+        game_get_sound_samples(gp);
+
+        #ifdef HANDMADE_AUDIO_LATENCY_DEBUG
+        Platform_win32_debug_time_marker *marker = &debug_time_markers.d[debug_time_marker_index];
+        marker->output_play_cursor = play_cursor;
+        marker->output_write_cursor = write_cursor;
+        marker->output_location = byte_to_lock_at;
+        marker->output_byte_count = bytes_to_write;
+        marker->expected_flip_cursor = expected_frame_boundary_byte;
+
+        DWORD debug_play_cursor;
+        DWORD debug_write_cursor;
+        platform_sound_buffer->lpVtbl->GetCurrentPosition(platform_sound_buffer, &debug_play_cursor, &debug_write_cursor);
+
+        // NOTE jfd: This value is the audio latency in bytes
+        if(debug_write_cursor < debug_play_cursor) {
+          audio_latency_bytes = debug_play_cursor - debug_write_cursor;
+        } else {
+          audio_latency_bytes = debug_write_cursor - debug_play_cursor;
+        }
+
+        audio_latency_seconds =
+        (((f32)audio_latency_bytes / (f32)platform_sound_output->bytes_per_sample) /
+          (f32)platform_sound_output->samples_per_second);
+
+        arena_clear(platform_temp_arena);
+        OutputDebugStringA(cstrf(platform_temp_arena,
+          "byte to lock at: %u   bytes to write: %u  -  play cursor: %u  write cursor: %u  audio latency bytes: %d  audio latency secs: %f\n",
+          byte_to_lock_at, bytes_to_write,
+          debug_play_cursor, debug_write_cursor,
+          audio_latency_bytes, audio_latency_seconds));
+
+        #endif
+
+        platform_win32_fill_sound_buffer(platform_sound_output, byte_to_lock_at, bytes_to_write, &gp->sound);
+
       } else {
-        target_cursor = write_cursor + expected_sound_bytes_per_frame + pp->platform_sound_output->safety_bytes;
+        sound_is_valid = false;
       }
-      target_cursor %= pp->platform_sound_output->buffer_size;
 
-      DWORD bytes_to_write = 0;
-      if(byte_to_lock_at > target_cursor) {
-        bytes_to_write = (pp->platform_sound_output->buffer_size - byte_to_lock_at);
-        bytes_to_write += target_cursor;
+      LARGE_INTEGER work_counter = platform_win32_get_wall_clock();
+      f32 work_seconds_elapsed = platform_win32_get_seconds_elapsed(last_counter, work_counter);
+
+      f32 seconds_elapsed_for_frame = work_seconds_elapsed;
+      if(seconds_elapsed_for_frame > platform_target_seconds_per_frame) {
+        // TODO jfd: MISSED FRAME RATE!!!!!
+        // TODO jfd: logging
       } else {
-        bytes_to_write = target_cursor - byte_to_lock_at;
+        while(seconds_elapsed_for_frame < platform_target_seconds_per_frame) {
+          if(sleep_is_granular) {
+            DWORD sleep_for_ms = (DWORD)(1000.0f * (platform_target_seconds_per_frame - seconds_elapsed_for_frame));
+            platform_sleep_ms(sleep_for_ms);
+          }
+          LARGE_INTEGER check_counter = platform_win32_get_wall_clock();
+          seconds_elapsed_for_frame = platform_win32_get_seconds_elapsed(last_counter, check_counter);
+        }
       }
 
-      // NOTE jfd: get sound samples from game
-      gp->sound = (Game_sound_buffer){0};
-      gp->sound.samples_per_second = pp->platform_sound_output->samples_per_second;
-      gp->sound.sample_count = bytes_to_write / pp->platform_sound_output->bytes_per_sample;
-      gp->sound.samples = pp->samples;
-      game_get_sound_samples(gp);
+      // NOTE jfd: blit to screen
+      HDC device_context = {0};
+      defer_loop(device_context = GetDC(window_handle), ReleaseDC(window_handle, device_context)) {
+        Platform_win32_window_dimensions window_dimensions = platform_win32_get_window_dimensions(window_handle);
 
-      #ifdef HANDMADE_AUDIO_LATENCY_DEBUG
-      Platform_win32_debug_time_marker *marker = &debug_time_markers.d[debug_time_marker_index];
-      marker->output_play_cursor = play_cursor;
-      marker->output_write_cursor = write_cursor;
-      marker->output_location = byte_to_lock_at;
-      marker->output_byte_count = bytes_to_write;
-      marker->expected_flip_cursor = expected_frame_boundary_byte;
+        #ifdef HANDMADE_DEBUG_SOUND
+        platform_win32_debug_audio_sync_display(&global_backbuffer, platform_sound_output, debug_time_markers, debug_time_marker_index - 1, platform_target_seconds_per_frame);
+        #endif
 
+        platform_win32_display_buffer_in_window(&global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, 0, 0, window_dimensions.width, window_dimensions.height);
+        flip_wall_clock = platform_win32_get_wall_clock();
+      }
+
+      #ifdef HANDMADE_INTERNAL
       DWORD debug_play_cursor;
       DWORD debug_write_cursor;
-      pp->platform_sound_buffer->lpVtbl->GetCurrentPosition(pp->platform_sound_buffer, &debug_play_cursor, &debug_write_cursor);
+      if(SUCCEEDED(platform_sound_buffer->lpVtbl->GetCurrentPosition(platform_sound_buffer, &debug_play_cursor, &debug_write_cursor))) {
+        ASSERT(debug_time_marker_index < debug_time_markers.count);
+        Platform_win32_debug_time_marker *marker = &debug_time_markers.d[debug_time_marker_index++];
 
-      // NOTE jfd: This value is the audio latency in bytes
-      if(debug_write_cursor < debug_play_cursor) {
-        pp->audio_latency_bytes = debug_play_cursor - debug_write_cursor;
-      } else {
-        pp->audio_latency_bytes = debug_write_cursor - debug_play_cursor;
-      }
-
-      pp->audio_latency_seconds =
-      (((f32)pp->audio_latency_bytes / (f32)pp->platform_sound_output->bytes_per_sample) /
-        (f32)pp->platform_sound_output->samples_per_second);
-
-      arena_clear(platform_temp_arena);
-      OutputDebugStringA(cstrf(platform_temp_arena,
-        "byte to lock at: %u   bytes to write: %u  -  play cursor: %u  write cursor: %u  audio latency bytes: %d  audio latency secs: %f\n",
-        byte_to_lock_at, bytes_to_write,
-        debug_play_cursor, debug_write_cursor,
-        pp->audio_latency_bytes, pp->audio_latency_seconds));
-
-      #endif
-
-      platform_win32_fill_sound_buffer(pp->platform_sound_output, byte_to_lock_at, bytes_to_write, &gp->sound);
-
-    } else {
-      pp->sound_is_valid = false;
-    }
-
-    LARGE_INTEGER work_counter = platform_win32_get_wall_clock();
-    f32 work_seconds_elapsed = platform_win32_get_seconds_elapsed(pp->last_counter, work_counter);
-
-    f32 seconds_elapsed_for_frame = work_seconds_elapsed;
-    if(seconds_elapsed_for_frame > pp->target_seconds_per_frame) {
-      // TODO jfd: MISSED FRAME RATE!!!!!
-      // TODO jfd: logging
-    } else {
-      while(seconds_elapsed_for_frame < pp->target_seconds_per_frame) {
-        if(pp->sleep_is_granular) {
-          DWORD sleep_for_ms = (DWORD)(1000.0f * (pp->target_seconds_per_frame - seconds_elapsed_for_frame));
-          platform_sleep_ms(sleep_for_ms);
+        if(debug_time_marker_index >= debug_time_markers.count) {
+          debug_time_marker_index = 0;
         }
-        LARGE_INTEGER check_counter = platform_win32_get_wall_clock();
-        seconds_elapsed_for_frame = platform_win32_get_seconds_elapsed(pp->last_counter, check_counter);
+        platform_sound_buffer->lpVtbl->GetCurrentPosition(platform_sound_buffer, &marker->flip_play_cursor, &marker->flip_write_cursor);
       }
-    }
-
-    // NOTE jfd: blit to screen
-    HDC device_context = {0};
-    defer_loop(device_context = GetDC(pp->window_handle), ReleaseDC(pp->window_handle, device_context)) {
-      Platform_win32_window_dimensions window_dimensions = platform_win32_get_window_dimensions(pp->window_handle);
-
-      #ifdef HANDMADE_DEBUG_SOUND
-      platform_win32_debug_audio_sync_display(&global_backbuffer, pp->platform_sound_output, debug_time_markers, debug_time_marker_index - 1, target_seconds_per_frame);
       #endif
 
-      platform_win32_display_buffer_in_window(&pp->global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, 0, 0, window_dimensions.width, window_dimensions.height);
-      pp->flip_wall_clock = platform_win32_get_wall_clock();
+      LARGE_INTEGER end_counter = platform_win32_get_wall_clock();
+
+      #ifdef HANDMADE_PROFILE
+      s64 end_cycle_count = __rdtsc();
+      s64 elapsed_cycles = end_cycle_count - last_cycle_count;
+      last_cycle_count = end_cycle_count;
+
+      f32 elapsed_time = platform_win32_get_seconds_elapsed(last_counter, end_counter);
+      f32 ms_per_frame = THOUSAND(elapsed_time);
+      f32 fps = 1.0f / elapsed_time;
+
+      OutputDebugStringA(
+        cstrf(platform_temp_arena,
+          "frame time (ms):  %f    fps:  %f    mega cycles: %d\n",
+          ms_per_frame, fps, elapsed_cycles / MILLION(1))
+      );
+      arena_clear(platform_temp_arena);
+      #endif
+
+      last_counter = end_counter;
+
     }
 
-    #ifdef HANDMADE_INTERNAL
-    DWORD debug_play_cursor;
-    DWORD debug_write_cursor;
-    if(SUCCEEDED(pp->platform_sound_buffer->lpVtbl->GetCurrentPosition(pp->platform_sound_buffer, &debug_play_cursor, &debug_write_cursor))) {
-      ASSERT(pp->debug_time_marker_index < pp->debug_time_markers.count);
-      Platform_win32_debug_time_marker *marker = &pp->debug_time_markers.d[pp->debug_time_marker_index++];
-
-      if(pp->debug_time_marker_index >= pp->debug_time_markers.count) {
-        pp->debug_time_marker_index = 0;
-      }
-      pp->platform_sound_buffer->lpVtbl->GetCurrentPosition(pp->platform_sound_buffer, &marker->flip_play_cursor, &marker->flip_write_cursor);
-    }
-    #endif
-
-    LARGE_INTEGER end_counter = platform_win32_get_wall_clock();
-
-    #ifdef HANDMADE_PROFILE
-    s64 end_cycle_count = __rdtsc();
-    s64 elapsed_cycles = end_cycle_count - last_cycle_count;
-    last_cycle_count = end_cycle_count;
-
-    f32 elapsed_time = platform_win32_get_seconds_elapsed(last_counter, end_counter);
-    f32 ms_per_frame = THOUSAND(elapsed_time);
-    f32 fps = 1.0f / elapsed_time;
-
-    OutputDebugStringA(
-      cstrf(platform_temp_arena,
-        "frame time (ms):  %f    fps:  %f    mega cycles: %d\n",
-        ms_per_frame, fps, elapsed_cycles / MILLION(1))
-    );
-    arena_clear(platform_temp_arena);
-    #endif
-
-    pp->last_counter = end_counter;
-
-  }
-
-  #ifdef HANDMADE_HOTRELOAD
-  if(!pp->do_reload) {
+    #ifdef HANDMADE_HOTRELOAD
     platform_win32_debug_shutdown_loop_recorder();
-  }
-  #endif
-
-}
+    #endif
 
 
-#ifndef HANDMADE_HOTRELOAD
-
-int CALLBACK
-WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode) {
-
-
-  platform_win32_init(instance, prevInstance, cmdLine, showCode);
-  platform_win32_main();
+  } /* main */
 
   return 0;
 }
-
-#endif
 
 
 

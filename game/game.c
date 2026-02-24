@@ -14,44 +14,6 @@ global Chunk world_chunks[WORLD_CHUNKS_Y_COUNT][WORLD_CHUNKS_X_COUNT];
 
 
 
-internal Game*
-func game_init(Platform *pp) {
-  ASSERT(GAME_STATE_SIZE < pp->backbuffer_size);
-
-  u64 alloc_size = pp->backbuffer_size;
-  u8 *alloc_ptr = (u8*)(pp->backbuffer);
-
-  Game *gp = (Game*)alloc_ptr;
-  alloc_ptr += GAME_STATE_SIZE;
-  alloc_size -= GAME_STATE_SIZE;
-
-  u64 game_frame_arena_backbuffer_size = MB(5);
-  u64 game_temp_arena_backbuffer_size  = MB(5);
-  u64 game_main_arena_backbuffer_size = alloc_size - game_frame_arena_backbuffer_size - game_temp_arena_backbuffer_size;
-
-  u8 *game_main_arena_backbuffer = alloc_ptr;
-  alloc_ptr += game_main_arena_backbuffer_size;
-
-  u8 *game_frame_arena_backbuffer = alloc_ptr;
-  alloc_ptr += game_frame_arena_backbuffer_size;
-
-  u8 *game_temp_arena_backbuffer = alloc_ptr;
-  alloc_ptr += game_temp_arena_backbuffer_size;
-
-  ASSERT(alloc_ptr <= ((u8*)pp->backbuffer + pp->backbuffer_size));
-
-  gp->main_arena  = arena_create_ex(game_main_arena_backbuffer_size, true, game_main_arena_backbuffer);
-  gp->frame_arena = arena_create_ex(game_frame_arena_backbuffer_size, true, game_frame_arena_backbuffer);
-  gp->temp_arena  = arena_create_ex(game_temp_arena_backbuffer_size,  true, game_temp_arena_backbuffer);
-
-  gp->did_reload = true;
-
-  init_player(gp);
-
-  return gp;
-}
-
-
 internal void
 func debug_render_weird_gradient(Game *gp, int x_offset, int y_offset) {
   u8 *row = gp->render.pixels;
@@ -361,10 +323,10 @@ func chunk_pos_from_tile_map_pos(Game *gp, Tile_map_pos pos) {
   u32 abs_tile_x = pos.tile.x;
   u32 abs_tile_y = pos.tile.y;
 
-  result.chunk.x = abs_tile_x >> 8;
-  result.chunk.y = abs_tile_y >> 8;
-  result.tile.x  = abs_tile_x & 0xff;
-  result.tile.y  = abs_tile_y & 0xff;
+  result.chunk.x = abs_tile_x >> CHUNK_SHIFT;
+  result.chunk.y = abs_tile_y >> CHUNK_SHIFT;
+  result.tile.x  = abs_tile_x & CHUNK_MASK;
+  result.tile.y  = abs_tile_y & CHUNK_MASK;
 
   return result;
 }
@@ -388,6 +350,7 @@ func tile_map_pos_from_point(Game *gp, f32 x, f32 y) {
 force_inline Chunk*
 func get_chunk(Game *gp, s32 chunk_x, s32 chunk_y) {
   Chunk *chunk = 0;
+  // TODO jfd: load chunks if not already loaded
   chunk = &world_chunks[chunk_y & (WORLD_CHUNKS_Y_COUNT - 1)][chunk_x & (WORLD_CHUNKS_X_COUNT - 1)];
   return chunk;
 }
@@ -418,7 +381,80 @@ func init_player(Game *gp) {
   gp->player_height = CM(150);
 }
 
+
 internal void
+func draw_tile_by_point(Game *gp, Color color, v2 point) {
+  Tile_map_pos tile_map_pos = tile_map_pos_from_point(gp, point.x, point.y);
+
+  int tile_col = tile_map_pos.tile.x;
+  int tile_row = tile_map_pos.tile.y;
+
+  v2 tile_screen_point = { (f32)tile_col * TILE_SIZE_METERS, (f32)(tile_row & CHUNK_MASK) * TILE_SIZE_METERS };
+  tile_screen_point = sub_v2(tile_screen_point, gp->camera_pos);
+  tile_screen_point    = scale_v2(tile_screen_point, PIXELS_PER_METER);
+  tile_screen_point.y = gp->render.height - tile_screen_point.y - TILE_SIZE_METERS*PIXELS_PER_METER;
+  v2 tile_screen_size  = scale_v2((v2){ TILE_SIZE_METERS, TILE_SIZE_METERS }, PIXELS_PER_METER);
+  draw_rect(gp,
+    color,
+    tile_screen_point.x,
+    tile_screen_point.y,
+    tile_screen_size.x,
+    tile_screen_size.y
+  );
+}
+
+internal void
+func draw_tile_map(Game *gp) {
+
+  Tile_map_pos camera_tile_map_pos = tile_map_pos_from_point(gp, gp->camera_pos.x, gp->camera_pos.y);
+
+  s32 rows_to_draw = (s32)((gp->render.height*METERS_PER_PIXEL) / TILE_SIZE_METERS);
+  s32 cols_to_draw = (s32)((gp->render.width*METERS_PER_PIXEL)  / TILE_SIZE_METERS);
+
+  for(int row = -1; row <= rows_to_draw+2; row++) {
+    for(int col = -1; col <= cols_to_draw+2; col++) {
+
+      Tile_map_pos cur_tile_map_pos = {0};
+      cur_tile_map_pos.tile.x = camera_tile_map_pos.tile.x + col;
+      cur_tile_map_pos.tile.y = camera_tile_map_pos.tile.y + row - 1;
+
+      u8 tile = tile_from_tile_map_pos(gp, cur_tile_map_pos);
+
+      Color color = { 0.2f, 0.2f, 0.2f, 1 };
+      if(tile == 1) {
+        color = (Color){ 0.8f, 0.8f, 0.8f, 1 };
+      } else if(tile == 2) {
+        color = (Color){ 0.0f, 0.8f, 0.4f, 1 };
+      }
+
+      #if 1
+      if(cur_tile_map_pos.tile.x == 0 || cur_tile_map_pos.tile.y == 0 || cur_tile_map_pos.tile.x == CHUNK_SIZE || cur_tile_map_pos.tile.y == CHUNK_SIZE) {
+        color = (Color){ 1.0f, 0, 0, 0.7f };
+      }
+      #endif
+
+      v2 tile_screen_point = { (f32)col * TILE_SIZE_METERS, (f32)((row & CHUNK_MASK)) * TILE_SIZE_METERS };
+      tile_screen_point = sub_v2(tile_screen_point, camera_tile_map_pos.tile_rel);
+      tile_screen_point = scale_v2(tile_screen_point, PIXELS_PER_METER);
+      tile_screen_point.y = gp->render.height - tile_screen_point.y;
+
+
+      v2 tile_screen_size  = scale_v2((v2){ TILE_SIZE_METERS, TILE_SIZE_METERS }, PIXELS_PER_METER);
+
+      draw_rect(gp,
+        color,
+        tile_screen_point.x,
+        tile_screen_point.y,
+        tile_screen_size.x,
+        tile_screen_size.y
+      );
+
+    }
+  }
+
+}
+
+shared_function void
 func game_update_and_render(Game *gp) {
 
   if(gp->did_reload) {
@@ -509,13 +545,21 @@ func game_update_and_render(Game *gp) {
     v2 player_tile = { (f32)(player_tile_map_pos.tile.x & 0xff), (f32)(player_tile_map_pos.tile.y & CHUNK_MASK) };
     v2 player_pos = add_v2(player_tile_rel, scale_v2(player_tile, TILE_SIZE_METERS));
 
-    v2 camera_pos = {
+    /* update_camera */
+    gp->camera_pos = (v2){
       player_pos.x - ((f32)gp->render.width)*METERS_PER_PIXEL*0.5f,
       player_pos.y - ((f32)gp->render.height)*METERS_PER_PIXEL*0.5f,
     };
 
     clear_screen(gp);
 
+    // HERE
+    // TODO jfd: draw multiple chunks at once
+    // DONE TODO jfd: parametrize the chunk size (chunk_shift parameter)
+
+    #if 1
+    draw_tile_map(gp);
+    #else
     for(u32 row = 0; row < CHUNK_SIZE; row++) {
       for(u32 col = 0; col < CHUNK_SIZE; col++) {
         u8 tile = get_tile_of_chunk(gp, &world_chunk_00, col, row);
@@ -529,7 +573,7 @@ func game_update_and_render(Game *gp) {
 
 
         v2 tile_screen_point = { (f32)col * TILE_SIZE_METERS, (f32)((row & CHUNK_MASK)) * TILE_SIZE_METERS };
-        tile_screen_point = sub_v2(tile_screen_point, camera_pos);
+        tile_screen_point = sub_v2(tile_screen_point, gp->camera_pos);
         tile_screen_point    = scale_v2(tile_screen_point, PIXELS_PER_METER);
         tile_screen_point.y = gp->render.height - tile_screen_point.y - TILE_SIZE_METERS*PIXELS_PER_METER;
 
@@ -546,13 +590,15 @@ func game_update_and_render(Game *gp) {
 
       }
     }
+    #endif
+
 
     // draw_rect_lines(gp, (Color){ 1, 1, 1, 1 }, 1.0f, 20, 20, 80, 80);
 
     #if 0
     {
       v2 tile_screen_point = { (f32)player_tile_col * TILE_SIZE_METERS, (f32)(player_tile_row & CHUNK_MASK) * TILE_SIZE_METERS };
-      tile_screen_point = sub_v2(tile_screen_point, camera_pos);
+      tile_screen_point = sub_v2(tile_screen_point, gp->camera_pos);
       tile_screen_point    = scale_v2(tile_screen_point, PIXELS_PER_METER);
       tile_screen_point.y = gp->render.height - tile_screen_point.y - TILE_SIZE_METERS*PIXELS_PER_METER;
       v2 tile_screen_size  = scale_v2((v2){ TILE_SIZE_METERS, TILE_SIZE_METERS }, PIXELS_PER_METER);
@@ -567,7 +613,16 @@ func game_update_and_render(Game *gp) {
     }
     #endif
 
-    v2 player_screen_pos = scale_v2(sub_v2(player_pos, camera_pos), PIXELS_PER_METER);
+    #if 0
+    {
+      v2 point = { 10, 16 };
+      Color color = { 0.6f, 0.0f, 1.0f, 1 };
+      draw_tile_by_point(gp, color, point);
+      // draw_rect(gp, color, point.x, point.y, 50, 50);
+    }
+    #endif
+
+    v2 player_screen_pos = scale_v2(sub_v2(player_pos, gp->camera_pos), PIXELS_PER_METER);
     player_screen_pos.y = gp->render.height - player_screen_pos.y;
 
     v2 player_rect_screen_size        = scale_v2((v2){ gp->player_width, gp->player_height }, PIXELS_PER_METER);
@@ -598,7 +653,7 @@ func game_update_and_render(Game *gp) {
 
 }
 
-internal void
+shared_function void
 func game_get_sound_samples(Game *gp) {
 
   // TODO jfd: allow sample offsets here for more robust platform options
@@ -607,6 +662,44 @@ func game_get_sound_samples(Game *gp) {
   // TODO jfd 23/02/26: there is some popping in the sound, not sure if it has to do with hot-reloading
   // debug_output_sound(gp);
 
+}
+
+
+shared_function Game*
+func game_init(Platform *pp) {
+  ASSERT(GAME_STATE_SIZE < pp->backbuffer_size);
+
+  u64 alloc_size = pp->backbuffer_size;
+  u8 *alloc_ptr = (u8*)(pp->backbuffer);
+
+  Game *gp = (Game*)alloc_ptr;
+  alloc_ptr += GAME_STATE_SIZE;
+  alloc_size -= GAME_STATE_SIZE;
+
+  u64 game_frame_arena_backbuffer_size = MB(5);
+  u64 game_temp_arena_backbuffer_size  = MB(5);
+  u64 game_main_arena_backbuffer_size = alloc_size - game_frame_arena_backbuffer_size - game_temp_arena_backbuffer_size;
+
+  u8 *game_main_arena_backbuffer = alloc_ptr;
+  alloc_ptr += game_main_arena_backbuffer_size;
+
+  u8 *game_frame_arena_backbuffer = alloc_ptr;
+  alloc_ptr += game_frame_arena_backbuffer_size;
+
+  u8 *game_temp_arena_backbuffer = alloc_ptr;
+  alloc_ptr += game_temp_arena_backbuffer_size;
+
+  ASSERT(alloc_ptr <= ((u8*)pp->backbuffer + pp->backbuffer_size));
+
+  gp->main_arena  = arena_create_ex(game_main_arena_backbuffer_size, true, game_main_arena_backbuffer);
+  gp->frame_arena = arena_create_ex(game_frame_arena_backbuffer_size, true, game_frame_arena_backbuffer);
+  gp->temp_arena  = arena_create_ex(game_temp_arena_backbuffer_size,  true, game_temp_arena_backbuffer);
+
+  gp->did_reload = true;
+
+  init_player(gp);
+
+  return gp;
 }
 
 

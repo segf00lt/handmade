@@ -14,14 +14,10 @@ int win32_build_hot_reload_no_cradle(void) {
     "/Od",
     "/DHANDMADE_INTERNAL",
     "/DHANDMADE_HOTRELOAD",
+    "/DPLATFORM_CORE_IMPORT",
     "/LD",
-    "handmade_hotreload_build.c",
-    "user32.lib",
-    "gdi32.lib",
-    "Dsound.lib",
-    "dxguid.lib",
-    "winmm.lib",
-    "ole32.lib",
+    "handmade_module_build.c",
+    "platform_core.lib",
     "/link",
     "/INCREMENTAL:NO",
     "/PDB:handmade_module.pdb",
@@ -44,17 +40,27 @@ int win32_build_hot_reload(void) {
     "/wd4100",
     "/Zi",
     "/Od",
+    "/DHANDMADE_INTERNAL",
     "/DHANDMADE_HOTRELOAD",
-    "/DMODULE=\\\"game\\\"",
-    "/Fe:handmade.exe",
-    "hotreload/cradle_win32.c",
+    "/DPLATFORM_CORE_EXPORT",
+    "handmade_cradle_build.c",
+
     "user32.lib",
+    "gdi32.lib",
+    "Dsound.lib",
+    "dxguid.lib",
+    "winmm.lib",
+    "ole32.lib",
+
     "/link",
     "/INCREMENTAL:NO",
+    "/OUT:handmade.exe",
+    "/IMPLIB:platform_core.lib",
     ""
   );
   if(!nob_cmd_run_sync_and_reset(&cmd)) return 0;
 
+  // return 1;
   return win32_build_hot_reload_no_cradle();
 }
 
@@ -110,8 +116,8 @@ int macos_build_virutal_memory_test(void) {
 int main(int argc, char **argv) {
   NOB_GO_REBUILD_URSELF(argc, argv);
 
-
   if(!win32_build_hot_reload_no_cradle()) return 1;
+
   return 0;
   if(!win32_build_hot_reload()) return 1;
   if(!win32_build()) return 1;

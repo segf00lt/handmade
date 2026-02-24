@@ -37,6 +37,14 @@ TYPEDEF_VEC3(f64);
 
 typedef v3_f32 v3;
 
+typedef struct v4 v4;
+struct v4 {
+  f32 x;
+  f32 y;
+  f32 z;
+  f32 w;
+};
+
 force_inline s32 round_f32_to_s32(f32 value);
 force_inline f32 max_f32(f32 a, f32 b);
 force_inline f32 abs_f32(f32 x);
