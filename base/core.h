@@ -286,8 +286,6 @@ typedef uint64_t b64;
 #define MAX_S32 (((s32)~0)^(1u<<31))
 #define MAX_S64 (((s64)~0)^(1ull<<63))
 
-#define floor_f32(f) floorf((f))
-#define floor_f64(f) floor((f))
 
 typedef void* void_ptr;
 typedef char* char_ptr;

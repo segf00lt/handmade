@@ -78,6 +78,9 @@ struct Game {
   b8 once;
   b8 should_init_player;
 
+  u32 world_chunks_x_count;
+  u32 world_chunks_y_count;
+  Chunk *world_chunks;
   Chunk chunk;
 
   v2 camera_offset;

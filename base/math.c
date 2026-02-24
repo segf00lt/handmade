@@ -3,6 +3,24 @@
 
 #include <math.h>
 
+force_inline f32
+func floor_f32(f32 f) {
+  // TODO jfd: reimplement
+  return (f32)floorf(f);
+}
+
+
+force_inline f64
+func floor_f64(f64 f) {
+  // TODO jfd: reimplement
+  return (f64)floor(f);
+}
+
+force_inline f32
+func round_f32(f32 f) {
+  return (f32)roundf(f);
+}
+
 
 // TODO jfd: handle negative values in round_f32_to_s32()
 force_inline s32

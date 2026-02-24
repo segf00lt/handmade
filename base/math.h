@@ -45,6 +45,12 @@ struct v4 {
   f32 w;
 };
 
+
+force_inline f32 floor_f32(f32 f);
+
+force_inline f64 floor_f64(f64 f);
+force_inline f32 round_f32(f32 f);
+
 force_inline s32 round_f32_to_s32(f32 value);
 force_inline f32 max_f32(f32 a, f32 b);
 force_inline f32 abs_f32(f32 x);
