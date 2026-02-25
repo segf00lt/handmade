@@ -20,7 +20,7 @@
 
 #define PLAYER_MOVE_SPEED        (M(40)) /* meters per second */
 
-#define PIXELS_PER_METER (13.5f)
+#define PIXELS_PER_METER (3.0f)
 #define METERS_PER_PIXEL (1.0f/PIXELS_PER_METER)
 #define METERS_TO_PIXELS(x) ((f32)((f32)(x)*PIXELS_PER_METER))
 #define PIXELS_TO_METERS(x) ((f32)((f32)(x)*METERS_PER_PIXEL))
