@@ -86,6 +86,8 @@ struct Game {
   v2 camera_offset;
   v2 camera_pos;
 
+  s32 random_number_index;
+
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
 #define GAME_STATE_SIZE ((u64)MB(1))

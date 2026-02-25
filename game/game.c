@@ -5,6 +5,8 @@
 /////////////////////////////////
 // globals
 
+#include "game_random.h"
+
 #define TILE_KIND_MAX 5
 
 
@@ -12,6 +14,14 @@
 // functions
 
 
+internal u32
+func get_random(Game *gp) {
+  if(gp->random_number_index >= ARRLEN(game_random_choices)) {
+    gp->random_number_index = 0;
+  }
+  u32 result = game_random_choices[gp->random_number_index++];
+  return result;
+}
 
 internal void
 func debug_render_weird_gradient(Game *gp, int x_offset, int y_offset) {
@@ -431,38 +441,48 @@ func init_tile_map(Game *gp) {
     }
   }
 
+  u32 screen_x = 0;
+  u32 screen_y = 0;
+
   u32 tiles_per_width = 35;
   u32 tiles_per_height = 20;
-  for(u32 screen_y = 0; screen_y < 32; screen_y++) {
-    for(u32 screen_x = 0; screen_x < 32; screen_x++) {
-      for(u32 tile_y = 0; tile_y < tiles_per_height; tile_y++) {
-        for(u32 tile_x = 0; tile_x < tiles_per_width; tile_x++) {
-          u32 abs_tile_x = screen_x*tiles_per_width + tile_x;
-          u32 abs_tile_y = screen_y*tiles_per_height + tile_y;
+  for(u32 screen_index = 0; screen_index < 100; screen_index++) {
 
-          u8 tile_value = 0;
+    for(u32 tile_y = 0; tile_y < tiles_per_height; tile_y++) {
+      for(u32 tile_x = 0; tile_x < tiles_per_width; tile_x++) {
+        u32 abs_tile_x = screen_x*tiles_per_width + tile_x;
+        u32 abs_tile_y = screen_y*tiles_per_height + tile_y;
 
-          if((tile_x == 0) || (tile_x == (tiles_per_width - 1))) {
-            if(tile_y == (tiles_per_height / 2)) {
-              tile_value = 0;
-            } else {
-              tile_value = 1;
-            }
+        u8 tile_value = 0;
+
+        if((tile_x == 0) || (tile_x == (tiles_per_width - 1))) {
+          if(tile_y == (tiles_per_height / 2)) {
+            tile_value = 0;
+          } else {
+            tile_value = 1;
           }
-
-          if((tile_y == 0) || (tile_y == (tiles_per_height - 1))) {
-            if(tile_x == (tiles_per_width / 2)) {
-              tile_value = 0;
-            } else {
-              tile_value = 1;
-            }
-          }
-
-          set_tile_from_abs_tile_pos(gp, abs_tile_x, abs_tile_y, tile_value);
-
         }
+
+        if((tile_y == 0) || (tile_y == (tiles_per_height - 1))) {
+          if(tile_x == (tiles_per_width / 2)) {
+            tile_value = 0;
+          } else {
+            tile_value = 1;
+          }
+        }
+
+        set_tile_from_abs_tile_pos(gp, abs_tile_x, abs_tile_y, tile_value);
+
       }
     }
+
+    u32 random_choice = get_random(gp) % 2;
+    if(random_choice == 0) {
+      screen_x += 1;
+    } else {
+      screen_y += 1;
+    }
+
   }
 
 }
@@ -532,6 +552,7 @@ func draw_tile_map(Game *gp) {
       s32 tile_col = half_cols_to_draw + col;
       v2 tile_screen_point = { (f32)(tile_col) * TILE_SIZE_METERS, (f32)((tile_row)) * TILE_SIZE_METERS };
       tile_screen_point = sub_v2(tile_screen_point, camera_tile_map_pos.tile_rel);
+      tile_screen_point = add_value_v2(tile_screen_point, TILE_SIZE_METERS*0.5);
       tile_screen_point = scale_v2(tile_screen_point, PIXELS_PER_METER);
       tile_screen_point.y = gp->render.height - tile_screen_point.y;
 
@@ -652,12 +673,14 @@ func game_update_and_render(Game *gp) {
 
     draw_tile_map(gp);
 
+    // TODO jfd: make tile rendering consistet with draw_tile_map()
     #if 0
     {
-      v2 tile_screen_point = { (f32)player_tile_col * TILE_SIZE_METERS, (f32)(player_tile_row & CHUNK_MASK) * TILE_SIZE_METERS };
-      tile_screen_point = sub_v2(tile_screen_point, gp->camera_pos);
+      v2 tile_screen_point = { (f32)player_tile_col * TILE_SIZE_METERS, (f32)(player_tile_row) * TILE_SIZE_METERS };
+      tile_screen_point = add_value_v2(tile_screen_point, 0.5f*TILE_SIZE_METERS);
+      tile_screen_point = sub_v2(tile_screen_point, gp->player_pos.tile_rel);
       tile_screen_point    = scale_v2(tile_screen_point, PIXELS_PER_METER);
-      tile_screen_point.y = gp->render.height - tile_screen_point.y - TILE_SIZE_METERS*PIXELS_PER_METER;
+      tile_screen_point.y = gp->render.height - tile_screen_point.y;
       v2 tile_screen_size  = scale_v2((v2){ TILE_SIZE_METERS, TILE_SIZE_METERS }, PIXELS_PER_METER);
       draw_rect_lines(gp,
         (Color){ 0, 0.4f, 0.9f, 1 },
@@ -672,9 +695,8 @@ func game_update_and_render(Game *gp) {
 
     #if 0
     {
-      v2 point = { 10, 16 };
       Color color = { 0.6f, 0.0f, 1.0f, 1 };
-      draw_tile_by_point(gp, color, point);
+      draw_tile_by_point(gp, color, player_pos);
     }
     #endif
 
