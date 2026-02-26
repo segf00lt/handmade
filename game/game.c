@@ -100,15 +100,34 @@ func pixel_from_color(Color color) {
 internal void
 func draw_rect_min_max(Game *gp, Color color, f32 min_x, f32 min_y, f32 max_x, f32 max_y) {
 
+  f32 render_width = (f32)gp->render.width;
+  f32 render_height = (f32)gp->render.height;
+
   f32 x0 = fminf(min_x, max_x);
   f32 x1 = fmaxf(min_x, max_x);
   f32 y0 = fminf(min_y, max_y);
   f32 y1 = fmaxf(min_y, max_y);
 
+  if(x0 < 0.0f) {
+    x0 = 0.0f;
+  }
+
+  if(x1 >= render_width) {
+    x1 = (f32)render_width;
+  }
+
+  if(y0 < 0.0f) {
+    y0 = 0.0f;
+  }
+
+  if(y1 >= render_height) {
+    y1 = (f32)render_height;
+  }
+
   int begin_x = round_f32_to_s32(fmaxf(0, x0));
   int begin_y = round_f32_to_s32(fmaxf(0, y0));
-  int end_x   = round_f32_to_s32(fminf(x1, (f32)gp->render.width));
-  int end_y   = round_f32_to_s32(fminf(y1, (f32)gp->render.height));
+  int end_x   = round_f32_to_s32(fminf(x1, (f32)render_width));
+  int end_y   = round_f32_to_s32(fminf(y1, (f32)render_height));
 
   u8 *row = gp->render.pixels;
 
@@ -132,10 +151,29 @@ func draw_rect_min_max(Game *gp, Color color, f32 min_x, f32 min_y, f32 max_x, f
 internal void
 func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_x, f32 min_y, f32 max_x, f32 max_y) {
 
+  f32 render_width = (f32)gp->render.width;
+  f32 render_height = (f32)gp->render.height;
+
   f32 x0 = fminf(min_x, max_x);
   f32 x1 = fmaxf(min_x, max_x);
   f32 y0 = fminf(min_y, max_y);
   f32 y1 = fmaxf(min_y, max_y);
+
+  if(x0 < 0.0f) {
+    x0 = 0.0f;
+  }
+
+  if(x1 >= render_width) {
+    x1 = (f32)render_width;
+  }
+
+  if(y0 < 0.0f) {
+    y0 = 0.0f;
+  }
+
+  if(y1 >= render_height) {
+    y1 = (f32)render_height;
+  }
 
   int begin_x = round_f32_to_s32(fmaxf(0, x0));
   int begin_y = round_f32_to_s32(fmaxf(0, y0));
@@ -307,24 +345,24 @@ func chunk_pos_from_point(Game *gp, v2 v) {
 }
 
 internal void
-func recanonicalize_coord(Game *gp, u32 *tile, f32 *tile_rel) {
+func recanonicalize_coord(Game *gp, u32 *tile, f32 *offset) {
   // NOTE jfd: casey made the tiles be drawn from their center, but that doesn't really change anything for us
-  // s32 carry = (s32)floor_f32(*tile_rel * (1.0f/TILE_SIZE_METERS));
-  s32 carry = (s32)round_f32(*tile_rel * (1.0f/TILE_SIZE_METERS));
+  // s32 carry = (s32)floor_f32(*offset * (1.0f/TILE_SIZE_METERS));
+  s32 carry = (s32)round_f32(*offset * (1.0f/TILE_SIZE_METERS));
   *tile += carry;
-  *tile_rel -= (f32)carry * TILE_SIZE_METERS;
-  // ASSERT(*tile_rel >= 0.0f);
-  // ASSERT(*tile_rel <= TILE_SIZE_METERS);
-  ASSERT(*tile_rel >= -0.5f*TILE_SIZE_METERS);
-  ASSERT(*tile_rel <= 0.5f*TILE_SIZE_METERS);
+  *offset -= (f32)carry * TILE_SIZE_METERS;
+  // ASSERT(*offset >= 0.0f);
+  // ASSERT(*offset <= TILE_SIZE_METERS);
+  ASSERT(*offset >= -0.5f*TILE_SIZE_METERS);
+  ASSERT(*offset <= 0.5f*TILE_SIZE_METERS);
 }
 
 internal Tile_map_pos
 func recanonicalize_pos(Game *gp, Tile_map_pos pos) {
   Tile_map_pos result = pos;
 
-  recanonicalize_coord(gp, &result.tile_x, &result.tile_rel.x);
-  recanonicalize_coord(gp, &result.tile_y, &result.tile_rel.y);
+  recanonicalize_coord(gp, &result.tile_x, &result.offset.x);
+  recanonicalize_coord(gp, &result.tile_y, &result.offset.y);
 
   return result;
 }
@@ -362,9 +400,9 @@ func tile_map_pos_from_point(Game *gp, f32 x, f32 y) {
 
   v2 tile = truncate_v2(scale_v2(v, 1.0f/TILE_SIZE_METERS));
 
-  v2 tile_rel = sub_v2(v, scale_v2(tile, TILE_SIZE_METERS));
+  v2 offset = sub_v2(v, scale_v2(tile, TILE_SIZE_METERS));
 
-  result.tile_rel = tile_rel;
+  result.offset = offset;
 
   result.tile_x = (u32)tile.x;
   result.tile_y = (u32)tile.y;
@@ -484,7 +522,11 @@ func init_tile_map(Game *gp) {
       random_choice = get_random(gp) % 3;
     }
 
+    b32 created_z_door = false;
+
     if(random_choice == 2) {
+
+      created_z_door = true;
 
       if(abs_tile_z == 0) {
         door_up = true;
@@ -522,10 +564,10 @@ func init_tile_map(Game *gp) {
         }
 
         if(tile_x == 10 && tile_y == 6) {
-          if(door_up) {
+          if(door_up && abs_tile_z < gp->world_chunks_z_count - 1) {
             tile_value = 3;
           }
-          if(door_down) {
+          if(door_down && abs_tile_z > 0) {
             tile_value = 4;
           }
         }
@@ -538,12 +580,9 @@ func init_tile_map(Game *gp) {
     door_bottom = door_top;
     door_left   = door_right;
 
-    if(door_up) {
-      door_down = true;
-      door_up   = false;
-    } else if(door_down) {
-      door_down = false;
-      door_up   = true;
+    if(created_z_door) {
+      door_down = !door_down;
+      door_up = !door_up;
     } else {
       door_down = false;
       door_up   = false;
@@ -606,6 +645,7 @@ func draw_tile_map(Game *gp) {
       Tile_map_pos cur_tile_map_pos = {0};
       cur_tile_map_pos.tile_x = (s32)camera_tile_map_pos.tile_x + col;
       cur_tile_map_pos.tile_y = (s32)camera_tile_map_pos.tile_y + row - 1;
+      cur_tile_map_pos.tile_z = (s32)camera_tile_map_pos.tile_z;
 
       u8 tile = tile_from_tile_map_pos(gp, cur_tile_map_pos);
 
@@ -620,16 +660,16 @@ func draw_tile_map(Game *gp) {
 
       Color color = tile_colors[tile];
 
-      #if 1
+      #if 0
       if(cur_tile_map_pos.tile_x % CHUNK_SIZE == 0 || cur_tile_map_pos.tile_y % CHUNK_SIZE == 0) {
-        color = alpha_blend(color, (Color){ 0.0f, 0.5f, 1.0f, 0.5f });
+        color = alpha_blend(color, (Color){ 0.0f, 0.5f, 1.0f, 0.3f });
       }
       #endif
 
       s32 tile_row = half_rows_to_draw + row;
       s32 tile_col = half_cols_to_draw + col;
       v2 tile_screen_point = { (f32)(tile_col) * TILE_SIZE_METERS, (f32)((tile_row)) * TILE_SIZE_METERS };
-      tile_screen_point = sub_v2(tile_screen_point, camera_tile_map_pos.tile_rel);
+      tile_screen_point = sub_v2(tile_screen_point, camera_tile_map_pos.offset);
       tile_screen_point = add_value_v2(tile_screen_point, TILE_SIZE_METERS*0.5);
       tile_screen_point = scale_v2(tile_screen_point, gp->pixels_per_meter);
       tile_screen_point.y = gp->render.height - tile_screen_point.y;
@@ -644,6 +684,18 @@ func draw_tile_map(Game *gp) {
         tile_screen_size.x,
         tile_screen_size.y
       );
+
+      #if 0
+      Color debug_line_color = { 0.0f, 1.0f, 0.0f, 0.3f };
+      draw_rect_lines(gp,
+        debug_line_color,
+        1.0f,
+        tile_screen_point.x,
+        tile_screen_point.y,
+        tile_screen_size.x,
+        tile_screen_size.y
+      );
+      #endif
 
     }
   }
@@ -732,14 +784,28 @@ func game_update_and_render(Game *gp) {
   { /* update world */
 
     Tile_map_pos new_pos = gp->player_pos;
-    new_pos.tile_rel = add_v2(new_pos.tile_rel, gp->player_vel);
+    new_pos.offset = add_v2(new_pos.offset, gp->player_vel);
     new_pos = recanonicalize_pos(gp, new_pos);
 
     { /* tile collisions */
 
-      // TODO jfd: correct tile collisions on chunk boundaries
-      if(tile_from_tile_map_pos(gp, new_pos) > 1) {
+      // TODO jfd 26/02/26: correct tile collisions on chunk boundaries
+
+      u8 new_tile_value = tile_from_tile_map_pos(gp, new_pos);
+      if(new_tile_value == 2) {
         new_pos = gp->player_pos;
+      } else if(new_tile_value == 3) {
+        if(!gp->player_changed_z) {
+          gp->player_changed_z = true;
+          new_pos.tile_z++;
+        }
+      } else if(new_tile_value == 4) {
+        if(!gp->player_changed_z) {
+          gp->player_changed_z = true;
+          new_pos.tile_z--;
+        }
+      } else {
+        gp->player_changed_z = false;
       }
 
     } /* tile collisions */
@@ -755,9 +821,9 @@ func game_update_and_render(Game *gp) {
 
     Tile_map_pos player_tile_map_pos = gp->player_pos;
 
-    v2 player_tile_rel = { player_tile_map_pos.tile_rel.x, player_tile_map_pos.tile_rel.y };
+    v2 player_offset = { player_tile_map_pos.offset.x, player_tile_map_pos.offset.y };
     v2 player_tile = { (f32)(player_tile_map_pos.tile_x & CHUNK_MASK), (f32)(player_tile_map_pos.tile_y & CHUNK_MASK) };
-    v2 player_pos = add_v2(player_tile_rel, scale_v2(player_tile, TILE_SIZE_METERS));
+    v2 player_pos = add_v2(player_offset, scale_v2(player_tile, TILE_SIZE_METERS));
 
     /* update_camera */
     gp->camera_pos = (v2){
@@ -775,7 +841,7 @@ func game_update_and_render(Game *gp) {
     {
       v2 tile_screen_point = { (f32)player_tile_col * TILE_SIZE_METERS, (f32)(player_tile_row) * TILE_SIZE_METERS };
       tile_screen_point = add_value_v2(tile_screen_point, 0.5f*TILE_SIZE_METERS);
-      tile_screen_point = sub_v2(tile_screen_point, gp->player_pos.tile_rel);
+      tile_screen_point = sub_v2(tile_screen_point, gp->player_pos.offset);
       tile_screen_point    = scale_v2(tile_screen_point, gp->pixels_per_meter);
       tile_screen_point.y = gp->render.height - tile_screen_point.y;
       v2 tile_screen_size  = scale_v2((v2){ TILE_SIZE_METERS, TILE_SIZE_METERS }, gp->pixels_per_meter);

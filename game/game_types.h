@@ -55,7 +55,7 @@ struct Tile_map_pos {
   u32 tile_x;
   u32 tile_y;
   u32 tile_z;
-  v2 tile_rel;
+  v2 offset;
 };
 
 typedef struct Game Game;
@@ -96,6 +96,8 @@ struct Game {
 
   f32 pixels_per_meter;
   f32 meters_per_pixel;
+
+  b8 player_changed_z;
 
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
