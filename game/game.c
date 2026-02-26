@@ -10,9 +10,21 @@
 #define TILE_KIND_MAX 6
 
 
+
 /////////////////////////////////
 // functions
 
+internal void
+func load_bmp(Game *gp, Str8 path) {
+  char *path_cstr = cstr_from_str8(gp->temp_arena, path);
+
+  Str8 data = platform_read_entire_file(gp->main_arena, path_cstr);
+  Bitmap_header *header = (Bitmap_header*)data.s;
+  u32 *pixels = data.s + header->bitmap_offset;
+
+  ASSERT(data.s);
+
+}
 
 internal u32
 func get_random(Game *gp) {
@@ -654,8 +666,8 @@ func draw_tile_map(Game *gp) {
         { 0.1f,  0.1f, 0.1f, 1 },
         { 0.8f,  0.8f, 0.8f, 1 },
         { 0.0f,  0.8f, 0.4f, 1 },
-        { 0.36f, 0.2f, 0.1f, 1 },
         { 0.96f, 1.0f, 0.0f, 1 },
+        { 0.36f, 0.2f, 0.1f, 1 },
       };
 
       Color color = tile_colors[tile];
@@ -940,6 +952,8 @@ func game_init(Platform *pp) {
   gp->pixels_per_meter = PIXELS_PER_METER;
 
   gp->did_reload = true;
+
+  load_bmp(gp, str8_lit("assets/guy.bmp"));
 
   init_player(gp);
 

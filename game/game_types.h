@@ -58,6 +58,22 @@ struct Tile_map_pos {
   v2 offset;
 };
 
+#pragma pack(push, 1)
+typedef struct Bitmap_header Bitmap_header;
+struct Bitmap_header {
+  u16 file_type;     /* File type, always 4D42h ("BM") */
+  u32 file_size;     /* Size of the file in bytes */
+  u16 reserved_1;    /* Always 0 */
+  u16 reserved_2;    /* Always 0 */
+  u32 bitmap_offset; /* Starting position of image data in bytes */
+  u32 size;            /* Size of this header in bytes */
+  s32 width;           /* Image width in pixels */
+  s32 height;          /* Image height in pixels */
+  u16 planes;          /* Number of color planes */
+  u16 bits_per_pixel;    /* Number of bits per pixel */
+};
+#pragma pack(pop)
+
 typedef struct Game Game;
 struct Game {
   f32 t;

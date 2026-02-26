@@ -29,6 +29,7 @@
 
 
 
+internal void load_bmp(Game *gp, Str8 path);
 
 internal u32 get_random(Game *gp);
 
