@@ -32,6 +32,7 @@ struct Game_input {
   b32 key_released[KBD_KEY_MAX];
   v2 mouse_pos;
   v2 mouse_delta;
+  v2 scroll_delta;
 };
 
 TYPEDEF_SLICE(Game_input);
@@ -43,13 +44,17 @@ struct Chunk {
 
 typedef struct Chunk_pos Chunk_pos;
 struct Chunk_pos {
-  v2_s32 chunk;
+  s32 chunk_x;
+  s32 chunk_y;
+  s32 chunk_z;
   v2_s32 tile;
 };
 
 typedef struct Tile_map_pos Tile_map_pos;
 struct Tile_map_pos {
-  v2_u32 tile;
+  u32 tile_x;
+  u32 tile_y;
+  u32 tile_z;
   v2 tile_rel;
 };
 
@@ -80,6 +85,7 @@ struct Game {
 
   u32 world_chunks_x_count;
   u32 world_chunks_y_count;
+  u32 world_chunks_z_count;
   Chunk *world_chunks;
   Chunk chunk;
 
@@ -87,6 +93,9 @@ struct Game {
   v2 camera_pos;
 
   s32 random_number_index;
+
+  f32 pixels_per_meter;
+  f32 meters_per_pixel;
 
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);

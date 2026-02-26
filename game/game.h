@@ -12,15 +12,17 @@
 #define CM(x) ((f32)(x) * 1.0e-2f)
 #define MM(x) ((f32)(x) * 1.0e-3f)
 
-#define CHUNK_SHIFT                    7
+#define CHUNK_SHIFT                    4
 #define CHUNK_SIZE                     (1 << CHUNK_SHIFT)
 #define CHUNK_MASK                     (CHUNK_SIZE - 1)
 #define TILE_SIZE_METERS               M(2.0f)
 #define CHUNK_SIZE_METERS             (TILE_SIZE_METERS*(f32)CHUNK_SIZE)
 
-#define PLAYER_MOVE_SPEED        (M(50)) /* meters per second */
+#define PLAYER_MOVE_SPEED        (M(40)) /* meters per second */
 
-#define PIXELS_PER_METER (3.0f)
+#define PIXELS_PER_METER (12.0f)
+#define MIN_PIXELS_PER_METER (PIXELS_PER_METER*0.1f)
+#define MAX_PIXELS_PER_METER (PIXELS_PER_METER*4.0f)
 #define METERS_PER_PIXEL (1.0f/PIXELS_PER_METER)
 #define METERS_TO_PIXELS(x) ((f32)((f32)(x)*PIXELS_PER_METER))
 #define PIXELS_TO_METERS(x) ((f32)((f32)(x)*METERS_PER_PIXEL))
@@ -64,17 +66,17 @@ internal Tile_map_pos recanonicalize_pos(Game *gp, Tile_map_pos pos);
 
 internal Chunk_pos chunk_pos_from_tile_map_pos(Game *gp, Tile_map_pos pos);
 
-internal Chunk_pos chunk_pos_from_abs_tile_pos(Game *gp, u32 abs_tile_x, u32 abs_tile_y);
+internal Chunk_pos chunk_pos_from_abs_tile_pos(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 abs_tile_z);
 
 internal Tile_map_pos tile_map_pos_from_point(Game *gp, f32 x, f32 y);
 
-force_inline Chunk* get_chunk(Game *gp, s32 chunk_x, s32 chunk_y);
+force_inline Chunk* get_chunk(Game *gp, s32 chunk_x, s32 chunk_y, s32 chunk_z);
 
 force_inline u8 get_tile_of_chunk(Game *gp, Chunk *chunk, s32 tile_x, s32 tile_y);
 
 force_inline u8 tile_from_tile_map_pos(Game *gp, Tile_map_pos pos);
 
-internal void set_tile(Game *gp, u32 tile_x, u32 tile_y, u8 tile_value);
+internal void set_tile(Game *gp, u32 tile_x, u32 tile_y, u32 tile_z, u8 tile_value);
 
 internal void init_player(Game *gp);
 

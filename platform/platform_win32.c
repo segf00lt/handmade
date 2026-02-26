@@ -586,6 +586,8 @@ func platform_win32_get_game_input_from_events(Platform_event_list *event_list, 
 
   memory_zero(input->key_released, sizeof(input->key_released));
 
+  input->scroll_delta = (v2){0};
+
   for(Platform_event *event = event_list->first; event; event = event->next) {
 
     switch(event->kind) {
@@ -630,6 +632,9 @@ func platform_win32_get_game_input_from_events(Platform_event_list *event_list, 
         input->mouse_pos = event->mouse_pos;
         input->mouse_delta.x = event->mouse_pos.x - input->mouse_pos.x;
         input->mouse_delta.y = event->mouse_pos.y - input->mouse_pos.y;
+      } break;
+      case EVENT_MOUSE_SCROLL: {
+        input->scroll_delta = event->scroll_delta;
       } break;
     }
   }
@@ -1368,100 +1373,98 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
   } /* init */
 
-  { /* main */
 
+  while(platform_is_running) {
 
-    while(platform_is_running) {
+    #ifdef HANDMADE_HOTRELOAD
+    if(platform_file_exists("game.dll")) {
+      platform_win32_unload_game_code();
+      platform_win32_load_game_code();
+      gp->did_reload = true;
+    }
+    #endif
 
-      #ifdef HANDMADE_HOTRELOAD
-      if(platform_file_exists("game.dll")) {
-        platform_win32_unload_game_code();
-        platform_win32_load_game_code();
-        gp->did_reload = true;
+    // NOTE jfd: get input messages
+    while(PeekMessageA(&message, window_handle, 0, 0, PM_REMOVE)) {
+      if(message.message == WM_QUIT) {
+        platform_is_running = false;
       }
-      #endif
+      TranslateMessage(&message); // NOTE jfd: has to do with keyboard messages
+      DispatchMessage(&message);
 
-      // NOTE jfd: get input messages
-      while(PeekMessageA(&message, window_handle, 0, 0, PM_REMOVE)) {
-        if(message.message == WM_QUIT) {
-          platform_is_running = false;
+    }
+
+    #ifdef HANDMADE_INTERNAL
+    if(debug_paused) {
+      continue;
+    }
+    #endif
+
+    // TODO jfd: Implement gamepad input
+    #if 0
+    { /* get gamepad input */
+
+      for(DWORD controller_index = 0; controller_index < XUSER_MAX_COUNT; controller_index++) {
+        XINPUT_STATE controller_state;
+        if(os_win32_xinput_get_state(controller_index, &controller_state) == ERROR_SUCCESS) {
+          // NOTE jfd: this controller is plugged in
+          XINPUT_GAMEPAD *gamepad = &controller_state.Gamepad;
+
+          b8 dpad_up    = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_UP);
+          b8 dpad_down  = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN);
+          b8 dpad_left  = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT);
+          b8 dpad_right = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT);
+
+          b8 start_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_START);
+          b8 back_button  = !!(gamepad->wButtons & XINPUT_GAMEPAD_BACK);
+
+          b8 left_thumb     = !!(gamepad->wButtons & XINPUT_GAMEPAD_LEFT_THUMB);
+          b8 right_thumb    = !!(gamepad->wButtons & XINPUT_GAMEPAD_RIGHT_THUMB);
+          b8 left_shoulder  = !!(gamepad->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER);
+          b8 right_shoulder = !!(gamepad->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER);
+
+          b8 a_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_A);
+          b8 b_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_B);
+          b8 x_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_X);
+          b8 y_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_Y);
+
+          s16 left_stick_x = gamepad->sThumbLX;
+          s16 left_stick_y = gamepad->sThumbLY;
+          s16 right_stick_x = gamepad->sThumbRX;
+          s16 right_stick_y = gamepad->sThumbRY;
+
+        } else {
+          // NOTE jfd: this controller is not available
         }
-        TranslateMessage(&message); // NOTE jfd: has to do with keyboard messages
-        DispatchMessage(&message);
-
       }
 
-      #ifdef HANDMADE_INTERNAL
-      if(debug_paused) {
-        continue;
-      }
-      #endif
+    } /* get gamepad input */
+    #endif
 
-      // TODO jfd: Implement gamepad input
-      #if 0
-      { /* get gamepad input */
+    platform_win32_get_game_input_from_events(platform_event_list, gp);
 
-        for(DWORD controller_index = 0; controller_index < XUSER_MAX_COUNT; controller_index++) {
-          XINPUT_STATE controller_state;
-          if(os_win32_xinput_get_state(controller_index, &controller_state) == ERROR_SUCCESS) {
-            // NOTE jfd: this controller is plugged in
-            XINPUT_GAMEPAD *gamepad = &controller_state.Gamepad;
+    #ifdef HANDMADE_HOTRELOAD
+    platform_win32_debug_run_loop_recorder(gp);
+    #endif
 
-            b8 dpad_up    = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_UP);
-            b8 dpad_down  = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN);
-            b8 dpad_left  = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT);
-            b8 dpad_right = !!(gamepad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT);
+    // TODO jfd: cleanup how we pass render data to and from the game
+    gp->t = platform_target_seconds_per_frame;
+    gp->render.pixels = global_backbuffer.bitmap_memory;
+    gp->render.width  = global_backbuffer.bitmap_width;
+    gp->render.height = global_backbuffer.bitmap_height;
+    gp->render.stride = global_backbuffer.stride;
 
-            b8 start_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_START);
-            b8 back_button  = !!(gamepad->wButtons & XINPUT_GAMEPAD_BACK);
+    game_update_and_render(gp);
 
-            b8 left_thumb     = !!(gamepad->wButtons & XINPUT_GAMEPAD_LEFT_THUMB);
-            b8 right_thumb    = !!(gamepad->wButtons & XINPUT_GAMEPAD_RIGHT_THUMB);
-            b8 left_shoulder  = !!(gamepad->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER);
-            b8 right_shoulder = !!(gamepad->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER);
+    // LARGE_INTEGER audio_wall_clock = platform_win32_get_wall_clock();
+    // f32 from_begin_to_audio_seconds = platform_win32_get_seconds_elapsed(flip_wall_clock, audio_wall_clock);
 
-            b8 a_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_A);
-            b8 b_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_B);
-            b8 x_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_X);
-            b8 y_button = !!(gamepad->wButtons & XINPUT_GAMEPAD_Y);
+    DWORD play_cursor;
+    DWORD write_cursor;
 
-            s16 left_stick_x = gamepad->sThumbLX;
-            s16 left_stick_y = gamepad->sThumbLY;
-            s16 right_stick_x = gamepad->sThumbRX;
-            s16 right_stick_y = gamepad->sThumbRY;
+    if(SUCCEEDED(platform_sound_buffer->lpVtbl->GetCurrentPosition(platform_sound_buffer, &play_cursor, &write_cursor))) {
 
-          } else {
-            // NOTE jfd: this controller is not available
-          }
-        }
-
-      } /* get gamepad input */
-      #endif
-
-      platform_win32_get_game_input_from_events(platform_event_list, gp);
-
-      #ifdef HANDMADE_HOTRELOAD
-      platform_win32_debug_run_loop_recorder(gp);
-      #endif
-
-      // TODO jfd: cleanup how we pass render data to and from the game
-      gp->t = platform_target_seconds_per_frame;
-      gp->render.pixels = global_backbuffer.bitmap_memory;
-      gp->render.width  = global_backbuffer.bitmap_width;
-      gp->render.height = global_backbuffer.bitmap_height;
-      gp->render.stride = global_backbuffer.stride;
-
-      game_update_and_render(gp);
-
-      // LARGE_INTEGER audio_wall_clock = platform_win32_get_wall_clock();
-      // f32 from_begin_to_audio_seconds = platform_win32_get_seconds_elapsed(flip_wall_clock, audio_wall_clock);
-
-      DWORD play_cursor;
-      DWORD write_cursor;
-
-      if(SUCCEEDED(platform_sound_buffer->lpVtbl->GetCurrentPosition(platform_sound_buffer, &play_cursor, &write_cursor))) {
-
-        /* NOTE jfd:
+      /* NOTE jfd:
            Here is how sound output computation works.
 
            We define a safety value that is the number of samples we think our game update loop
@@ -1479,169 +1482,166 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
            so we will write one frame's worth of audio plus the safety margin's worth of guard samples.
         */
 
-        if(!sound_is_valid) {
-          // NOTE jfd: On the first sound buffer write we need to set the running sample index for the sound
-          //           output to be the place where the sound card is letting us write to.
-          platform_sound_output->running_sample_index = write_cursor / platform_sound_output->bytes_per_sample;
-          sound_is_valid = true;
-        }
+      if(!sound_is_valid) {
+        // NOTE jfd: On the first sound buffer write we need to set the running sample index for the sound
+        //           output to be the place where the sound card is letting us write to.
+        platform_sound_output->running_sample_index = write_cursor / platform_sound_output->bytes_per_sample;
+        sound_is_valid = true;
+      }
 
-        DWORD byte_to_lock_at =
-        (platform_sound_output->running_sample_index * platform_sound_output->bytes_per_sample) % platform_sound_output->buffer_size;
+      DWORD byte_to_lock_at =
+      (platform_sound_output->running_sample_index * platform_sound_output->bytes_per_sample) % platform_sound_output->buffer_size;
 
-        DWORD expected_sound_bytes_per_frame =
-        (DWORD)((platform_sound_output->bytes_per_sample * platform_sound_output->samples_per_second) / (DWORD)game_update_hz);
+      DWORD expected_sound_bytes_per_frame =
+      (DWORD)((platform_sound_output->bytes_per_sample * platform_sound_output->samples_per_second) / (DWORD)game_update_hz);
 
-        // TODO jfd: find out what the heck casey used this for
-        // f32 seconds_left_until_flip = (target_seconds_per_frame - from_begin_to_audio_seconds);
-        // DWORD expected_bytes_until_flip =
-        // (DWORD)((seconds_left_until_flip/target_seconds_per_frame) * (f32)expected_sound_bytes_per_frame);
+      // TODO jfd: find out what the heck casey used this for
+      // f32 seconds_left_until_flip = (target_seconds_per_frame - from_begin_to_audio_seconds);
+      // DWORD expected_bytes_until_flip =
+      // (DWORD)((seconds_left_until_flip/target_seconds_per_frame) * (f32)expected_sound_bytes_per_frame);
 
-        DWORD expected_frame_boundary_byte = play_cursor + expected_sound_bytes_per_frame;
+      DWORD expected_frame_boundary_byte = play_cursor + expected_sound_bytes_per_frame;
 
-        DWORD safe_write_cursor = write_cursor;
-        if(safe_write_cursor < play_cursor) {
-          safe_write_cursor += platform_sound_output->buffer_size;
-        }
-        ASSERT(safe_write_cursor >= play_cursor);
-        safe_write_cursor += platform_sound_output->safety_bytes;
-        b32 audio_card_is_low_latency = (safe_write_cursor < expected_frame_boundary_byte);
+      DWORD safe_write_cursor = write_cursor;
+      if(safe_write_cursor < play_cursor) {
+        safe_write_cursor += platform_sound_output->buffer_size;
+      }
+      ASSERT(safe_write_cursor >= play_cursor);
+      safe_write_cursor += platform_sound_output->safety_bytes;
+      b32 audio_card_is_low_latency = (safe_write_cursor < expected_frame_boundary_byte);
 
-        DWORD target_cursor = 0;
-        if(audio_card_is_low_latency) {
-          target_cursor = expected_frame_boundary_byte + expected_sound_bytes_per_frame;
-        } else {
-          target_cursor = write_cursor + expected_sound_bytes_per_frame + platform_sound_output->safety_bytes;
-        }
-        target_cursor %= platform_sound_output->buffer_size;
-
-        DWORD bytes_to_write = 0;
-        if(byte_to_lock_at > target_cursor) {
-          bytes_to_write = (platform_sound_output->buffer_size - byte_to_lock_at);
-          bytes_to_write += target_cursor;
-        } else {
-          bytes_to_write = target_cursor - byte_to_lock_at;
-        }
-
-        // NOTE jfd: get sound samples from game
-        gp->sound = (Game_sound_buffer){0};
-        gp->sound.samples_per_second = platform_sound_output->samples_per_second;
-        gp->sound.sample_count = bytes_to_write / platform_sound_output->bytes_per_sample;
-        gp->sound.samples = samples;
-        game_get_sound_samples(gp);
-
-        #ifdef HANDMADE_AUDIO_LATENCY_DEBUG
-        Platform_win32_debug_time_marker *marker = &debug_time_markers.d[debug_time_marker_index];
-        marker->output_play_cursor = play_cursor;
-        marker->output_write_cursor = write_cursor;
-        marker->output_location = byte_to_lock_at;
-        marker->output_byte_count = bytes_to_write;
-        marker->expected_flip_cursor = expected_frame_boundary_byte;
-
-        DWORD debug_play_cursor;
-        DWORD debug_write_cursor;
-        platform_sound_buffer->lpVtbl->GetCurrentPosition(platform_sound_buffer, &debug_play_cursor, &debug_write_cursor);
-
-        // NOTE jfd: This value is the audio latency in bytes
-        if(debug_write_cursor < debug_play_cursor) {
-          audio_latency_bytes = debug_play_cursor - debug_write_cursor;
-        } else {
-          audio_latency_bytes = debug_write_cursor - debug_play_cursor;
-        }
-
-        audio_latency_seconds =
-        (((f32)audio_latency_bytes / (f32)platform_sound_output->bytes_per_sample) /
-          (f32)platform_sound_output->samples_per_second);
-
-        arena_clear(platform_temp_arena);
-        OutputDebugStringA(cstrf(platform_temp_arena,
-          "byte to lock at: %u   bytes to write: %u  -  play cursor: %u  write cursor: %u  audio latency bytes: %d  audio latency secs: %f\n",
-          byte_to_lock_at, bytes_to_write,
-          debug_play_cursor, debug_write_cursor,
-          audio_latency_bytes, audio_latency_seconds));
-
-        #endif
-
-        platform_win32_fill_sound_buffer(platform_sound_output, byte_to_lock_at, bytes_to_write, &gp->sound);
-
+      DWORD target_cursor = 0;
+      if(audio_card_is_low_latency) {
+        target_cursor = expected_frame_boundary_byte + expected_sound_bytes_per_frame;
       } else {
-        sound_is_valid = false;
+        target_cursor = write_cursor + expected_sound_bytes_per_frame + platform_sound_output->safety_bytes;
       }
+      target_cursor %= platform_sound_output->buffer_size;
 
-      LARGE_INTEGER work_counter = platform_win32_get_wall_clock();
-      f32 work_seconds_elapsed = platform_win32_get_seconds_elapsed(last_counter, work_counter);
-
-      f32 seconds_elapsed_for_frame = work_seconds_elapsed;
-      if(seconds_elapsed_for_frame > platform_target_seconds_per_frame) {
-        // TODO jfd: MISSED FRAME RATE!!!!!
-        // TODO jfd: logging
+      DWORD bytes_to_write = 0;
+      if(byte_to_lock_at > target_cursor) {
+        bytes_to_write = (platform_sound_output->buffer_size - byte_to_lock_at);
+        bytes_to_write += target_cursor;
       } else {
-        while(seconds_elapsed_for_frame < platform_target_seconds_per_frame) {
-          if(sleep_is_granular) {
-            DWORD sleep_for_ms = (DWORD)(1000.0f * (platform_target_seconds_per_frame - seconds_elapsed_for_frame));
-            platform_sleep_ms(sleep_for_ms);
-          }
-          LARGE_INTEGER check_counter = platform_win32_get_wall_clock();
-          seconds_elapsed_for_frame = platform_win32_get_seconds_elapsed(last_counter, check_counter);
-        }
+        bytes_to_write = target_cursor - byte_to_lock_at;
       }
 
-      // NOTE jfd: blit to screen
-      HDC device_context = {0};
-      defer_loop(device_context = GetDC(window_handle), ReleaseDC(window_handle, device_context)) {
-        Platform_win32_window_dimensions window_dimensions = platform_win32_get_window_dimensions(window_handle);
+      // NOTE jfd: get sound samples from game
+      gp->sound = (Game_sound_buffer){0};
+      gp->sound.samples_per_second = platform_sound_output->samples_per_second;
+      gp->sound.sample_count = bytes_to_write / platform_sound_output->bytes_per_sample;
+      gp->sound.samples = samples;
+      game_get_sound_samples(gp);
 
-        #ifdef HANDMADE_DEBUG_SOUND
-        platform_win32_debug_audio_sync_display(&global_backbuffer, platform_sound_output, debug_time_markers, debug_time_marker_index - 1, platform_target_seconds_per_frame);
-        #endif
+      #ifdef HANDMADE_AUDIO_LATENCY_DEBUG
+      Platform_win32_debug_time_marker *marker = &debug_time_markers.d[debug_time_marker_index];
+      marker->output_play_cursor = play_cursor;
+      marker->output_write_cursor = write_cursor;
+      marker->output_location = byte_to_lock_at;
+      marker->output_byte_count = bytes_to_write;
+      marker->expected_flip_cursor = expected_frame_boundary_byte;
 
-        platform_win32_display_buffer_in_window(&global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, 0, 0, window_dimensions.width, window_dimensions.height);
-        flip_wall_clock = platform_win32_get_wall_clock();
-      }
-
-      #ifdef HANDMADE_INTERNAL
       DWORD debug_play_cursor;
       DWORD debug_write_cursor;
-      if(SUCCEEDED(platform_sound_buffer->lpVtbl->GetCurrentPosition(platform_sound_buffer, &debug_play_cursor, &debug_write_cursor))) {
-        ASSERT(debug_time_marker_index < debug_time_markers.count);
-        Platform_win32_debug_time_marker *marker = &debug_time_markers.d[debug_time_marker_index++];
+      platform_sound_buffer->lpVtbl->GetCurrentPosition(platform_sound_buffer, &debug_play_cursor, &debug_write_cursor);
 
-        if(debug_time_marker_index >= debug_time_markers.count) {
-          debug_time_marker_index = 0;
-        }
-        platform_sound_buffer->lpVtbl->GetCurrentPosition(platform_sound_buffer, &marker->flip_play_cursor, &marker->flip_write_cursor);
+      // NOTE jfd: This value is the audio latency in bytes
+      if(debug_write_cursor < debug_play_cursor) {
+        audio_latency_bytes = debug_play_cursor - debug_write_cursor;
+      } else {
+        audio_latency_bytes = debug_write_cursor - debug_play_cursor;
       }
-      #endif
 
-      LARGE_INTEGER end_counter = platform_win32_get_wall_clock();
+      audio_latency_seconds =
+      (((f32)audio_latency_bytes / (f32)platform_sound_output->bytes_per_sample) /
+        (f32)platform_sound_output->samples_per_second);
 
-      #ifdef HANDMADE_PROFILE
-      s64 end_cycle_count = __rdtsc();
-      s64 elapsed_cycles = end_cycle_count - last_cycle_count;
-      last_cycle_count = end_cycle_count;
-
-      f32 elapsed_time = platform_win32_get_seconds_elapsed(last_counter, end_counter);
-      f32 ms_per_frame = THOUSAND(elapsed_time);
-      f32 fps = 1.0f / elapsed_time;
-
-      OutputDebugStringA(
-        cstrf(platform_temp_arena,
-          "frame time (ms):  %f    fps:  %f    mega cycles: %d\n",
-          ms_per_frame, fps, elapsed_cycles / MILLION(1))
-      );
       arena_clear(platform_temp_arena);
+      OutputDebugStringA(cstrf(platform_temp_arena,
+        "byte to lock at: %u   bytes to write: %u  -  play cursor: %u  write cursor: %u  audio latency bytes: %d  audio latency secs: %f\n",
+        byte_to_lock_at, bytes_to_write,
+        debug_play_cursor, debug_write_cursor,
+        audio_latency_bytes, audio_latency_seconds));
+
       #endif
 
-      last_counter = end_counter;
+      platform_win32_fill_sound_buffer(platform_sound_output, byte_to_lock_at, bytes_to_write, &gp->sound);
 
+    } else {
+      sound_is_valid = false;
     }
 
-    #ifdef HANDMADE_HOTRELOAD
-    platform_win32_debug_shutdown_loop_recorder();
+    LARGE_INTEGER work_counter = platform_win32_get_wall_clock();
+    f32 work_seconds_elapsed = platform_win32_get_seconds_elapsed(last_counter, work_counter);
+
+    f32 seconds_elapsed_for_frame = work_seconds_elapsed;
+    if(seconds_elapsed_for_frame > platform_target_seconds_per_frame) {
+      // TODO jfd: MISSED FRAME RATE!!!!!
+      // TODO jfd: logging
+    } else {
+      while(seconds_elapsed_for_frame < platform_target_seconds_per_frame) {
+        if(sleep_is_granular) {
+          DWORD sleep_for_ms = (DWORD)(1000.0f * (platform_target_seconds_per_frame - seconds_elapsed_for_frame));
+          platform_sleep_ms(sleep_for_ms);
+        }
+        LARGE_INTEGER check_counter = platform_win32_get_wall_clock();
+        seconds_elapsed_for_frame = platform_win32_get_seconds_elapsed(last_counter, check_counter);
+      }
+    }
+
+    // NOTE jfd: blit to screen
+    HDC device_context = {0};
+    defer_loop(device_context = GetDC(window_handle), ReleaseDC(window_handle, device_context)) {
+      Platform_win32_window_dimensions window_dimensions = platform_win32_get_window_dimensions(window_handle);
+
+      #ifdef HANDMADE_DEBUG_SOUND
+      platform_win32_debug_audio_sync_display(&global_backbuffer, platform_sound_output, debug_time_markers, debug_time_marker_index - 1, platform_target_seconds_per_frame);
+      #endif
+
+      platform_win32_display_buffer_in_window(&global_backbuffer, device_context, window_dimensions.width, window_dimensions.height, 0, 0, window_dimensions.width, window_dimensions.height);
+      flip_wall_clock = platform_win32_get_wall_clock();
+    }
+
+    #ifdef HANDMADE_INTERNAL
+    DWORD debug_play_cursor;
+    DWORD debug_write_cursor;
+    if(SUCCEEDED(platform_sound_buffer->lpVtbl->GetCurrentPosition(platform_sound_buffer, &debug_play_cursor, &debug_write_cursor))) {
+      ASSERT(debug_time_marker_index < debug_time_markers.count);
+      Platform_win32_debug_time_marker *marker = &debug_time_markers.d[debug_time_marker_index++];
+
+      if(debug_time_marker_index >= debug_time_markers.count) {
+        debug_time_marker_index = 0;
+      }
+      platform_sound_buffer->lpVtbl->GetCurrentPosition(platform_sound_buffer, &marker->flip_play_cursor, &marker->flip_write_cursor);
+    }
     #endif
 
+    LARGE_INTEGER end_counter = platform_win32_get_wall_clock();
 
-  } /* main */
+    #ifdef HANDMADE_PROFILE
+    s64 end_cycle_count = __rdtsc();
+    s64 elapsed_cycles = end_cycle_count - last_cycle_count;
+    last_cycle_count = end_cycle_count;
+
+    f32 elapsed_time = platform_win32_get_seconds_elapsed(last_counter, end_counter);
+    f32 ms_per_frame = THOUSAND(elapsed_time);
+    f32 fps = 1.0f / elapsed_time;
+
+    OutputDebugStringA(
+      cstrf(platform_temp_arena,
+        "frame time (ms):  %f    fps:  %f    mega cycles: %d\n",
+        ms_per_frame, fps, elapsed_cycles / MILLION(1))
+    );
+    arena_clear(platform_temp_arena);
+    #endif
+
+    last_counter = end_counter;
+
+  }
+
+  #ifdef HANDMADE_HOTRELOAD
+  platform_win32_debug_shutdown_loop_recorder();
+  #endif
 
   return 0;
 }
