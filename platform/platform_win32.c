@@ -1288,8 +1288,6 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
     platform_win32_load_game_code();
     #endif
 
-    gp = game_init(&platform);
-
 
     if(RegisterClass(&window_class)) {
       window_handle =
@@ -1341,7 +1339,8 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
         samples = (s16*)push_array_no_zero(platform_main_arena, u8, platform_sound_output->buffer_size);
 
         platform_is_running = true;
-        gp->did_reload = true;
+
+        gp = game_init(&platform);
 
         #ifdef HANDMADE_HOTRELOAD
         platform_win32_debug_setup_loop_recorder();

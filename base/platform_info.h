@@ -12,11 +12,11 @@
 # define COMPILER_CLANG 1
 
 # if defined(_WIN32)
-#  define OS_WINDOWS 1
+#  define PLATFORM_WINDOWS 1
 # elif defined(__gnu_linux__) || defined(__linux__)
-#  define OS_LINUX 1
+#  define PLATFORM_LINUX 1
 # elif defined(__APPLE__) && defined(__MACH__)
-#  define OS_MAC 1
+#  define PLATFORM_MAC 1
 # else
 #  error This compiler/OS combo is not supported.
 # endif
@@ -61,7 +61,7 @@
 # endif
 
 # if defined(_WIN32)
-#  define OS_WINDOWS 1
+#  define PLATFORM_WINDOWS 1
 # else
 #  error This compiler/OS combo is not supported.
 # endif
@@ -86,7 +86,7 @@
 # define COMPILER_GCC 1
 
 # if defined(__gnu_linux__) || defined(__linux__)
-#  define OS_LINUX 1
+#  define PLATFORM_LINUX 1
 # else
 #  error This compiler/OS combo is not supported.
 # endif
@@ -218,14 +218,14 @@
 #if !defined(COMPILER_CLANG)
 # define COMPILER_CLANG 0
 #endif
-#if !defined(OS_WINDOWS)
-# define OS_WINDOWS 0
+#if !defined(PLATFORM_WINDOWS)
+# define PLATFORM_WINDOWS 0
 #endif
-#if !defined(OS_LINUX)
-# define OS_LINUX 0
+#if !defined(PLATFORM_LINUX)
+# define PLATFORM_LINUX 0
 #endif
-#if !defined(OS_MAC)
-# define OS_MAC 0
+#if !defined(PLATFORM_MAC)
+# define PLATFORM_MAC 0
 #endif
 #if !defined(LANG_CPP)
 # define LANG_CPP 0
@@ -244,7 +244,7 @@
 # error You tried to build with an unsupported architecture. Currently, only building in x64 mode is supported.
 #endif
 
-#if OS_WINDOWS
+#if PLATFORM_WINDOWS
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 

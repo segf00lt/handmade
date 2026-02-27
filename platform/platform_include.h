@@ -5,19 +5,19 @@
 #include "platform.h"
 
 
-#if OS_WINDOWS
+#if PLATFORM_WINDOWS
 
 #include "platform_win32.h"
 
-#elif OS_LINUX
+#elif PLATFORM_LINUX
 
 #include "platform_linux.h"
 
-#elif OS_MAC
+#elif PLATFORM_MAC
 
 #include "platform_macos.h"
 
-#elif OS_WEB
+#elif PLATFORM_WEB
 
 #error unsupported platform
 

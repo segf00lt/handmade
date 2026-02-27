@@ -49,40 +49,40 @@ struct Platform {
 
 #if defined(PLATFORM_CORE_EXPORT)
 
-#if OS_WINDOWS
-#define PLATFORM_CORE_API __declspec(dllexport)
+#if PLATFORM_WINDOWS
+#define platform_core_api __declspec(dllexport)
 #endif
 
 #elif defined(PLATFORM_CORE_IMPORT)
 
-#if OS_WINDOWS
-#define PLATFORM_CORE_API __declspec(dllimport)
+#if PLATFORM_WINDOWS
+#define platform_core_api __declspec(dllimport)
 #endif
 
 #else
-#define PLATFORM_CORE_API internal
+#define platform_core_api internal
 #endif
 
 
-PLATFORM_CORE_API    Keyboard_modifier platform_get_keyboard_modifiers(void);
+platform_core_api    Keyboard_modifier platform_get_keyboard_modifiers(void);
 
-PLATFORM_CORE_API    void*             platform_alloc(u64 bytes);
-PLATFORM_CORE_API    void              platform_free(void *ptr);
-PLATFORM_CORE_API    Str8              platform_read_entire_file(Arena *a, char *path);
-PLATFORM_CORE_API    b32               platform_write_entire_file(Str8 data, char *path);
-PLATFORM_CORE_API    b32               platform_file_exists(char *path);
-PLATFORM_CORE_API    b32               platform_make_dir(char *dir_path);
-PLATFORM_CORE_API    Str8              platform_get_current_dir(Arena *a);
-PLATFORM_CORE_API    b32               platform_set_current_dir(char *dir_path);
-PLATFORM_CORE_API    b32               platform_move_file(char *old_path, char *new_path);
-PLATFORM_CORE_API    b32               platform_remove_file(char *path);
-PLATFORM_CORE_API    Str8              platform_file_name_from_path(Str8 path);
+platform_core_api    void*             platform_alloc(u64 bytes);
+platform_core_api    void              platform_free(void *ptr);
+platform_core_api    Str8              platform_read_entire_file(Arena *a, char *path);
+platform_core_api    b32               platform_write_entire_file(Str8 data, char *path);
+platform_core_api    b32               platform_file_exists(char *path);
+platform_core_api    b32               platform_make_dir(char *dir_path);
+platform_core_api    Str8              platform_get_current_dir(Arena *a);
+platform_core_api    b32               platform_set_current_dir(char *dir_path);
+platform_core_api    b32               platform_move_file(char *old_path, char *new_path);
+platform_core_api    b32               platform_remove_file(char *path);
+platform_core_api    Str8              platform_file_name_from_path(Str8 path);
 
-PLATFORM_CORE_API    void              platform_sleep_ms(u32 ms);
+platform_core_api    void              platform_sleep_ms(u32 ms);
 
-PLATFORM_CORE_API    void*             platform_library_load(char *path);
-PLATFORM_CORE_API    void              platform_library_unload(void *lib);
-PLATFORM_CORE_API    Void_func*        platform_library_load_function(void *lib, char *name);
+platform_core_api    void*             platform_library_load(char *path);
+platform_core_api    void              platform_library_unload(void *lib);
+platform_core_api    Void_func*        platform_library_load_function(void *lib, char *name);
 
 
 

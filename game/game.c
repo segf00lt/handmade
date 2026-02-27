@@ -426,24 +426,24 @@ func chunk_pos_from_point(Game *gp, v2 v) {
 }
 
 internal void
-func recanonicalize_coord(Game *gp, u32 *tile, f32 *offset) {
+func recanonicalize_coord(Game *gp, u32 *tile, f32 *tile_offset) {
   // NOTE jfd: casey made the tiles be drawn from their center, but that doesn't really change anything for us
-  // s32 carry = (s32)floor_f32(*offset * (1.0f/TILE_SIZE_METERS));
-  s32 carry = (s32)round_f32(*offset * (1.0f/TILE_SIZE_METERS));
+  // s32 carry = (s32)floor_f32(*tile_offset * (1.0f/TILE_SIZE_METERS));
+  s32 carry = (s32)round_f32(*tile_offset * (1.0f/TILE_SIZE_METERS));
   *tile += carry;
-  *offset -= (f32)carry * TILE_SIZE_METERS;
-  // ASSERT(*offset >= 0.0f);
-  // ASSERT(*offset <= TILE_SIZE_METERS);
-  ASSERT(*offset >= -0.5f*TILE_SIZE_METERS);
-  ASSERT(*offset <= 0.5f*TILE_SIZE_METERS);
+  *tile_offset -= (f32)carry * TILE_SIZE_METERS;
+  // ASSERT(*tile_offset >= 0.0f);
+  // ASSERT(*tile_offset <= TILE_SIZE_METERS);
+  ASSERT(*tile_offset >= -0.5f*TILE_SIZE_METERS);
+  ASSERT(*tile_offset <= 0.5f*TILE_SIZE_METERS);
 }
 
 internal Tile_map_pos
 func recanonicalize_pos(Game *gp, Tile_map_pos pos) {
   Tile_map_pos result = pos;
 
-  recanonicalize_coord(gp, &result.tile_x, &result.offset.x);
-  recanonicalize_coord(gp, &result.tile_y, &result.offset.y);
+  recanonicalize_coord(gp, &result.tile_x, &result.tile_offset.x);
+  recanonicalize_coord(gp, &result.tile_y, &result.tile_offset.y);
 
   return result;
 }
@@ -481,9 +481,9 @@ func tile_map_pos_from_point(Game *gp, f32 x, f32 y) {
 
   v2 tile = truncate_v2(scale_v2(v, 1.0f/TILE_SIZE_METERS));
 
-  v2 offset = sub_v2(v, scale_v2(tile, TILE_SIZE_METERS));
+  v2 tile_offset = sub_v2(v, scale_v2(tile, TILE_SIZE_METERS));
 
-  result.offset = offset;
+  result.tile_offset = tile_offset;
 
   result.tile_x = (u32)tile.x;
   result.tile_y = (u32)tile.y;
@@ -563,8 +563,8 @@ func set_tile_from_abs_tile_pos(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 ab
 internal void
 func init_player(Game *gp) {
   gp->player_pos = tile_map_pos_from_point(gp, 4, 2);
-  gp->player_width = CM(150);
-  gp->player_height = CM(150);
+  gp->player_width = CM(200);
+  gp->player_height = CM(400);
 }
 
 internal void
@@ -684,44 +684,16 @@ func init_tile_map(Game *gp) {
 
 }
 
-
-internal void
-func draw_tile_by_point(Game *gp, Color color, v2 point) {
-  Tile_map_pos tile_map_pos = tile_map_pos_from_point(gp, point.x, point.y);
-
-  int tile_col = tile_map_pos.tile_x;
-  int tile_row = tile_map_pos.tile_y;
-
-  v2 tile_screen_point = { (f32)tile_col * TILE_SIZE_METERS, (f32)(tile_row & CHUNK_MASK) * TILE_SIZE_METERS };
-  tile_screen_point = sub_v2(tile_screen_point, gp->camera_pos);
-  tile_screen_point    = scale_v2(tile_screen_point, gp->pixels_per_meter);
-  tile_screen_point.y = gp->render.height - tile_screen_point.y - TILE_SIZE_METERS*gp->pixels_per_meter;
-  v2 tile_screen_size  = scale_v2((v2){ TILE_SIZE_METERS, TILE_SIZE_METERS }, gp->pixels_per_meter);
-  draw_rect(gp,
-    color,
-    tile_screen_point.x,
-    tile_screen_point.y,
-    tile_screen_size.x,
-    tile_screen_size.y
-  );
-}
-
 internal void
 func draw_tile_map(Game *gp) {
 
-  // Tile_map_pos camera_tile_map_pos = tile_map_pos_from_point(gp, gp->camera_pos.x, gp->camera_pos.y);
-
-  Tile_map_pos camera_tile_map_pos = gp->player_pos;
+  Tile_map_pos camera_tile_map_pos = gp->camera_pos;
 
   s32 rows_to_draw = (s32)(((f32)gp->render.height*gp->meters_per_pixel) / TILE_SIZE_METERS);
   s32 cols_to_draw = (s32)(((f32)gp->render.width*gp->meters_per_pixel)  / TILE_SIZE_METERS);
 
-  s32 half_rows_to_draw = rows_to_draw >> 1;
-  s32 half_cols_to_draw = cols_to_draw >> 1;
-
-
-  for(int row = -half_rows_to_draw - 2; row <= half_rows_to_draw+2; row++) {
-    for(int col = -half_cols_to_draw - 2; col <= half_cols_to_draw+2; col++) {
+  for(int row = -2; row <= rows_to_draw+2; row++) {
+    for(int col = -2; col <= cols_to_draw+2; col++) {
 
       Tile_map_pos cur_tile_map_pos = {0};
       cur_tile_map_pos.tile_x = (s32)camera_tile_map_pos.tile_x + col;
@@ -742,16 +714,23 @@ func draw_tile_map(Game *gp) {
       Color color = tile_colors[tile];
 
       #if 0
+      if(gp->player_pos.tile_x == cur_tile_map_pos.tile_x && gp->player_pos.tile_y == cur_tile_map_pos.tile_y) {
+        color = (Color){ 1.0f, 0, 0, 1 };
+      }
+      #endif
+
+      #if 0
       if(cur_tile_map_pos.tile_x % CHUNK_SIZE == 0 || cur_tile_map_pos.tile_y % CHUNK_SIZE == 0) {
         color = alpha_blend(color, (Color){ 0.0f, 0.5f, 1.0f, 0.3f });
       }
       #endif
 
-      s32 tile_row = half_rows_to_draw + row;
-      s32 tile_col = half_cols_to_draw + col;
+      s32 tile_row =  row;
+      s32 tile_col = col;
+
       v2 tile_screen_point = { (f32)(tile_col) * TILE_SIZE_METERS, (f32)((tile_row)) * TILE_SIZE_METERS };
-      tile_screen_point = sub_v2(tile_screen_point, camera_tile_map_pos.offset);
-      tile_screen_point = add_value_v2(tile_screen_point, TILE_SIZE_METERS*0.5);
+      tile_screen_point = sub_v2(tile_screen_point, camera_tile_map_pos.tile_offset);
+      tile_screen_point = add_value_v2(tile_screen_point, -TILE_SIZE_METERS*0.5);
       tile_screen_point = scale_v2(tile_screen_point, gp->pixels_per_meter);
       tile_screen_point.y = gp->render.height - tile_screen_point.y;
 
@@ -788,8 +767,6 @@ func game_update_and_render(Game *gp) {
 
   if(gp->did_reload) {
     gp->did_reload = false;
-
-
     gp->once = false;
 
   }
@@ -839,7 +816,7 @@ func game_update_and_render(Game *gp) {
     f32 scaled_player_speed = player_speed * gp->t;
 
     if(is_key_pressed(gp, KBD_KEY_LEFT_SHIFT)) {
-      scaled_player_speed *= 0.2f;
+      scaled_player_speed *= 0.1f;
     }
 
     gp->player_vel = (v2){0};
@@ -865,7 +842,7 @@ func game_update_and_render(Game *gp) {
   { /* update world */
 
     Tile_map_pos new_pos = gp->player_pos;
-    new_pos.offset = add_v2(new_pos.offset, gp->player_vel);
+    new_pos.tile_offset = add_v2(new_pos.tile_offset, gp->player_vel);
     new_pos = recanonicalize_pos(gp, new_pos);
 
     { /* tile collisions */
@@ -900,52 +877,37 @@ func game_update_and_render(Game *gp) {
 
   { /* draw */
 
+    gp->camera_offset = (Tile_map_pos){
+      .tile_x = (u32)( (0.5f*gp->meters_per_pixel*(f32)gp->render.width)  / TILE_SIZE_METERS),
+      .tile_y = (u32)( (0.5f*gp->meters_per_pixel*(f32)gp->render.height) / TILE_SIZE_METERS),
+      .tile_z = 0,
+      .tile_offset = { 0.5f, 0.5f },
+    };
+
     Tile_map_pos player_tile_map_pos = gp->player_pos;
 
-    v2 player_offset = { player_tile_map_pos.offset.x, player_tile_map_pos.offset.y };
-    v2 player_tile = { (f32)(player_tile_map_pos.tile_x & CHUNK_MASK), (f32)(player_tile_map_pos.tile_y & CHUNK_MASK) };
-    v2 player_pos = add_v2(player_offset, scale_v2(player_tile, TILE_SIZE_METERS));
+    v2 player_tile_offset = { player_tile_map_pos.tile_offset.x, player_tile_map_pos.tile_offset.y };
+    v2 player_tile = { (f32)((s32)player_tile_map_pos.tile_x), (f32)((s32)player_tile_map_pos.tile_y) };
+    v2 player_pos = add_v2(player_tile_offset, scale_v2(player_tile, TILE_SIZE_METERS));
 
     /* update_camera */
-    gp->camera_pos = (v2){
-      player_pos.x - ((f32)gp->render.width)*gp->meters_per_pixel*0.5f,
-      player_pos.y - ((f32)gp->render.height)*gp->meters_per_pixel*0.5f,
-    };
+
+    gp->camera_pos = player_tile_map_pos;
+
+    gp->camera_pos.tile_x -= gp->camera_offset.tile_x;
+    gp->camera_pos.tile_y -= gp->camera_offset.tile_y;
+    gp->camera_pos.tile_offset = sub_v2(gp->camera_pos.tile_offset, gp->camera_offset.tile_offset);
+
+    v2 camera_tile_offset = { gp->camera_pos.tile_offset.x, gp->camera_pos.tile_offset.y };
+    v2 camera_tile = { (f32)((s32)gp->camera_pos.tile_x), (f32)((s32)gp->camera_pos.tile_y) };
+    v2 camera_pos  = add_v2(camera_tile_offset, scale_v2(camera_tile, TILE_SIZE_METERS));
+
 
     clear_screen(gp);
 
-
     draw_tile_map(gp);
 
-    // TODO jfd: make tile rendering consistet with draw_tile_map()
-    #if 0
-    {
-      v2 tile_screen_point = { (f32)player_tile_col * TILE_SIZE_METERS, (f32)(player_tile_row) * TILE_SIZE_METERS };
-      tile_screen_point = add_value_v2(tile_screen_point, 0.5f*TILE_SIZE_METERS);
-      tile_screen_point = sub_v2(tile_screen_point, gp->player_pos.offset);
-      tile_screen_point    = scale_v2(tile_screen_point, gp->pixels_per_meter);
-      tile_screen_point.y = gp->render.height - tile_screen_point.y;
-      v2 tile_screen_size  = scale_v2((v2){ TILE_SIZE_METERS, TILE_SIZE_METERS }, gp->pixels_per_meter);
-      draw_rect_lines(gp,
-        (Color){ 0, 0.4f, 0.9f, 1 },
-        2.0f,
-        tile_screen_point.x,
-        tile_screen_point.y,
-        tile_screen_size.x,
-        tile_screen_size.y
-      );
-    }
-    #endif
-
-    #if 0
-    {
-      Color color = { 0.6f, 0.0f, 1.0f, 1 };
-      draw_tile_by_point(gp, color, player_pos);
-    }
-    #endif
-
-    v2 player_screen_pos = scale_v2(sub_v2(add_value_v2(player_pos, 0.5f*TILE_SIZE_METERS), gp->camera_pos), gp->pixels_per_meter);
-    // v2 player_screen_pos = scale_v2(sub_v2(player_pos, gp->camera_pos), gp->pixels_per_meter);
+    v2 player_screen_pos = scale_v2(sub_v2(player_pos, camera_pos), gp->pixels_per_meter);
     player_screen_pos.y = gp->render.height - player_screen_pos.y;
 
     v2 player_rect_screen_size        = scale_v2((v2){ gp->player_width, gp->player_height }, gp->pixels_per_meter);
@@ -960,6 +922,7 @@ func game_update_and_render(Game *gp) {
       draw_bitmap(gp, gp->player_bitmap, player_bitmap_x, player_bitmap_y);
     }
 
+    #if 0
     draw_rect(gp,
       (Color){ 0.95f, 0.2f, 0.4f, 0.5f },
       player_rect_screen_pos.x,
@@ -975,6 +938,30 @@ func game_update_and_render(Game *gp) {
       player_center_rect_screen_size.x,
       player_center_rect_screen_size.y
     );
+    #endif
+
+    #if 0
+    {
+      Color color = { 1.0f, 0, 0, 1 };
+
+      draw_rect(gp,
+        color,
+        0.5f*(f32)gp->render.width,
+        0,
+        1,
+        (f32)gp->render.height
+      );
+
+      draw_rect(gp,
+        color,
+        0,
+        0.5f*(f32)gp->render.height,
+        (f32)gp->render.width,
+        1
+      );
+
+    }
+    #endif
 
   } /* draw */
 

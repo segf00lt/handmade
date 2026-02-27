@@ -55,7 +55,7 @@ struct Tile_map_pos {
   u32 tile_x;
   u32 tile_y;
   u32 tile_z;
-  v2 offset;
+  v2 tile_offset;
 };
 
 typedef struct Bitmap Bitmap;
@@ -109,6 +109,9 @@ struct Game {
   f32       player_height;
   v2        player_vel;
 
+  Tile_map_pos camera_pos;
+  Tile_map_pos camera_offset;
+
   b8 once;
   b8 should_init_player;
 
@@ -118,8 +121,6 @@ struct Game {
   Chunk *world_chunks;
   Chunk chunk;
 
-  v2 camera_offset;
-  v2 camera_pos;
 
   s32 random_number_index;
 

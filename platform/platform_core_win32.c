@@ -1,20 +1,20 @@
 #ifndef PLATFORM_CORE_WIN32_C
 #define PLATFORM_CORE_WIN32_C
 
-PLATFORM_CORE_API void*
+platform_core_api void*
 func platform_alloc(u64 bytes) {
   void *ptr = VirtualAlloc(0, bytes, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
   ASSERT(ptr);
   return ptr;
 }
 
-PLATFORM_CORE_API void
+platform_core_api void
 func platform_free(void *ptr) {
   ASSERT(ptr);
   VirtualFree(ptr, 0, MEM_RELEASE);
 }
 
-PLATFORM_CORE_API void*
+platform_core_api void*
 func platform_library_load(char *path) {
   void *result = 0;
   HMODULE module = LoadLibraryA(path);
@@ -23,13 +23,13 @@ func platform_library_load(char *path) {
   return result;
 }
 
-PLATFORM_CORE_API void
+platform_core_api void
 func platform_library_unload(void *lib) {
   ASSERT(lib);
   FreeLibrary((HMODULE)lib);
 }
 
-PLATFORM_CORE_API Void_func*
+platform_core_api Void_func*
 func platform_library_load_function(void *lib, char *name) {
   ASSERT(lib); // TODO jfd 23/02/26: these asserts need to be something more robust for shipping
   Void_func *result = (Void_func*)GetProcAddress((HMODULE)lib, name);
@@ -37,14 +37,14 @@ func platform_library_load_function(void *lib, char *name) {
   return result;
 }
 
-PLATFORM_CORE_API b32
+platform_core_api b32
 func platform_file_exists(char *path) {
   DWORD attrs = GetFileAttributesA(path);
   b32 result = (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY));
   return result;
 }
 
-PLATFORM_CORE_API Str8
+platform_core_api Str8
 func platform_get_current_dir(Arena *a) {
   DWORD buf_size = GetCurrentDirectory(0, NULL);
   ASSERT(buf_size > 0);
@@ -57,7 +57,7 @@ func platform_get_current_dir(Arena *a) {
   return result;
 }
 
-PLATFORM_CORE_API b32
+platform_core_api b32
 func platform_set_current_dir(char *dir_path) {
   b32 result = 0;
 
@@ -66,7 +66,7 @@ func platform_set_current_dir(char *dir_path) {
   return result;
 }
 
-PLATFORM_CORE_API b32
+platform_core_api b32
 func platform_move_file(char *old_path, char *new_path) {
   b32 result = 0;
 
@@ -75,21 +75,21 @@ func platform_move_file(char *old_path, char *new_path) {
   return result;
 }
 
-PLATFORM_CORE_API b32
+platform_core_api b32
 func platform_remove_file(char *path) {
   b32 result = !!(DeleteFileA(path));
 
   return result;
 }
 
-PLATFORM_CORE_API b32
+platform_core_api b32
 func platform_make_dir(char *dir_path) {
   b32 result = CreateDirectoryA(dir_path, 0);
   return result;
 }
 
 
-PLATFORM_CORE_API Str8
+platform_core_api Str8
 func platform_read_entire_file(Arena *arena, char *path) {
   Str8 data;
 
@@ -153,7 +153,7 @@ func platform_read_entire_file(Arena *arena, char *path) {
   return data;
 }
 
-PLATFORM_CORE_API b32
+platform_core_api b32
 func platform_write_entire_file(Str8 data, char *path) {
   b32 success = true;
 
@@ -214,12 +214,12 @@ func platform_write_entire_file(Str8 data, char *path) {
 }
 
 
-PLATFORM_CORE_API void
+platform_core_api void
 func platform_sleep_ms(u32 ms) {
   Sleep((DWORD)ms);
 }
 
-PLATFORM_CORE_API Keyboard_modifier
+platform_core_api Keyboard_modifier
 func platform_get_keyboard_modifiers(void) {
   Keyboard_modifier modifier_mask = 0;
 

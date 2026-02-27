@@ -9,7 +9,7 @@
 ////////////////////////////////
 //~ rjf: Codebase Keywords
 
-#if OS_LINUX
+#if PLATFORM_LINUX
 #define _POSIX_C_SOURCE 200809L
 #endif
 
@@ -18,10 +18,10 @@
 #define global        static
 #define local_persist static
 
-#if COMPILER_MSVC || (COMPILER_CLANG && OS_WINDOWS)
+#if COMPILER_MSVC || (COMPILER_CLANG && PLATFORM_WINDOWS)
 # pragma section(".rdata$", read)
 # define read_only __declspec(allocate(".rdata$"))
-#elif (COMPILER_CLANG && OS_LINUX)
+#elif (COMPILER_CLANG && PLATFORM_LINUX)
 # define read_only __attribute__((section(".rodata")))
 #else
 // NOTE(rjf): I don't know of a useful way to do this in GCC land.
@@ -47,7 +47,7 @@
 ////////////////////////////////
 //~ rjf: Linkage Keyword Macros
 
-#if OS_WINDOWS
+#if PLATFORM_WINDOWS
 # define shared_function C_LINKAGE __declspec(dllexport)
 #else
 # define shared_function C_LINKAGE

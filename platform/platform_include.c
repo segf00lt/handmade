@@ -5,22 +5,22 @@
 #include "platform.c"
 
 
-#if OS_WINDOWS
+#if PLATFORM_WINDOWS
 
 #include "platform_core_win32.c"
 #include "platform_win32.c"
 
-#elif OS_LINUX
+#elif PLATFORM_LINUX
 
 #include "platform_core_win32.c"
 #include "platform_linux.c"
 
-#elif OS_MAC
+#elif PLATFORM_MAC
 
 #include "platform_core_macos.c"
 #include "platform_macos.c"
 
-#elif OS_WEB
+#elif PLATFORM_WEB
 
 #error unsupported platform
 
