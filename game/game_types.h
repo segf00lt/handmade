@@ -58,6 +58,13 @@ struct Tile_map_pos {
   v2 offset;
 };
 
+typedef struct Bitmap Bitmap;
+struct Bitmap {
+  u32 *pixels;
+  s32 width;
+  s32 height;
+};
+
 #pragma pack(push, 1)
 typedef struct Bitmap_header Bitmap_header;
 struct Bitmap_header {
@@ -71,6 +78,12 @@ struct Bitmap_header {
   s32 height;          /* Image height in pixels */
   u16 planes;          /* Number of color planes */
   u16 bits_per_pixel;    /* Number of bits per pixel */
+  u32 compression;
+  u32 size_of_bitmap;
+  s32 horizontal_resolution;
+  s32 vertical_resolution;
+  u32 colors_user;
+  u32 colors_important;
 };
 #pragma pack(pop)
 
@@ -114,6 +127,8 @@ struct Game {
   f32 meters_per_pixel;
 
   b8 player_changed_z;
+
+  Bitmap player_bitmap;
 
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);

@@ -14,16 +14,30 @@
 /////////////////////////////////
 // functions
 
-internal void
-func load_bmp(Game *gp, Str8 path) {
+internal Bitmap
+func load_bitmap(Game *gp, Str8 path) {
+  Bitmap result = {0};
+
   char *path_cstr = cstr_from_str8(gp->temp_arena, path);
 
-  Str8 data = platform_read_entire_file(gp->main_arena, path_cstr);
+  Str8 data = platform_read_entire_file(gp->temp_arena, path_cstr);
   Bitmap_header *header = (Bitmap_header*)data.s;
-  u32 *pixels = data.s + header->bitmap_offset;
+  u32 *pixels = (u32*)(data.s + header->bitmap_offset);
+  u32 *result_pixels = push_array_no_zero(gp->main_arena, u32, header->width*header->height);
 
-  ASSERT(data.s);
+  for(int y = 0; y < header->height; y++) {
+    u32 *write_row = result_pixels + y*header->width;
+    u32 *read_row = pixels + (header->height - 1 - y)*header->width;
+    memory_copy(write_row, read_row, sizeof(*write_row)*header->width);
+  }
 
+  arena_clear(gp->temp_arena);
+
+  result.width = header->width;
+  result.height = header->height;
+  result.pixels = result_pixels;
+
+  return result;
 }
 
 internal u32
@@ -154,6 +168,61 @@ func draw_rect_min_max(Game *gp, Color color, f32 min_x, f32 min_y, f32 max_x, f
       u32 final_pixel_color = pixel_from_color(final_color);
 
       pixel_row[x] = final_pixel_color;
+    }
+
+  }
+
+}
+
+internal void
+func draw_bitmap(Game *gp, Bitmap bitmap, f32 x, f32 y) {
+
+  f32 x0 = x;
+  f32 y0 = y;
+  f32 x1 = x + bitmap.width;
+  f32 y1 = y + bitmap.height;
+
+  f32 render_width = (f32)gp->render.width;
+  f32 render_height = (f32)gp->render.height;
+
+  if(x0 < 0.0f) {
+    x0 = 0.0f;
+  }
+
+  if(x1 >= render_width) {
+    x1 = (f32)render_width;
+  }
+
+  if(y0 < 0.0f) {
+    y0 = 0.0f;
+  }
+
+  if(y1 >= render_height) {
+    y1 = (f32)render_height;
+  }
+
+  int begin_x = round_f32_to_s32(fmaxf(0, x0));
+  int begin_y = round_f32_to_s32(fmaxf(0, y0));
+  int end_x   = round_f32_to_s32(fminf(x1, (f32)render_width));
+  int end_y   = round_f32_to_s32(fminf(y1, (f32)render_height));
+
+  u8 *row = gp->render.pixels;
+  u32 *bitmap_row = bitmap.pixels;
+
+  for(int cur_y = begin_y, bitmap_y = 0; cur_y < end_y; cur_y++, bitmap_y++) {
+    u32 *pixel_row = (u32*)(row + cur_y * gp->render.stride);
+    u32 *bitmap_pixel_row = bitmap_row + bitmap_y * bitmap.width;
+
+    for(int cur_x = begin_x, bitmap_x = 0; cur_x < end_x; cur_x++, bitmap_x++) {
+      Color cur_color = color_from_pixel(pixel_row[cur_x]);
+
+      Color bitmap_pixel_color = color_from_pixel(bitmap_pixel_row[bitmap_x]);
+
+      Color final_color = alpha_blend(cur_color, bitmap_pixel_color);
+
+      u32 final_pixel_color = pixel_from_color(final_color);
+
+      pixel_row[cur_x] = final_pixel_color;
     }
 
   }
@@ -885,8 +954,14 @@ func game_update_and_render(Game *gp) {
     v2 player_center_rect_screen_pos  = sub_v2(player_screen_pos, scale_v2(half_player_screen_size, 0.2f));
     v2 player_center_rect_screen_size = scale_v2(player_rect_screen_size, 0.2f);
 
+    {
+      f32 player_bitmap_x = player_screen_pos.x - 0.5f*(f32)gp->player_bitmap.width;
+      f32 player_bitmap_y = player_screen_pos.y - 0.5f*(f32)gp->player_bitmap.height;
+      draw_bitmap(gp, gp->player_bitmap, player_bitmap_x, player_bitmap_y);
+    }
+
     draw_rect(gp,
-      (Color){ 0.95f, 0.2f, 0.4f, 0.8f },
+      (Color){ 0.95f, 0.2f, 0.4f, 0.5f },
       player_rect_screen_pos.x,
       player_rect_screen_pos.y,
       player_rect_screen_size.x,
@@ -894,7 +969,7 @@ func game_update_and_render(Game *gp) {
     );
 
     draw_rect(gp,
-      (Color){ 0.95f, 0.8f, 0.0f, 1.0f },
+      (Color){ 0.95f, 0.8f, 0.0f, 0.5f },
       player_center_rect_screen_pos.x,
       player_center_rect_screen_pos.y,
       player_center_rect_screen_size.x,
@@ -953,7 +1028,7 @@ func game_init(Platform *pp) {
 
   gp->did_reload = true;
 
-  load_bmp(gp, str8_lit("assets/guy.bmp"));
+  gp->player_bitmap = load_bitmap(gp, str8_lit("assets/guy.bmp"));
 
   init_player(gp);
 
