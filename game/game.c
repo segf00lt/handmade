@@ -566,6 +566,15 @@ func init_player(Game *gp) {
   gp->player_pos = tile_map_pos_from_point(gp, 4, 2);
   gp->player_width = CM(200);
   gp->player_height = CM(400);
+
+
+  // init_camera
+  gp->camera_pos = (Tile_map_pos){
+    .tile_x = gp->tiles_per_room_width / 2,
+    .tile_y = gp->tiles_per_room_height / 2,
+    .tile_z = 0,
+  };
+
 }
 
 internal void
@@ -582,8 +591,12 @@ func init_tile_map(Game *gp) {
   u32 screen_x = 0;
   u32 screen_y = 0;
 
-  u32 tiles_per_width  = 35;
-  u32 tiles_per_height = 20;
+
+  gp->tiles_per_room_width  = 35;
+  gp->tiles_per_room_height = 20;
+
+  u32 tiles_per_width  = gp->tiles_per_room_width;
+  u32 tiles_per_height = gp->tiles_per_room_height;
 
   u32 abs_tile_z = 0;
 
@@ -768,8 +781,7 @@ func game_update_and_render(Game *gp) {
 
   if(gp->did_reload) {
     gp->did_reload = false;
-    gp->once = false;
-
+    gp->once = true;
   }
 
   if(gp->once) {
@@ -789,6 +801,12 @@ func game_update_and_render(Game *gp) {
     }
 
   } /* run_once */
+
+  // s32 camera_viewport_width_tiles = (s32)( (gp->meters_per_pixel*(f32)gp->render.width) / TILE_SIZE_METERS);
+  // s32 camera_viewport_height_tiles = (s32)( (gp->meters_per_pixel*(f32)gp->render.height) / TILE_SIZE_METERS);
+
+  s32 camera_viewport_width_tiles = gp->tiles_per_room_width;
+  s32 camera_viewport_height_tiles = gp->tiles_per_room_height;
 
 
   { /* get keyboard and mouse input */
@@ -879,8 +897,8 @@ func game_update_and_render(Game *gp) {
   { /* draw */
 
     gp->camera_offset = (Tile_map_pos){
-      .tile_x = (u32)( (0.5f*gp->meters_per_pixel*(f32)gp->render.width)  / TILE_SIZE_METERS),
-      .tile_y = (u32)( (0.5f*gp->meters_per_pixel*(f32)gp->render.height) / TILE_SIZE_METERS),
+      .tile_x = camera_viewport_width_tiles >> 1,
+      .tile_y = camera_viewport_height_tiles >> 1,
       .tile_z = 0,
       .tile_offset = { 0.5f, 0.5f },
     };
@@ -893,7 +911,25 @@ func game_update_and_render(Game *gp) {
 
     /* update_camera */
 
-    gp->camera_pos = player_tile_map_pos;
+    if((s32)player_tile_map_pos.tile_x - (s32)gp->camera_pos.tile_x < -(camera_viewport_width_tiles/2 + 1)) {
+      gp->camera_pos.tile_x -= camera_viewport_width_tiles;
+    }
+
+    if((s32)player_tile_map_pos.tile_x - (s32)gp->camera_pos.tile_x > (camera_viewport_width_tiles/2 + 1)) {
+      gp->camera_pos.tile_x += camera_viewport_width_tiles;
+    }
+
+    if((s32)player_tile_map_pos.tile_y - (s32)gp->camera_pos.tile_y < -(camera_viewport_height_tiles/2 + 1)) {
+      gp->camera_pos.tile_y -= camera_viewport_height_tiles;
+    }
+
+    if((s32)player_tile_map_pos.tile_y - (s32)gp->camera_pos.tile_y > (camera_viewport_height_tiles/2 + 1)) {
+      gp->camera_pos.tile_y += camera_viewport_height_tiles;
+    }
+
+    gp->camera_pos.tile_z = player_tile_map_pos.tile_z;
+
+    Tile_map_pos save_camera_tile_pos = gp->camera_pos;
 
     gp->camera_pos.tile_x -= gp->camera_offset.tile_x;
     gp->camera_pos.tile_y -= gp->camera_offset.tile_y;
@@ -908,29 +944,8 @@ func game_update_and_render(Game *gp) {
 
     draw_tile_map(gp);
 
-
-    #if 0
-    {
-      u32 *pixels = (u32*)gp->render.pixels;
-      for(int y = 0; y < gp->render.height; y++) {
-        for(int x = 0; x < gp->render.width; x++) {
-          if(pixels[y*gp->render.width + x] == 0xff000000) {
-            COWABUNGA;
-          }
-        }
-      }
-    }
-    #endif
-
-
     v2 player_screen_pos = scale_v2(sub_v2(player_pos, camera_pos), gp->pixels_per_meter);
     player_screen_pos.y = gp->render.height - player_screen_pos.y;
-
-    v2 player_rect_screen_size        = scale_v2((v2){ gp->player_width, gp->player_height }, gp->pixels_per_meter);
-    v2 half_player_screen_size        = scale_v2(player_rect_screen_size, 0.5f);
-    v2 player_rect_screen_pos         = sub_v2(player_screen_pos, half_player_screen_size);
-    v2 player_center_rect_screen_pos  = sub_v2(player_screen_pos, scale_v2(half_player_screen_size, 0.2f));
-    v2 player_center_rect_screen_size = scale_v2(player_rect_screen_size, 0.2f);
 
     {
       f32 player_bitmap_x = player_screen_pos.x - 0.5f*(f32)gp->player_bitmap.width;
@@ -939,6 +954,13 @@ func game_update_and_render(Game *gp) {
     }
 
     #if 0
+
+    v2 player_rect_screen_size        = scale_v2((v2){ gp->player_width, gp->player_height }, gp->pixels_per_meter);
+    v2 half_player_screen_size        = scale_v2(player_rect_screen_size, 0.5f);
+    v2 player_rect_screen_pos         = sub_v2(player_screen_pos, half_player_screen_size);
+    v2 player_center_rect_screen_pos  = sub_v2(player_screen_pos, scale_v2(half_player_screen_size, 0.2f));
+    v2 player_center_rect_screen_size = scale_v2(player_rect_screen_size, 0.2f);
+
     draw_rect(gp,
       (Color){ 0.95f, 0.2f, 0.4f, 0.5f },
       player_rect_screen_pos.x,
@@ -954,6 +976,7 @@ func game_update_and_render(Game *gp) {
       player_center_rect_screen_size.x,
       player_center_rect_screen_size.y
     );
+
     #endif
 
     #if 0
@@ -978,6 +1001,8 @@ func game_update_and_render(Game *gp) {
 
     }
     #endif
+
+    gp->camera_pos = save_camera_tile_pos;
 
   } /* draw */
 
@@ -1033,9 +1058,9 @@ func game_init(Platform *pp) {
 
   gp->player_bitmap = load_bitmap(gp, str8_lit("assets/guy.bmp"));
 
-  init_player(gp);
-
   init_tile_map(gp);
+
+  init_player(gp);
 
   return gp;
 }

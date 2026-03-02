@@ -131,6 +131,9 @@ struct Game {
 
   Bitmap player_bitmap;
 
+  s32 tiles_per_room_width;
+  s32 tiles_per_room_height;
+
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
 #define GAME_STATE_SIZE ((u64)MB(1))
