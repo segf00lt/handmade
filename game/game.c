@@ -150,10 +150,10 @@ func draw_rect_min_max(Game *gp, Color color, f32 min_x, f32 min_y, f32 max_x, f
     y1 = (f32)render_height;
   }
 
-  int begin_x = round_f32_to_s32(fmaxf(0, x0));
-  int begin_y = round_f32_to_s32(fmaxf(0, y0));
-  int end_x   = round_f32_to_s32(fminf(x1, (f32)render_width));
-  int end_y   = round_f32_to_s32(fminf(y1, (f32)render_height));
+  int begin_x = (int)floor_f32(fmaxf(0, x0));
+  int begin_y = (int)floor_f32(fmaxf(0, y0));
+  int end_x   = (int)floor_f32(fminf(x1, (f32)render_width));
+  int end_y   = (int)floor_f32(fminf(y1, (f32)render_height));
 
   u8 *row = gp->render.pixels;
 
@@ -201,10 +201,10 @@ func draw_bitmap(Game *gp, Bitmap bitmap, f32 x, f32 y) {
     y1 = (f32)render_height;
   }
 
-  int begin_x = round_f32_to_s32(fmaxf(0, x0));
-  int begin_y = round_f32_to_s32(fmaxf(0, y0));
-  int end_x   = round_f32_to_s32(fminf(x1, (f32)render_width));
-  int end_y   = round_f32_to_s32(fminf(y1, (f32)render_height));
+  int begin_x = (int)floor_f32(fmaxf(0, x0));
+  int begin_y = (int)floor_f32(fmaxf(0, y0));
+  int end_x   = (int)floor_f32(fminf(x1, (f32)render_width));
+  int end_y   = (int)floor_f32(fminf(y1, (f32)render_height));
 
   u8 *row = gp->render.pixels;
   u32 *bitmap_row = bitmap.pixels;
@@ -256,16 +256,16 @@ func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_
     y1 = (f32)render_height;
   }
 
-  int begin_x = round_f32_to_s32(fmaxf(0, x0));
-  int begin_y = round_f32_to_s32(fmaxf(0, y0));
-  int end_x   = round_f32_to_s32(fminf(x1, (f32)gp->render.width));
-  int end_y   = round_f32_to_s32(fminf(y1, (f32)gp->render.height));
+  int begin_x = (int)floor_f32(fmaxf(0, x0));
+  int begin_y = (int)floor_f32(fmaxf(0, y0));
+  int end_x   = (int)floor_f32(fminf(x1, (f32)gp->render.width));
+  int end_y   = (int)floor_f32(fminf(y1, (f32)gp->render.height));
 
   line_thickness = fminf(line_thickness, fminf(x1-x0, y1-y0));
 
   u8 *row = gp->render.pixels;
 
-  for(int y = begin_y; y < begin_y + round_f32_to_s32(line_thickness) && y < gp->render.height; y++) {
+  for(int y = begin_y; y < begin_y + (int)floor_f32(line_thickness) && y < gp->render.height; y++) {
     u32 *pixel_row = (u32*)(row + y * gp->render.stride);
 
     for(int x = begin_x; x < end_x && x < gp->render.width; x++) {
@@ -282,10 +282,10 @@ func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_
   }
 
 
-  for(int y = begin_y + round_f32_to_s32(line_thickness); y < end_y - round_f32_to_s32(line_thickness) && y < gp->render.height; y++) {
+  for(int y = begin_y + (int)floor_f32(line_thickness); y < end_y - (int)floor_f32(line_thickness) && y < gp->render.height; y++) {
     u32 *pixel_row = (u32*)(row + y * gp->render.stride);
 
-    for(int x = begin_x; x < begin_x + round_f32_to_s32(line_thickness) && x < gp->render.width; x++) {
+    for(int x = begin_x; x < begin_x + (int)floor_f32(line_thickness) && x < gp->render.width; x++) {
 
       Color cur_color = color_from_pixel(pixel_row[x]);
 
@@ -296,7 +296,7 @@ func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_
       pixel_row[x] = final_pixel_color;
     }
 
-    for(int x = end_x - round_f32_to_s32(line_thickness); x < end_x && x < gp->render.width; x++) {
+    for(int x = end_x - (int)floor_f32(line_thickness); x < end_x && x < gp->render.width; x++) {
 
       Color cur_color = color_from_pixel(pixel_row[x]);
 
@@ -309,7 +309,7 @@ func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_
 
   }
 
-  for(int y = end_y - round_f32_to_s32(line_thickness); y < end_y && y < gp->render.height; y++) {
+  for(int y = end_y - (int)floor_f32(line_thickness); y < end_y && y < gp->render.height; y++) {
     u32 *pixel_row = (u32*)(row + y * gp->render.stride);
 
     for(int x = begin_x; x < end_x; x++) {
@@ -429,9 +429,10 @@ internal void
 func recanonicalize_coord(Game *gp, u32 *tile, f32 *tile_offset) {
   // NOTE jfd: casey made the tiles be drawn from their center, but that doesn't really change anything for us
   // s32 carry = (s32)floor_f32(*tile_offset * (1.0f/TILE_SIZE_METERS));
-  s32 carry = (s32)round_f32(*tile_offset * (1.0f/TILE_SIZE_METERS));
+  f32 carry_float = round_f32(*tile_offset * (1.0f/TILE_SIZE_METERS));
+  s32 carry = (s32)carry_float;
   *tile += carry;
-  *tile_offset -= (f32)carry * TILE_SIZE_METERS;
+  *tile_offset -= carry_float * TILE_SIZE_METERS;
   // ASSERT(*tile_offset >= 0.0f);
   // ASSERT(*tile_offset <= TILE_SIZE_METERS);
   ASSERT(*tile_offset >= -0.5f*TILE_SIZE_METERS);
@@ -713,13 +714,13 @@ func draw_tile_map(Game *gp) {
 
       Color color = tile_colors[tile];
 
-      #if 0
+      #if 1
       if(gp->player_pos.tile_x == cur_tile_map_pos.tile_x && gp->player_pos.tile_y == cur_tile_map_pos.tile_y) {
         color = (Color){ 1.0f, 0, 0, 1 };
       }
       #endif
 
-      #if 0
+      #if 1
       if(cur_tile_map_pos.tile_x % CHUNK_SIZE == 0 || cur_tile_map_pos.tile_y % CHUNK_SIZE == 0) {
         color = alpha_blend(color, (Color){ 0.0f, 0.5f, 1.0f, 0.3f });
       }
@@ -745,7 +746,7 @@ func draw_tile_map(Game *gp) {
         tile_screen_size.y
       );
 
-      #if 0
+      #if 1
       Color debug_line_color = { 0.0f, 1.0f, 0.0f, 0.3f };
       draw_rect_lines(gp,
         debug_line_color,
@@ -906,6 +907,21 @@ func game_update_and_render(Game *gp) {
     clear_screen(gp);
 
     draw_tile_map(gp);
+
+
+    #if 0
+    {
+      u32 *pixels = (u32*)gp->render.pixels;
+      for(int y = 0; y < gp->render.height; y++) {
+        for(int x = 0; x < gp->render.width; x++) {
+          if(pixels[y*gp->render.width + x] == 0xff000000) {
+            COWABUNGA;
+          }
+        }
+      }
+    }
+    #endif
+
 
     v2 player_screen_pos = scale_v2(sub_v2(player_pos, camera_pos), gp->pixels_per_meter);
     player_screen_pos.y = gp->render.height - player_screen_pos.y;
