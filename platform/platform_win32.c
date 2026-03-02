@@ -54,6 +54,11 @@ global Platform_win32_debug_time_marker_slice debug_time_markers;
 global LARGE_INTEGER last_counter;
 global LARGE_INTEGER flip_wall_clock;
 
+global b32 debug_show_cursor;
+
+global WINDOWPLACEMENT global_window_position = { sizeof(global_window_position) };
+
+
 #ifdef HANDMADE_PROFILE
 global u64 last_cycle_count
 #endif
@@ -78,6 +83,42 @@ Game_service_proc *game_get_sound_samples;
 
 /////////////////////////////////
 // functions
+
+
+
+internal void
+func platform_win32_toggle_fullscreen(HWND window_handle) {
+
+  DWORD style = GetWindowLong(window_handle, GWL_STYLE);
+  if(style & WS_OVERLAPPEDWINDOW) {
+
+    MONITORINFO monitor_info = { sizeof(monitor_info) };
+
+    if(GetWindowPlacement(window_handle, &global_window_position) &&
+      GetMonitorInfo(MonitorFromWindow(window_handle,
+        MONITOR_DEFAULTTOPRIMARY), &monitor_info)
+    ) {
+      SetWindowLong(window_handle, GWL_STYLE, style & ~WS_OVERLAPPEDWINDOW);
+      SetWindowPos(window_handle, HWND_TOP,
+        monitor_info.rcMonitor.left, monitor_info.rcMonitor.top,
+        monitor_info.rcMonitor.right - monitor_info.rcMonitor.left,
+        monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top,
+        SWP_NOOWNERZORDER | SWP_FRAMECHANGED
+      );
+    }
+
+  } else {
+
+    SetWindowLong(window_handle, GWL_STYLE, style | WS_OVERLAPPEDWINDOW);
+    SetWindowPlacement(window_handle, &global_window_position);
+    SetWindowPos(window_handle, 0, 0, 0, 0, 0,
+      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+      SWP_NOOWNERZORDER | SWP_FRAMECHANGED
+    );
+
+  }
+
+}
 
 internal Platform_win32_window_dimensions
 func platform_win32_get_window_dimensions(HWND window_handle) {
@@ -732,6 +773,8 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
           // debug_loop_recorder.read_game_state_from_file = true;
 
           #endif
+        } else if(key == KBD_KEY_F11) {
+          platform_win32_toggle_fullscreen(window);
         }
 
       }
@@ -780,6 +823,13 @@ func platform_win32_main_window_callback(HWND window, UINT message, WPARAM wPara
     case WM_ERASEBKGND: {
       return 1; // tell Windows "I handled it"
     }
+    case WM_SETCURSOR: {
+      if(debug_show_cursor) {
+        result = DefWindowProc(window, message, wParam, lParam);
+      } else {
+        SetCursor(0);
+      }
+    } break;
     case WM_PAINT: {
       PAINTSTRUCT paint;
 
@@ -1267,6 +1317,11 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
     window_class.lpfnWndProc = platform_win32_main_window_callback;
     window_class.hInstance = instance;
     window_class.lpszClassName = "Handmade Hero";
+
+    #ifdef HANDMADE_INTERNAL
+    debug_show_cursor = true;
+    window_class.hCursor = LoadCursor(0, IDC_CROSS);
+    #endif
 
     global_backbuffer.bytes_per_pixel = 4;
     platform_event_list = &_platform_event_list_stub;

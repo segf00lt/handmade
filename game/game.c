@@ -185,7 +185,9 @@ func draw_bitmap(Game *gp, Bitmap bitmap, f32 x, f32 y) {
   f32 render_width = (f32)gp->render.width;
   f32 render_height = (f32)gp->render.height;
 
+  s32 source_offset_x = 0;
   if(x0 < 0.0f) {
+    source_offset_x = (s32)-x0;
     x0 = 0.0f;
   }
 
@@ -193,7 +195,9 @@ func draw_bitmap(Game *gp, Bitmap bitmap, f32 x, f32 y) {
     x1 = (f32)render_width;
   }
 
+  s32 source_offset_y = 0;
   if(y0 < 0.0f) {
+    source_offset_y = (s32)-y0;
     y0 = 0.0f;
   }
 
@@ -208,6 +212,7 @@ func draw_bitmap(Game *gp, Bitmap bitmap, f32 x, f32 y) {
 
   u8 *row = gp->render.pixels;
   u32 *bitmap_row = bitmap.pixels;
+  bitmap_row += bitmap.width*source_offset_y + source_offset_x;
 
   for(int cur_y = begin_y, bitmap_y = 0; cur_y < end_y; cur_y++, bitmap_y++) {
     u32 *pixel_row = (u32*)(row + cur_y * gp->render.stride);
@@ -386,38 +391,6 @@ func debug_silence(Game *gp) {
   memory_zero(gp->sound.samples, sizeof(gp->sound.samples[0]) * gp->sound.sample_count);
 }
 
-internal void
-func debug_output_sound(Game *gp) {
-  Game_sound_buffer *sound_buffer = &gp->sound;
-
-  s16 tone_volume = 600;
-  int tone_hz = 256;
-  int wave_period = sound_buffer->samples_per_second / tone_hz;
-
-  s16 *sample_out = sound_buffer->samples;
-  for(s32 sample_index = 0; sample_index < sound_buffer->sample_count; sample_index++) {
-
-    #if 0
-    OutputDebugStringA(cstrf(gp->temp_arena, "sine_value = %f\n", sine_value));
-    arena_clear(gp->temp_arena);
-    #endif
-
-    f32 sine_value = sinf(gp->t_sine);
-
-    s16 sample_value = (s16)(sine_value * tone_volume);
-
-    *sample_out++ = sample_value;
-    *sample_out++ = sample_value;
-
-    gp->t_sine += (2.0f*PI*1.0f/((f32)wave_period));
-    if(gp->t_sine > 2.0f*PI) {
-      gp->t_sine -= 2.0f*PI;
-    }
-
-  }
-
-}
-
 internal v2_s32
 func chunk_pos_from_point(Game *gp, v2 v) {
   v2_s32 chunk = cast_v2_f32_to_s32(scale_v2(v, 1.0f/CHUNK_SIZE));
@@ -428,6 +401,8 @@ func chunk_pos_from_point(Game *gp, v2 v) {
 internal void
 func recanonicalize_coord(Game *gp, u32 *tile, f32 *tile_offset) {
   // NOTE jfd: casey made the tiles be drawn from their center, but that doesn't really change anything for us
+  // NOTE jfd 02/03/26: (I think)
+
   // s32 carry = (s32)floor_f32(*tile_offset * (1.0f/TILE_SIZE_METERS));
   f32 carry_float = round_f32(*tile_offset * (1.0f/TILE_SIZE_METERS));
   s32 carry = (s32)carry_float;

@@ -102,8 +102,6 @@ struct Game {
 
   s32 test_sound_pitch;
 
-  f32 t_sine;
-
   Tile_map_pos player_pos;
   f32       player_width;
   f32       player_height;
