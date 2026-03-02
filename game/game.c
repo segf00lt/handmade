@@ -754,13 +754,20 @@ func draw_tile_map(Game *gp) {
 shared_function void
 func game_update_and_render(Game *gp) {
 
+  f32 t = gp->t;
+
   if(gp->did_reload) {
     gp->did_reload = false;
+    gp->once = false;
+  }
+
+  if(is_key_pressed(gp, KBD_KEY_F5)) {
     gp->once = true;
   }
 
   if(gp->once) {
     gp->once = false;
+
     gp->should_init_player = true;
 
   }
@@ -776,9 +783,6 @@ func game_update_and_render(Game *gp) {
     }
 
   } /* run_once */
-
-  // s32 camera_viewport_width_tiles = (s32)( (gp->meters_per_pixel*(f32)gp->render.width) / TILE_SIZE_METERS);
-  // s32 camera_viewport_height_tiles = (s32)( (gp->meters_per_pixel*(f32)gp->render.height) / TILE_SIZE_METERS);
 
   s32 camera_viewport_width_tiles = gp->tiles_per_room_width;
   s32 camera_viewport_height_tiles = gp->tiles_per_room_height;
@@ -805,27 +809,21 @@ func game_update_and_render(Game *gp) {
     }
 
     // TODO jfd: mouse movement and clicks
-    f32 player_speed = PLAYER_MOVE_SPEED;
+    f32 player_accel = PLAYER_ACCEL;
 
-    f32 scaled_player_speed = player_speed * gp->t;
-
-    if(is_key_pressed(gp, KBD_KEY_LEFT_SHIFT)) {
-      scaled_player_speed *= 0.1f;
-    }
-
-    gp->player_vel = (v2){0};
+    gp->player_accel = (v2){0};
 
     if(is_key_pressed(gp, KBD_KEY_W)) {
-      gp->player_vel.y += scaled_player_speed;
+      gp->player_accel.y += player_accel;
     }
     if(is_key_pressed(gp, KBD_KEY_A)) {
-      gp->player_vel.x -= scaled_player_speed;
+      gp->player_accel.x -= player_accel;
     }
     if(is_key_pressed(gp, KBD_KEY_S)) {
-      gp->player_vel.y -= scaled_player_speed;
+      gp->player_accel.y -= player_accel;
     }
     if(is_key_pressed(gp, KBD_KEY_D)) {
-      gp->player_vel.x += scaled_player_speed;
+      gp->player_accel.x += player_accel;
     }
 
   } /* get keyboard and mouse input */
@@ -835,8 +833,23 @@ func game_update_and_render(Game *gp) {
 
   { /* update world */
 
+    // v = v0 + at
+    // s = s0 + vt - v*drag*t (at^2) / 2
+
+    gp->player_vel = add_v2(gp->player_vel, scale_v2(gp->player_accel, t));
+
+    if(is_key_pressed(gp, KBD_KEY_LEFT_SHIFT)) {
+      gp->player_vel = scale_v2(gp->player_vel, 0.00001f);
+    }
+
+    f32 drag = 19.0f;
+
+    gp->player_vel = sub_v2(gp->player_vel, scale_v2(gp->player_vel, drag*t));
+
     Tile_map_pos new_pos = gp->player_pos;
-    new_pos.tile_offset = add_v2(new_pos.tile_offset, gp->player_vel);
+    new_pos.tile_offset = add_v2(new_pos.tile_offset, scale_v2(gp->player_vel, t));
+    new_pos.tile_offset = add_v2(new_pos.tile_offset, scale_v2(gp->player_accel, t*t*0.5f));
+
     new_pos = recanonicalize_pos(gp, new_pos);
 
     { /* tile collisions */

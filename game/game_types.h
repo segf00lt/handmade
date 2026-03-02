@@ -105,7 +105,9 @@ struct Game {
   Tile_map_pos player_pos;
   f32       player_width;
   f32       player_height;
+  f32       player_mass;
   v2        player_vel;
+  v2        player_accel;
 
   Tile_map_pos camera_pos;
   Tile_map_pos camera_offset;
