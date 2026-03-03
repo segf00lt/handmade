@@ -704,7 +704,10 @@ func draw_tile_map(Game *gp) {
 
       #if 1
       if(gp->player_pos.tile_x == cur_tile_map_pos.tile_x && gp->player_pos.tile_y == cur_tile_map_pos.tile_y) {
-        color = (Color){ 1.0f, 0, 0, 1 };
+        color = alpha_blend(color, (Color){ 1.0f, 0, 0, 1 });
+      }
+      if(gp->debug_new_player_pos.tile_x == cur_tile_map_pos.tile_x && gp->debug_new_player_pos.tile_y == cur_tile_map_pos.tile_y) {
+        color = alpha_blend(color, (Color){ 0, 0, 1.0f, 0.5f });
       }
       #endif
 
@@ -846,9 +849,13 @@ func game_update_and_render(Game *gp) {
 
     gp->player_vel = sub_v2(gp->player_vel, scale_v2(gp->player_vel, drag*t));
 
-    Tile_map_pos new_pos = gp->player_pos;
-    new_pos.tile_offset = add_v2(new_pos.tile_offset, scale_v2(gp->player_vel, t));
-    new_pos.tile_offset = add_v2(new_pos.tile_offset, scale_v2(gp->player_accel, t*t*0.5f));
+    Tile_map_pos cur_pos = gp->player_pos;
+    Tile_map_pos new_pos = cur_pos;
+    v2 delta_pos = add_v2(scale_v2(gp->player_vel, t), scale_v2(gp->player_accel, t*t*0.5f));
+
+    new_pos.tile_offset = add_v2(new_pos.tile_offset, delta_pos);
+
+    // dp -= 2*dot(dp, normal_vector)*normal_vector
 
     new_pos = recanonicalize_pos(gp, new_pos);
 
@@ -857,20 +864,52 @@ func game_update_and_render(Game *gp) {
       // TODO jfd 26/02/26: correct tile collisions on chunk boundaries
 
       u8 new_tile_value = tile_from_tile_map_pos(gp, new_pos);
-      if(new_tile_value == 2) {
-        new_pos = gp->player_pos;
-      } else if(new_tile_value == 3) {
-        if(!gp->player_changed_z) {
-          gp->player_changed_z = true;
-          new_pos.tile_z++;
+
+      gp->debug_new_player_pos = new_pos;
+
+      if(new_tile_value > 1) {
+
+        if(new_tile_value == 2) {
+
+          v2 normal = {0};
+
+          s32 tile_dx = (s32)new_pos.tile_x - (s32)cur_pos.tile_x;
+          s32 tile_dy = (s32)new_pos.tile_y - (s32)cur_pos.tile_y;
+
+          if(tile_dx > 0) {
+            normal.x = -1;
+          }
+          if(tile_dy > 0) {
+            normal.y = -1 ;
+          }
+          if(tile_dx < 0) {
+            normal.x = 1;
+          }
+          if(tile_dy < 0) {
+            normal.y = 1;
+          }
+
+          delta_pos = sub_v2(delta_pos, scale_v2(normal, dot_v2(delta_pos, normal)));
+
+          new_pos = cur_pos;
+          new_pos.tile_offset = add_v2(new_pos.tile_offset, delta_pos);
+
+          new_pos = recanonicalize_pos(gp, new_pos);
+
+        } else if(new_tile_value == 3) {
+          if(!gp->player_changed_z) {
+            gp->player_changed_z = true;
+            new_pos.tile_z++;
+          }
+        } else if(new_tile_value == 4) {
+          if(!gp->player_changed_z) {
+            gp->player_changed_z = true;
+            new_pos.tile_z--;
+          }
+        } else {
+          gp->player_changed_z = false;
         }
-      } else if(new_tile_value == 4) {
-        if(!gp->player_changed_z) {
-          gp->player_changed_z = true;
-          new_pos.tile_z--;
-        }
-      } else {
-        gp->player_changed_z = false;
+
       }
 
     } /* tile collisions */
@@ -967,7 +1006,7 @@ func game_update_and_render(Game *gp) {
 
     #endif
 
-    #if 0
+    #if 1
     {
       Color color = { 1.0f, 0, 0, 1 };
 

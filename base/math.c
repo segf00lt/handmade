@@ -121,6 +121,12 @@ func mul_v2(v2 a, v2 b) {
   return result;
 }
 
+force_inline f32
+func dot_v2(v2 a, v2 b) {
+  f32 result = a.x*b.x + a.y*b.y;
+  return result;
+}
+
 force_inline v2
 func div_v2(v2 a, v2 b) {
   v2 result = {
@@ -212,6 +218,12 @@ func mul_v2_s16(v2_s16 a, v2_s16 b) {
     a.x * b.x,
     a.y * b.y,
   };
+  return result;
+}
+
+force_inline s16
+func dot_v2_s16(v2_s16 a, v2_s16 b) {
+  s16 result = a.x*b.x + a.y+b.y;
   return result;
 }
 
@@ -308,6 +320,12 @@ func mul_v2_s32(v2_s32 a, v2_s32 b) {
   return result;
 }
 
+force_inline s32
+func dot_v2_s32(v2_s32 a, v2_s32 b) {
+  s32 result = a.x*b.x + a.y+b.y;
+  return result;
+}
+
 force_inline v2_s32
 func div_v2_s32(v2_s32 a, v2_s32 b) {
   v2_s32 result = {
@@ -399,6 +417,12 @@ func mul_v2_u32(v2_u32 a, v2_u32 b) {
     a.x * b.x,
     a.y * b.y,
   };
+  return result;
+}
+
+force_inline u32
+func dot_v2_u32(v2_u32 a, v2_u32 b) {
+  u32 result = a.x*b.x + a.y*b.y;
   return result;
 }
 
@@ -505,6 +529,8 @@ func cast_v2_s32_to_f32(v2_s32 v) {
   };
   return result;
 }
+
+
 
 
 #endif
