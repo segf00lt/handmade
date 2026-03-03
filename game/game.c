@@ -14,6 +14,29 @@
 /////////////////////////////////
 // functions
 
+internal Entity*
+func entity_alloc(Game *gp, Entity_kind kind) {
+  Entity *result = 0;
+
+  for(int entity_index = 0; entity_index < ARRLEN(gp->entities); entity_index++) {
+    if(gp->entities[entity_index].kind == ENTITY_KIND_NONE) {
+      result = &gp->entities[entity_index];
+      break;
+    }
+  }
+
+  memory_zero(result, sizeof(*result));
+
+  result->kind = kind;
+
+  return result;
+}
+
+internal void
+func entity_free(Game *gp, Entity *ep) {
+  ep->kind = ENTITY_KIND_NONE;
+}
+
 internal Bitmap
 func load_bitmap(Game *gp, Str8 path) {
   Bitmap result = {0};
@@ -537,11 +560,31 @@ func set_tile_from_abs_tile_pos(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 ab
 }
 
 internal void
-func init_player(Game *gp) {
-  gp->player_pos = tile_map_pos_from_point(gp, 4, 2);
-  gp->player_width = CM(200);
-  gp->player_height = CM(400);
+func init_player_1(Game *gp) {
 
+  Entity *ep = entity_alloc(gp, ENTITY_KIND_PLAYER_1);
+
+  ep->pos = tile_map_pos_from_point(gp, 4, 2);
+  ep->width = CM(200);
+  ep->height = CM(400);
+  ep->bitmap = gp->guy_bitmap;
+
+}
+
+internal void
+func init_player_2(Game *gp) {
+
+  Entity *ep = entity_alloc(gp, ENTITY_KIND_PLAYER_2);
+
+  ep->pos = tile_map_pos_from_point(gp, 12, 14);
+  ep->width = CM(200);
+  ep->height = CM(400);
+  ep->bitmap = gp->guy_bitmap;
+
+}
+
+internal void
+func init_camera(Game *gp) {
 
   // init_camera
   gp->camera_pos = (Tile_map_pos){
@@ -702,7 +745,7 @@ func draw_tile_map(Game *gp) {
 
       Color color = tile_colors[tile];
 
-      #if 1
+      #if 0
       if(gp->player_pos.tile_x == cur_tile_map_pos.tile_x && gp->player_pos.tile_y == cur_tile_map_pos.tile_y) {
         color = alpha_blend(color, (Color){ 1.0f, 0, 0, 1 });
       }
@@ -782,7 +825,8 @@ func game_update_and_render(Game *gp) {
     if(gp->should_init_player) {
       gp->should_init_player = false;
 
-      init_player(gp);
+      init_player_1(gp);
+      init_player_2(gp);
     }
 
   } /* run_once */
@@ -790,264 +834,319 @@ func game_update_and_render(Game *gp) {
   s32 camera_viewport_width_tiles = gp->tiles_per_room_width;
   s32 camera_viewport_height_tiles = gp->tiles_per_room_height;
 
+  for(int entity_index = 0; entity_index < ARRLEN(gp->entities); entity_index++)
+  { /* update entities */
+    Entity *ep = gp->entities + entity_index;
 
-  { /* get keyboard and mouse input */
-
-    gp->pixels_per_meter -= gp->input.scroll_delta.y * 0.01f;
-
-    if(gp->pixels_per_meter < MIN_PIXELS_PER_METER) {
-      gp->pixels_per_meter = MIN_PIXELS_PER_METER;
+    if(ep->kind == ENTITY_KIND_NONE) {
+      continue;
     }
 
-    if(gp->pixels_per_meter > MAX_PIXELS_PER_METER) {
-      gp->pixels_per_meter = MAX_PIXELS_PER_METER;
-    }
+    switch(ep->kind) {
+      case ENTITY_KIND_PLAYER_1:
+      case ENTITY_KIND_PLAYER_2:
+      {
 
-    if(is_key_pressed(gp, KBD_KEY_LEFT_CONTROL) && is_key_pressed(gp, KBD_KEY_0)) {
-      gp->pixels_per_meter = PIXELS_PER_METER;
-    }
+        { /* get keyboard and mouse input */
 
-    if(gp->pixels_per_meter != 0.0f) {
-      gp->meters_per_pixel = 1.0f / gp->pixels_per_meter;
-    }
+          gp->pixels_per_meter -= gp->input.scroll_delta.y * 0.01f;
 
-    // TODO jfd: mouse movement and clicks
-    f32 player_accel = PLAYER_ACCEL;
-
-    gp->player_accel = (v2){0};
-
-    if(is_key_pressed(gp, KBD_KEY_W)) {
-      gp->player_accel.y += player_accel;
-    }
-    if(is_key_pressed(gp, KBD_KEY_A)) {
-      gp->player_accel.x -= player_accel;
-    }
-    if(is_key_pressed(gp, KBD_KEY_S)) {
-      gp->player_accel.y -= player_accel;
-    }
-    if(is_key_pressed(gp, KBD_KEY_D)) {
-      gp->player_accel.x += player_accel;
-    }
-
-  } /* get keyboard and mouse input */
-
-  int player_tile_col = 0;
-  int player_tile_row = 0;
-
-  { /* update world */
-    #if 1
-
-    // v = v0 + at
-    // s = s0 + vt - v*drag*t (at^2) / 2
-
-    gp->player_vel = add_v2(gp->player_vel, scale_v2(gp->player_accel, t));
-
-    if(is_key_pressed(gp, KBD_KEY_LEFT_SHIFT)) {
-      gp->player_vel = scale_v2(gp->player_vel, 0.00001f);
-    }
-
-    f32 drag = 19.0f;
-
-    gp->player_vel = sub_v2(gp->player_vel, scale_v2(gp->player_vel, drag*t));
-
-    Tile_map_pos cur_pos = gp->player_pos;
-    Tile_map_pos new_pos = cur_pos;
-    v2 delta_pos = add_v2(scale_v2(gp->player_vel, t), scale_v2(gp->player_accel, t*t*0.5f));
-
-    new_pos.tile_offset = add_v2(new_pos.tile_offset, delta_pos);
-
-    // dp -= 2*dot(dp, normal_vector)*normal_vector
-
-    new_pos = recanonicalize_pos(gp, new_pos);
-
-    { /* tile collisions */
-
-      // TODO jfd 26/02/26: correct tile collisions on chunk boundaries
-
-      u8 new_tile_value = tile_from_tile_map_pos(gp, new_pos);
-
-      gp->debug_new_player_pos = new_pos;
-
-      if(new_tile_value > 1) {
-
-        if(new_tile_value == 2) {
-
-          v2 normal = {0};
-
-          s32 tile_dx = (s32)new_pos.tile_x - (s32)cur_pos.tile_x;
-          s32 tile_dy = (s32)new_pos.tile_y - (s32)cur_pos.tile_y;
-
-          if(tile_dx > 0) {
-            normal.x = -1;
-          }
-          if(tile_dy > 0) {
-            normal.y = -1 ;
-          }
-          if(tile_dx < 0) {
-            normal.x = 1;
-          }
-          if(tile_dy < 0) {
-            normal.y = 1;
+          if(gp->pixels_per_meter < MIN_PIXELS_PER_METER) {
+            gp->pixels_per_meter = MIN_PIXELS_PER_METER;
           }
 
-          delta_pos = sub_v2(delta_pos, scale_v2(normal, dot_v2(delta_pos, normal)));
+          if(gp->pixels_per_meter > MAX_PIXELS_PER_METER) {
+            gp->pixels_per_meter = MAX_PIXELS_PER_METER;
+          }
 
-          new_pos = cur_pos;
+          if(is_key_pressed(gp, KBD_KEY_LEFT_CONTROL) && is_key_pressed(gp, KBD_KEY_0)) {
+            gp->pixels_per_meter = PIXELS_PER_METER;
+          }
+
+          if(gp->pixels_per_meter != 0.0f) {
+            gp->meters_per_pixel = 1.0f / gp->pixels_per_meter;
+          }
+
+          // TODO jfd: mouse movement and clicks
+          f32 player_accel = PLAYER_ACCEL;
+
+          ep->accel = (v2){0};
+
+          if(ep->kind == ENTITY_KIND_PLAYER_1) {
+            if(is_key_pressed(gp, KBD_KEY_W)) {
+              ep->accel.y += player_accel;
+            }
+            if(is_key_pressed(gp, KBD_KEY_A)) {
+              ep->accel.x -= player_accel;
+            }
+            if(is_key_pressed(gp, KBD_KEY_S)) {
+              ep->accel.y -= player_accel;
+            }
+            if(is_key_pressed(gp, KBD_KEY_D)) {
+              ep->accel.x += player_accel;
+            }
+          } else {
+            if(is_key_pressed(gp, KBD_KEY_UP_ARROW)) {
+              ep->accel.y += player_accel;
+            }
+            if(is_key_pressed(gp, KBD_KEY_LEFT_ARROW)) {
+              ep->accel.x -= player_accel;
+            }
+            if(is_key_pressed(gp, KBD_KEY_DOWN_ARROW)) {
+              ep->accel.y -= player_accel;
+            }
+            if(is_key_pressed(gp, KBD_KEY_RIGHT_ARROW)) {
+              ep->accel.x += player_accel;
+            }
+          }
+
+        } /* get keyboard and mouse input */
+
+        { /* update world */
+
+          #if 1
+
+          // v = v0 + at
+          // s = s0 + vt - v*drag*t (at^2) / 2
+
+          ep->vel = add_v2(ep->vel, scale_v2(ep->accel, t));
+
+          if(is_key_pressed(gp, KBD_KEY_LEFT_SHIFT)) {
+            ep->vel = scale_v2(ep->vel, 0.00001f);
+          }
+
+          f32 drag = 19.0f;
+
+          ep->vel = sub_v2(ep->vel, scale_v2(ep->vel, drag*t));
+
+          Tile_map_pos cur_pos = ep->pos;
+          Tile_map_pos new_pos = cur_pos;
+          v2 delta_pos = add_v2(scale_v2(ep->vel, t), scale_v2(ep->accel, t*t*0.5f));
+
+          new_pos.tile_offset = add_v2(new_pos.tile_offset, delta_pos);
+
+          // dp -= 2*dot(dp, normal_vector)*normal_vector
+
+          new_pos = recanonicalize_pos(gp, new_pos);
+
+          { /* tile collisions */
+
+            // TODO jfd 26/02/26: correct tile collisions on chunk boundaries
+
+            u8 new_tile_value = tile_from_tile_map_pos(gp, new_pos);
+
+            gp->debug_new_player_pos = new_pos;
+
+            if(new_tile_value > 1) {
+
+              if(new_tile_value == 2) {
+
+                v2 normal = {0};
+
+                s32 tile_dx = (s32)new_pos.tile_x - (s32)cur_pos.tile_x;
+                s32 tile_dy = (s32)new_pos.tile_y - (s32)cur_pos.tile_y;
+
+                if(tile_dx > 0) {
+                  normal.x = -1;
+                }
+                if(tile_dy > 0) {
+                  normal.y = -1 ;
+                }
+                if(tile_dx < 0) {
+                  normal.x = 1;
+                }
+                if(tile_dy < 0) {
+                  normal.y = 1;
+                }
+
+                delta_pos = sub_v2(delta_pos, scale_v2(normal, dot_v2(delta_pos, normal)));
+
+                new_pos = cur_pos;
+                new_pos.tile_offset = add_v2(new_pos.tile_offset, delta_pos);
+
+                new_pos = recanonicalize_pos(gp, new_pos);
+
+              } else if(new_tile_value == 3) {
+                if(!ep->changed_z) {
+                  ep->changed_z = true;
+                  new_pos.tile_z++;
+                }
+              } else if(new_tile_value == 4) {
+                if(!ep->changed_z) {
+                  ep->changed_z = true;
+                  new_pos.tile_z--;
+                }
+              } else {
+                ep->changed_z = false;
+              }
+
+            }
+
+          } /* tile collisions */
+
+          ep->pos = new_pos;
+
+          #else
+
+          // v = v0 + at
+          // s = s0 + vt - v*drag*t (at^2) / 2
+
+          ep->vel = add_v2(ep->vel, scale_v2(ep->accel, t));
+
+          if(is_key_pressed(gp, KBD_KEY_LEFT_SHIFT)) {
+            ep->vel = scale_v2(ep->vel, 0.00001f);
+          }
+
+          f32 drag = 19.0f;
+
+          ep->vel = sub_v2(ep->vel, scale_v2(ep->vel, drag*t));
+
+          Tile_map_pos cur_pos = ep->pos;
+          Tile_map_pos new_pos = cur_pos;
+
+          v2 delta_pos = add_v2(scale_v2(ep->vel, t), scale_v2(ep->accel, t*t*0.5f));
+
           new_pos.tile_offset = add_v2(new_pos.tile_offset, delta_pos);
 
           new_pos = recanonicalize_pos(gp, new_pos);
 
-        } else if(new_tile_value == 3) {
-          if(!gp->player_changed_z) {
-            gp->player_changed_z = true;
-            new_pos.tile_z++;
-          }
-        } else if(new_tile_value == 4) {
-          if(!gp->player_changed_z) {
-            gp->player_changed_z = true;
-            new_pos.tile_z--;
-          }
-        } else {
-          gp->player_changed_z = false;
-        }
+          { /* tile collisions */
 
-      }
+            v2 move_dir = norm_v2(delta_pos);
 
-    } /* tile collisions */
+            u32 start_x = (u32)MIN((s32)cur_pos.tile_x, (s32)new_pos.tile_x);
+            u32 end_x   = (u32)MAX((s32)cur_pos.tile_x, (s32)new_pos.tile_x);
+            u32 start_y = (u32)MIN((s32)cur_pos.tile_y, (s32)new_pos.tile_y);
+            u32 end_y   = (u32)MAX((s32)cur_pos.tile_y, (s32)new_pos.tile_y);
 
-    gp->player_pos = new_pos;
-
-    player_tile_col = gp->player_pos.tile_x;
-    player_tile_row = gp->player_pos.tile_y;
-
-    #else
-
-    // v = v0 + at
-    // s = s0 + vt - v*drag*t (at^2) / 2
-
-    gp->player_vel = add_v2(gp->player_vel, scale_v2(gp->player_accel, t));
-
-    if(is_key_pressed(gp, KBD_KEY_LEFT_SHIFT)) {
-      gp->player_vel = scale_v2(gp->player_vel, 0.00001f);
-    }
-
-    f32 drag = 19.0f;
-
-    gp->player_vel = sub_v2(gp->player_vel, scale_v2(gp->player_vel, drag*t));
-
-    Tile_map_pos cur_pos = gp->player_pos;
-    Tile_map_pos new_pos = cur_pos;
-
-    v2 delta_pos = add_v2(scale_v2(gp->player_vel, t), scale_v2(gp->player_accel, t*t*0.5f));
-
-    new_pos.tile_offset = add_v2(new_pos.tile_offset, delta_pos);
-
-    new_pos = recanonicalize_pos(gp, new_pos);
-
-    { /* tile collisions */
-
-      v2 move_dir = norm_v2(delta_pos);
-
-      u32 start_x = (u32)MIN((s32)cur_pos.tile_x, (s32)new_pos.tile_x);
-      u32 end_x   = (u32)MAX((s32)cur_pos.tile_x, (s32)new_pos.tile_x);
-      u32 start_y = (u32)MIN((s32)cur_pos.tile_y, (s32)new_pos.tile_y);
-      u32 end_y   = (u32)MAX((s32)cur_pos.tile_y, (s32)new_pos.tile_y);
-
-      if((s32)end_x < 0) {
-        end_x = 0;
-      } else {
-        end_x++;
-      }
-
-      if((s32)end_y < 0) {
-        end_y = 0;
-      } else {
-        end_y++;
-      }
-
-      Tile_map_pos hit_tile_pos = {0};
-      u8 hit_tile_value = 0;
-      v2 hit_tile_point = { new_pos.tile_x*TILE_SIZE_METERS + 0.5f, new_pos.tile_y*TILE_SIZE_METERS + 0.5f };
-      f32 hit_tile_point_dot = dot_v2(move_dir, hit_tile_point);
-
-      for(u32 tile_y = start_y; tile_y != end_y; tile_y++) {
-        for(u32 tile_x = start_x; tile_x != end_x; tile_x++) {
-          Tile_map_pos tile_pos = {
-            .tile_x = tile_x,
-            .tile_y = tile_y,
-            .tile_z = cur_pos.tile_z,
-            .tile_offset = { 0.5f, 0.5f },
-          };
-
-          u8 tile_value = tile_from_tile_map_pos(gp, tile_pos);
-
-          if(tile_value > 1) {
-
-            v2 tile_point = { tile_x*TILE_SIZE_METERS + 0.5f, tile_y*TILE_SIZE_METERS + 0.5f };
-            f32 tile_point_dot = dot_v2(move_dir, tile_point);
-
-            if(tile_point_dot <= hit_tile_point_dot) {
-              hit_tile_pos = tile_pos;
-              hit_tile_point = tile_point;
-              hit_tile_point_dot = tile_point_dot;
-              hit_tile_value = tile_value;
+            if((s32)end_x < 0) {
+              end_x = 0;
+            } else {
+              end_x++;
             }
 
+            if((s32)end_y < 0) {
+              end_y = 0;
+            } else {
+              end_y++;
+            }
+
+            Tile_map_pos hit_tile_pos = {0};
+            u8 hit_tile_value = 0;
+            v2 hit_tile_point = { new_pos.tile_x*TILE_SIZE_METERS + 0.5f, new_pos.tile_y*TILE_SIZE_METERS + 0.5f };
+            f32 hit_tile_point_dot = dot_v2(move_dir, hit_tile_point);
+
+            for(u32 tile_y = start_y; tile_y != end_y; tile_y++) {
+              for(u32 tile_x = start_x; tile_x != end_x; tile_x++) {
+                Tile_map_pos tile_pos = {
+                  .tile_x = tile_x,
+                  .tile_y = tile_y,
+                  .tile_z = cur_pos.tile_z,
+                  .tile_offset = { 0.5f, 0.5f },
+                };
+
+                u8 tile_value = tile_from_tile_map_pos(gp, tile_pos);
+
+                if(tile_value > 1) {
+
+                  v2 tile_point = { tile_x*TILE_SIZE_METERS + 0.5f, tile_y*TILE_SIZE_METERS + 0.5f };
+                  f32 tile_point_dot = dot_v2(move_dir, tile_point);
+
+                  if(tile_point_dot <= hit_tile_point_dot) {
+                    hit_tile_pos = tile_pos;
+                    hit_tile_point = tile_point;
+                    hit_tile_point_dot = tile_point_dot;
+                    hit_tile_value = tile_value;
+                  }
+
+                }
+
+              }
+            }
+
+            if(hit_tile_value == 2) {
+
+              v2 normal = {0};
+
+              s32 tile_dx = (s32)new_pos.tile_x - (s32)cur_pos.tile_x;
+              s32 tile_dy = (s32)new_pos.tile_y - (s32)cur_pos.tile_y;
+
+              if(tile_dx > 0) {
+                normal = (v2){ -1, 0 };
+              }
+              if(tile_dy > 0) {
+                normal = (v2){ 0, -1 };
+              }
+              if(tile_dx < 0) {
+                normal = (v2){ 1, 0 };
+              }
+              if(tile_dy < 0) {
+                normal = (v2){ 0, 1 };
+              }
+
+              delta_pos = sub_v2(delta_pos, scale_v2(normal, dot_v2(delta_pos, normal)));
+
+              new_pos = cur_pos;
+              new_pos.tile_offset = add_v2(new_pos.tile_offset, delta_pos);
+
+              new_pos = recanonicalize_pos(gp, new_pos);
+
+            } else if(hit_tile_value == 3) {
+              if(!ep->changed_z) {
+                ep->changed_z = true;
+                new_pos.tile_z++;
+              }
+            } else if(hit_tile_value == 4) {
+              if(!ep->changed_z) {
+                ep->changed_z = true;
+                new_pos.tile_z--;
+              }
+            } else {
+              ep->changed_z = false;
+            }
+
+          } /* tile collisions */
+
+          ep->pos = new_pos;
+
+          player_tile_col = ep->pos.tile_x;
+          player_tile_row = ep->pos.tile_y;
+
+          #endif
+        } /* update world */
+
+        if(ep->kind == ENTITY_KIND_PLAYER_1) {
+
+          Tile_map_pos player_tile_map_pos = ep->pos;
+
+
+          /* update_camera */
+
+          if((s32)player_tile_map_pos.tile_x - (s32)gp->camera_pos.tile_x < -(camera_viewport_width_tiles/2 + 1)) {
+            gp->camera_pos.tile_x -= camera_viewport_width_tiles;
           }
 
-        }
-      }
+          if((s32)player_tile_map_pos.tile_x - (s32)gp->camera_pos.tile_x > (camera_viewport_width_tiles/2 + 1)) {
+            gp->camera_pos.tile_x += camera_viewport_width_tiles;
+          }
 
-      if(hit_tile_value == 2) {
+          if((s32)player_tile_map_pos.tile_y - (s32)gp->camera_pos.tile_y < -(camera_viewport_height_tiles/2 + 1)) {
+            gp->camera_pos.tile_y -= camera_viewport_height_tiles;
+          }
 
-        v2 normal = {0};
+          if((s32)player_tile_map_pos.tile_y - (s32)gp->camera_pos.tile_y > (camera_viewport_height_tiles/2 + 1)) {
+            gp->camera_pos.tile_y += camera_viewport_height_tiles;
+          }
 
-        s32 tile_dx = (s32)new_pos.tile_x - (s32)cur_pos.tile_x;
-        s32 tile_dy = (s32)new_pos.tile_y - (s32)cur_pos.tile_y;
+          gp->camera_pos.tile_z = player_tile_map_pos.tile_z;
 
-        if(tile_dx > 0) {
-          normal = (v2){ -1, 0 };
-        }
-        if(tile_dy > 0) {
-          normal = (v2){ 0, -1 };
-        }
-        if(tile_dx < 0) {
-          normal = (v2){ 1, 0 };
-        }
-        if(tile_dy < 0) {
-          normal = (v2){ 0, 1 };
         }
 
-        delta_pos = sub_v2(delta_pos, scale_v2(normal, dot_v2(delta_pos, normal)));
+      } break;
+    }
 
-        new_pos = cur_pos;
-        new_pos.tile_offset = add_v2(new_pos.tile_offset, delta_pos);
+  } /* update entities */
 
-        new_pos = recanonicalize_pos(gp, new_pos);
-
-      } else if(hit_tile_value == 3) {
-        if(!gp->player_changed_z) {
-          gp->player_changed_z = true;
-          new_pos.tile_z++;
-        }
-      } else if(hit_tile_value == 4) {
-        if(!gp->player_changed_z) {
-          gp->player_changed_z = true;
-          new_pos.tile_z--;
-        }
-      } else {
-        gp->player_changed_z = false;
-      }
-
-    } /* tile collisions */
-
-    gp->player_pos = new_pos;
-
-    player_tile_col = gp->player_pos.tile_x;
-    player_tile_row = gp->player_pos.tile_y;
-
-    #endif
-  } /* update world */
 
   { /* draw */
 
@@ -1057,32 +1156,6 @@ func game_update_and_render(Game *gp) {
       .tile_z = 0,
       .tile_offset = { 0.5f, 0.5f },
     };
-
-    Tile_map_pos player_tile_map_pos = gp->player_pos;
-
-    v2 player_tile_offset = { player_tile_map_pos.tile_offset.x, player_tile_map_pos.tile_offset.y };
-    v2 player_tile = { (f32)((s32)player_tile_map_pos.tile_x), (f32)((s32)player_tile_map_pos.tile_y) };
-    v2 player_pos = add_v2(player_tile_offset, scale_v2(player_tile, TILE_SIZE_METERS));
-
-    /* update_camera */
-
-    if((s32)player_tile_map_pos.tile_x - (s32)gp->camera_pos.tile_x < -(camera_viewport_width_tiles/2 + 1)) {
-      gp->camera_pos.tile_x -= camera_viewport_width_tiles;
-    }
-
-    if((s32)player_tile_map_pos.tile_x - (s32)gp->camera_pos.tile_x > (camera_viewport_width_tiles/2 + 1)) {
-      gp->camera_pos.tile_x += camera_viewport_width_tiles;
-    }
-
-    if((s32)player_tile_map_pos.tile_y - (s32)gp->camera_pos.tile_y < -(camera_viewport_height_tiles/2 + 1)) {
-      gp->camera_pos.tile_y -= camera_viewport_height_tiles;
-    }
-
-    if((s32)player_tile_map_pos.tile_y - (s32)gp->camera_pos.tile_y > (camera_viewport_height_tiles/2 + 1)) {
-      gp->camera_pos.tile_y += camera_viewport_height_tiles;
-    }
-
-    gp->camera_pos.tile_z = player_tile_map_pos.tile_z;
 
     Tile_map_pos save_camera_tile_pos = gp->camera_pos;
 
@@ -1099,63 +1172,88 @@ func game_update_and_render(Game *gp) {
 
     draw_tile_map(gp);
 
-    v2 player_screen_pos = scale_v2(sub_v2(player_pos, camera_pos), gp->pixels_per_meter);
-    player_screen_pos.y = gp->render.height - player_screen_pos.y;
+    for(int entity_index = 0; entity_index < ARRLEN(gp->entities); entity_index++)
+    { /* draw entities */
+        Entity *ep = gp->entities + entity_index;
 
-    {
-      f32 player_bitmap_x = player_screen_pos.x - 0.5f*(f32)gp->player_bitmap.width;
-      f32 player_bitmap_y = player_screen_pos.y - 0.5f*(f32)gp->player_bitmap.height;
-      draw_bitmap(gp, gp->player_bitmap, player_bitmap_x, player_bitmap_y);
-    }
+        if(ep->kind == ENTITY_KIND_NONE) {
+          continue;
+        }
 
-    #if 0
+        switch(ep->kind) {
+          default:
+          UNREACHABLE;
+          break;
+          case ENTITY_KIND_PLAYER_1:
+          case ENTITY_KIND_PLAYER_2:
+          {
 
-    v2 player_rect_screen_size        = scale_v2((v2){ gp->player_width, gp->player_height }, gp->pixels_per_meter);
-    v2 half_player_screen_size        = scale_v2(player_rect_screen_size, 0.5f);
-    v2 player_rect_screen_pos         = sub_v2(player_screen_pos, half_player_screen_size);
-    v2 player_center_rect_screen_pos  = sub_v2(player_screen_pos, scale_v2(half_player_screen_size, 0.2f));
-    v2 player_center_rect_screen_size = scale_v2(player_rect_screen_size, 0.2f);
+            Tile_map_pos player_tile_map_pos = ep->pos;
+            v2 player_tile_offset = { player_tile_map_pos.tile_offset.x, player_tile_map_pos.tile_offset.y };
+            v2 player_tile = { (f32)((s32)player_tile_map_pos.tile_x), (f32)((s32)player_tile_map_pos.tile_y) };
+            v2 player_pos = add_v2(player_tile_offset, scale_v2(player_tile, TILE_SIZE_METERS));
 
-    draw_rect(gp,
-      (Color){ 0.95f, 0.2f, 0.4f, 0.5f },
-      player_rect_screen_pos.x,
-      player_rect_screen_pos.y,
-      player_rect_screen_size.x,
-      player_rect_screen_size.y
-    );
+            v2 player_screen_pos = scale_v2(sub_v2(player_pos, camera_pos), gp->pixels_per_meter);
+            player_screen_pos.y = gp->render.height - player_screen_pos.y;
 
-    draw_rect(gp,
-      (Color){ 0.95f, 0.8f, 0.0f, 0.5f },
-      player_center_rect_screen_pos.x,
-      player_center_rect_screen_pos.y,
-      player_center_rect_screen_size.x,
-      player_center_rect_screen_size.y
-    );
+            {
+              f32 player_bitmap_x = player_screen_pos.x - 0.5f*(f32)ep->bitmap.width;
+              f32 player_bitmap_y = player_screen_pos.y - 0.5f*(f32)ep->bitmap.height;
+              draw_bitmap(gp, ep->bitmap, player_bitmap_x, player_bitmap_y);
+            }
 
-    #endif
+            #if 0
 
-    #if 1
-    {
-      Color color = { 1.0f, 0, 0, 1 };
+            v2 player_rect_screen_size        = scale_v2((v2){ ep->width, ep->height }, gp->pixels_per_meter);
+            v2 half_player_screen_size        = scale_v2(player_rect_screen_size, 0.5f);
+            v2 player_rect_screen_pos         = sub_v2(player_screen_pos, half_player_screen_size);
+            v2 player_center_rect_screen_pos  = sub_v2(player_screen_pos, scale_v2(half_player_screen_size, 0.2f));
+            v2 player_center_rect_screen_size = scale_v2(player_rect_screen_size, 0.2f);
 
-      draw_rect(gp,
-        color,
-        0.5f*(f32)gp->render.width,
-        0,
-        1,
-        (f32)gp->render.height
-      );
+            draw_rect(gp,
+              (Color){ 0.95f, 0.2f, 0.4f, 0.5f },
+              player_rect_screen_pos.x,
+              player_rect_screen_pos.y,
+              player_rect_screen_size.x,
+              player_rect_screen_size.y
+            );
 
-      draw_rect(gp,
-        color,
-        0,
-        0.5f*(f32)gp->render.height,
-        (f32)gp->render.width,
-        1
-      );
+            draw_rect(gp,
+              (Color){ 0.95f, 0.8f, 0.0f, 0.5f },
+              player_center_rect_screen_pos.x,
+              player_center_rect_screen_pos.y,
+              player_center_rect_screen_size.x,
+              player_center_rect_screen_size.y
+            );
 
-    }
-    #endif
+            #endif
+
+            #if 1
+            {
+              Color color = { 1.0f, 0, 0, 1 };
+
+              draw_rect(gp,
+                color,
+                0.5f*(f32)gp->render.width,
+                0,
+                1,
+                (f32)gp->render.height
+              );
+
+              draw_rect(gp,
+                color,
+                0,
+                0.5f*(f32)gp->render.height,
+                (f32)gp->render.width,
+                1
+              );
+
+            }
+            #endif
+
+          } break;
+        }
+    } /* draw entities */
 
     gp->camera_pos = save_camera_tile_pos;
 
@@ -1211,11 +1309,14 @@ func game_init(Platform *pp) {
 
   gp->did_reload = true;
 
-  gp->player_bitmap = load_bitmap(gp, str8_lit("assets/guy.bmp"));
+  gp->guy_bitmap = load_bitmap(gp, str8_lit("assets/guy.bmp"));
 
   init_tile_map(gp);
 
-  init_player(gp);
+  init_camera(gp);
+
+  init_player_1(gp);
+  init_player_2(gp);
 
   return gp;
 }

@@ -28,6 +28,9 @@
 #define PIXELS_TO_METERS(x) ((f32)((f32)(x)*METERS_PER_PIXEL))
 
 
+internal Entity* entity_alloc(Game *gp, Entity_kind kind);
+
+internal void entity_free(Game *gp, Entity *ep);
 
 internal Bitmap load_bitmap(Game *gp, Str8 path);
 
@@ -42,6 +45,8 @@ force_inline Color color_from_pixel(u32 pixel);
 force_inline u32 pixel_from_color(Color color);
 
 internal void draw_rect_min_max(Game *gp, Color color, f32 min_x, f32 min_y, f32 max_x, f32 max_y);
+
+internal void draw_bitmap(Game *gp, Bitmap bitmap, f32 x, f32 y);
 
 internal void draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_x, f32 min_y, f32 max_x, f32 max_y);
 
@@ -59,11 +64,9 @@ internal b32 was_key_released(Game *gp, Keyboard_key key);
 
 internal void debug_silence(Game *gp);
 
-internal void debug_output_sound(Game *gp);
-
 internal v2_s32 chunk_pos_from_point(Game *gp, v2 v);
 
-internal void recanonicalize_coord(Game *gp, u32 *tile, f32 *offset);
+internal void recanonicalize_coord(Game *gp, u32 *tile, f32 *tile_offset);
 
 internal Tile_map_pos recanonicalize_pos(Game *gp, Tile_map_pos pos);
 
@@ -83,11 +86,13 @@ force_inline u8 tile_from_tile_map_pos(Game *gp, Tile_map_pos pos);
 
 internal void set_tile_from_abs_tile_pos(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 abs_tile_z, u8 tile_value);
 
-internal void init_player(Game *gp);
+internal void init_player_1(Game *gp);
+
+internal void init_player_2(Game *gp);
+
+internal void init_camera(Game *gp);
 
 internal void init_tile_map(Game *gp);
-
-internal void draw_tile_by_point(Game *gp, Color color, v2 point);
 
 internal void draw_tile_map(Game *gp);
 
