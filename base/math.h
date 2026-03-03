@@ -56,6 +56,7 @@ force_inline f32 max_f32(f32 a, f32 b);
 force_inline f32 abs_f32(f32 x);
 force_inline f32 lerp_f32(f32 t, f32 begin, f32 end);
 force_inline f32 wrap_f32(f32 value, f32 min, f32 max);
+force_inline f32 sqrt_f32(f32 f);
 
 force_inline v2 truncate_v2(v2 v);
 force_inline v2 wrap_v2(v2 v, v2 min, v2 max);
@@ -66,6 +67,9 @@ force_inline v2  add_v2(v2 a, v2 b);
 force_inline v2  sub_v2(v2 a, v2 b);
 force_inline v2  mul_v2(v2 a, v2 b);
 force_inline f32 dot_v2(v2 a, v2 b);
+force_inline f32 len_sq_v2(v2 v);
+force_inline f32 len_v2(v2 v);
+force_inline v2  norm_v2(v2 v);
 force_inline v2  div_v2(v2 a, v2 b);
 force_inline v2  scale_v2(v2 v, f32 a);
 force_inline v2  lt_v2(v2 a, v2 b);

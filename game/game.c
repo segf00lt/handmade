@@ -835,6 +835,7 @@ func game_update_and_render(Game *gp) {
   int player_tile_row = 0;
 
   { /* update world */
+    #if 1
 
     // v = v0 + at
     // s = s0 + vt - v*drag*t (at^2) / 2
@@ -919,6 +920,133 @@ func game_update_and_render(Game *gp) {
     player_tile_col = gp->player_pos.tile_x;
     player_tile_row = gp->player_pos.tile_y;
 
+    #else
+
+    // v = v0 + at
+    // s = s0 + vt - v*drag*t (at^2) / 2
+
+    gp->player_vel = add_v2(gp->player_vel, scale_v2(gp->player_accel, t));
+
+    if(is_key_pressed(gp, KBD_KEY_LEFT_SHIFT)) {
+      gp->player_vel = scale_v2(gp->player_vel, 0.00001f);
+    }
+
+    f32 drag = 19.0f;
+
+    gp->player_vel = sub_v2(gp->player_vel, scale_v2(gp->player_vel, drag*t));
+
+    Tile_map_pos cur_pos = gp->player_pos;
+    Tile_map_pos new_pos = cur_pos;
+
+    v2 delta_pos = add_v2(scale_v2(gp->player_vel, t), scale_v2(gp->player_accel, t*t*0.5f));
+
+    new_pos.tile_offset = add_v2(new_pos.tile_offset, delta_pos);
+
+    new_pos = recanonicalize_pos(gp, new_pos);
+
+    { /* tile collisions */
+
+      v2 move_dir = norm_v2(delta_pos);
+
+      u32 start_x = (u32)MIN((s32)cur_pos.tile_x, (s32)new_pos.tile_x);
+      u32 end_x   = (u32)MAX((s32)cur_pos.tile_x, (s32)new_pos.tile_x);
+      u32 start_y = (u32)MIN((s32)cur_pos.tile_y, (s32)new_pos.tile_y);
+      u32 end_y   = (u32)MAX((s32)cur_pos.tile_y, (s32)new_pos.tile_y);
+
+      if((s32)end_x < 0) {
+        end_x = 0;
+      } else {
+        end_x++;
+      }
+
+      if((s32)end_y < 0) {
+        end_y = 0;
+      } else {
+        end_y++;
+      }
+
+      Tile_map_pos hit_tile_pos = {0};
+      u8 hit_tile_value = 0;
+      v2 hit_tile_point = { new_pos.tile_x*TILE_SIZE_METERS + 0.5f, new_pos.tile_y*TILE_SIZE_METERS + 0.5f };
+      f32 hit_tile_point_dot = dot_v2(move_dir, hit_tile_point);
+
+      for(u32 tile_y = start_y; tile_y != end_y; tile_y++) {
+        for(u32 tile_x = start_x; tile_x != end_x; tile_x++) {
+          Tile_map_pos tile_pos = {
+            .tile_x = tile_x,
+            .tile_y = tile_y,
+            .tile_z = cur_pos.tile_z,
+            .tile_offset = { 0.5f, 0.5f },
+          };
+
+          u8 tile_value = tile_from_tile_map_pos(gp, tile_pos);
+
+          if(tile_value > 1) {
+
+            v2 tile_point = { tile_x*TILE_SIZE_METERS + 0.5f, tile_y*TILE_SIZE_METERS + 0.5f };
+            f32 tile_point_dot = dot_v2(move_dir, tile_point);
+
+            if(tile_point_dot <= hit_tile_point_dot) {
+              hit_tile_pos = tile_pos;
+              hit_tile_point = tile_point;
+              hit_tile_point_dot = tile_point_dot;
+              hit_tile_value = tile_value;
+            }
+
+          }
+
+        }
+      }
+
+      if(hit_tile_value == 2) {
+
+        v2 normal = {0};
+
+        s32 tile_dx = (s32)new_pos.tile_x - (s32)cur_pos.tile_x;
+        s32 tile_dy = (s32)new_pos.tile_y - (s32)cur_pos.tile_y;
+
+        if(tile_dx > 0) {
+          normal = (v2){ -1, 0 };
+        }
+        if(tile_dy > 0) {
+          normal = (v2){ 0, -1 };
+        }
+        if(tile_dx < 0) {
+          normal = (v2){ 1, 0 };
+        }
+        if(tile_dy < 0) {
+          normal = (v2){ 0, 1 };
+        }
+
+        delta_pos = sub_v2(delta_pos, scale_v2(normal, dot_v2(delta_pos, normal)));
+
+        new_pos = cur_pos;
+        new_pos.tile_offset = add_v2(new_pos.tile_offset, delta_pos);
+
+        new_pos = recanonicalize_pos(gp, new_pos);
+
+      } else if(hit_tile_value == 3) {
+        if(!gp->player_changed_z) {
+          gp->player_changed_z = true;
+          new_pos.tile_z++;
+        }
+      } else if(hit_tile_value == 4) {
+        if(!gp->player_changed_z) {
+          gp->player_changed_z = true;
+          new_pos.tile_z--;
+        }
+      } else {
+        gp->player_changed_z = false;
+      }
+
+    } /* tile collisions */
+
+    gp->player_pos = new_pos;
+
+    player_tile_col = gp->player_pos.tile_x;
+    player_tile_row = gp->player_pos.tile_y;
+
+    #endif
   } /* update world */
 
   { /* draw */

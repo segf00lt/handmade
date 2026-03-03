@@ -21,6 +21,10 @@ func round_f32(f32 f) {
   return (f32)roundf(f);
 }
 
+force_inline f32
+func sqrt_f32(f32 f) {
+  return (f32)sqrtf(f);
+}
 
 // TODO jfd: handle negative values in round_f32_to_s32()
 force_inline s32
@@ -124,6 +128,24 @@ func mul_v2(v2 a, v2 b) {
 force_inline f32
 func dot_v2(v2 a, v2 b) {
   f32 result = a.x*b.x + a.y*b.y;
+  return result;
+}
+
+force_inline f32
+func len_sq_v2(v2 v) {
+  f32 result = dot_v2(v, v);
+  return result;
+}
+
+force_inline f32
+func len_v2(v2 v) {
+  f32 result = sqrt_f32(len_sq_v2(v));
+  return result;
+}
+
+force_inline v2
+func norm_v2(v2 v) {
+  v2 result = scale_v2(v, 1.0f/len_v2(v));
   return result;
 }
 
