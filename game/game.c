@@ -10,6 +10,8 @@
 #define TILE_KIND_MAX 6
 
 
+global Tile_map_pos debug_new_pos;
+
 
 /////////////////////////////////
 // functions
@@ -559,6 +561,42 @@ func set_tile_from_abs_tile_pos(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 ab
   set_tile_of_chunk(gp, chunk, chunk_pos.tile.x, chunk_pos.tile.y, tile_value);
 }
 
+#if 0
+// TODO jfd 06/03/26: line segment intersection
+internal Line_segment_intersection
+func get_line_segment_intersection(v2 p1, v2 p2, v2 p3, v2 p4) {
+  f32 numerator_t = 0, numerator_u = 0, denominator = 0;
+
+  f32 p12x = p1.x - p2.x;
+  f32 p12y = p1.y - p2.y;
+  f32 p34x = p3.x - p4.x;
+  f32 p34y = p3.y - p4.y;
+  f32 p13x = p1.x - p3.x;
+  f32 p13y = p1.y - p3.y;
+
+  denominator = p12x*p34y - p12y*p34x;
+  denominator = 1.0f/denominator;
+
+  numerator_t = p13x * p34y - p13y * p34x;
+  numerator_u = p13x * p12y - p13y * p12x;
+
+  f32 t = numerator_t * denominator;
+  f32 u = numerator_u * denominator;
+
+  Vector2 contact = (Vector2){ p1.x - t*p12x, p1.y - t*p12y };
+
+  b32 collided = !!((0.0 <= t && t <= 1.0) && (0.0 <= u && u <= 1.0));
+
+  Vector2 delta = { -p12x, -p12y };
+  Vector2 dir = {0};
+  Vector2 normal = {0};
+  b32 segment_is_horizontal = 0;
+  b32 segment_is_vertical = 0;
+
+  return result;
+}
+#endif
+
 internal void
 func init_player_1(Game *gp) {
 
@@ -745,12 +783,13 @@ func draw_tile_map(Game *gp) {
 
       Color color = tile_colors[tile];
 
-      #if 0
-      if(gp->player_pos.tile_x == cur_tile_map_pos.tile_x && gp->player_pos.tile_y == cur_tile_map_pos.tile_y) {
-        color = alpha_blend(color, (Color){ 1.0f, 0, 0, 1 });
+      #if 1
+      Tile_map_pos debug_player_pos = gp->entities[0].pos;
+      if(debug_player_pos.tile_x == cur_tile_map_pos.tile_x && debug_player_pos.tile_y == cur_tile_map_pos.tile_y) {
+        color = alpha_blend(color, (Color){ 0, 0, 1.0f, 1.f });
       }
-      if(gp->debug_new_player_pos.tile_x == cur_tile_map_pos.tile_x && gp->debug_new_player_pos.tile_y == cur_tile_map_pos.tile_y) {
-        color = alpha_blend(color, (Color){ 0, 0, 1.0f, 0.5f });
+      if(debug_new_pos.tile_x == cur_tile_map_pos.tile_x && debug_new_pos.tile_y == cur_tile_map_pos.tile_y) {
+        color = alpha_blend(color, (Color){ 1.0f, 0, 0.0f, 0.5f });
       }
       #endif
 
@@ -904,8 +943,6 @@ func game_update_and_render(Game *gp) {
 
         { /* update world */
 
-          #if 1
-
           // v = v0 + at
           // s = s0 + vt - v*drag*t (at^2) / 2
 
@@ -929,9 +966,13 @@ func game_update_and_render(Game *gp) {
 
           new_pos = recanonicalize_pos(gp, new_pos);
 
-          { /* tile collisions */
+          if(ep->kind == ENTITY_KIND_PLAYER_1) {
+            debug_new_pos = new_pos;
+          }
 
-            // TODO jfd 26/02/26: correct tile collisions on chunk boundaries
+          // TODO jfd 06/03/26: proper collisions with surface gliding
+
+          { /* tile collisions */
 
             u8 new_tile_value = tile_from_tile_map_pos(gp, new_pos);
 
@@ -943,28 +984,75 @@ func game_update_and_render(Game *gp) {
 
                 v2 normal = {0};
 
+
                 s32 tile_dx = (s32)new_pos.tile_x - (s32)cur_pos.tile_x;
                 s32 tile_dy = (s32)new_pos.tile_y - (s32)cur_pos.tile_y;
 
-                if(tile_dx > 0) {
+                Tile_map_pos top_tile_pos = new_pos;
+                top_tile_pos.tile_y++;
+
+                Tile_map_pos right_tile_pos = new_pos;
+                right_tile_pos.tile_x++;
+
+                Tile_map_pos bottom_tile_pos = new_pos;
+                bottom_tile_pos.tile_y--;
+
+                Tile_map_pos left_tile_pos = new_pos;
+                left_tile_pos.tile_x--;
+
+                u8 top_tile_value    = tile_from_tile_map_pos(gp, top_tile_pos);
+                u8 right_tile_value  = tile_from_tile_map_pos(gp, right_tile_pos);
+                u8 bottom_tile_value = tile_from_tile_map_pos(gp, bottom_tile_pos);
+                u8 left_tile_value   = tile_from_tile_map_pos(gp, left_tile_pos);
+
+                b32 top_enabled    = (top_tile_value != 2);
+                b32 right_enabled  = (right_tile_value != 2);
+                b32 bottom_enabled = (bottom_tile_value != 2);
+                b32 left_enabled   = (left_tile_value != 2);
+
+                b32 top_left_corner_enabled     = (!left_enabled && !top_enabled);
+                b32 top_right_corner_enabled    = (!right_enabled && !top_enabled);
+                b32 bottom_right_corner_enabled = (!right_enabled && !bottom_enabled);
+                b32 bottom_left_corner_enabled  = (!left_enabled && !bottom_enabled);
+
+                if(tile_dx > 0 && left_enabled) {
                   normal.x = -1;
                 }
-                if(tile_dy > 0) {
-                  normal.y = -1 ;
-                }
-                if(tile_dx < 0) {
+                if(tile_dx < 0 && right_enabled) {
                   normal.x = 1;
                 }
-                if(tile_dy < 0) {
+                if(tile_dy > 0 && bottom_enabled) {
+                  normal.y = -1;
+                }
+                if(tile_dy < 0 && top_enabled) {
                   normal.y = 1;
                 }
 
-                delta_pos = sub_v2(delta_pos, scale_v2(normal, dot_v2(delta_pos, normal)));
+                if(tile_dx > 0 && tile_dy > 0 && bottom_left_corner_enabled) {
+                  normal = (v2){ -1, -1 };
+                }
+                if(tile_dx < 0 && tile_dy > 0 && bottom_right_corner_enabled) {
+                  normal = (v2){ 1, -1 };
+                }
+                if(tile_dx > 0 && tile_dy < 0 && top_left_corner_enabled) {
+                  normal = (v2){ -1, 1 };
+                }
+                if(tile_dx < 0 && tile_dy < 0 && top_right_corner_enabled) {
+                  normal = (v2){ 1, 1 };
+                }
+
+                if(normal.x != 0.0f && normal.y != 0.0f) {
+                  normal = scale_v2(normal, 0.70710678118654752440084436210485f);
+                }
+
+                delta_pos = sub_v2(delta_pos, scale_v2(normal, 1.5f*dot_v2(delta_pos, normal)));
 
                 new_pos = cur_pos;
                 new_pos.tile_offset = add_v2(new_pos.tile_offset, delta_pos);
 
                 new_pos = recanonicalize_pos(gp, new_pos);
+
+                ep->changed_z = false;
 
               } else if(new_tile_value == 3) {
                 if(!ep->changed_z) {
@@ -976,131 +1064,8 @@ func game_update_and_render(Game *gp) {
                   ep->changed_z = true;
                   new_pos.tile_z--;
                 }
-              } else {
-                ep->changed_z = false;
               }
 
-            }
-
-          } /* tile collisions */
-
-          ep->pos = new_pos;
-
-          #else
-
-          // v = v0 + at
-          // s = s0 + vt - v*drag*t (at^2) / 2
-
-          ep->vel = add_v2(ep->vel, scale_v2(ep->accel, t));
-
-          if(is_key_pressed(gp, KBD_KEY_LEFT_SHIFT)) {
-            ep->vel = scale_v2(ep->vel, 0.00001f);
-          }
-
-          f32 drag = 19.0f;
-
-          ep->vel = sub_v2(ep->vel, scale_v2(ep->vel, drag*t));
-
-          Tile_map_pos cur_pos = ep->pos;
-          Tile_map_pos new_pos = cur_pos;
-
-          v2 delta_pos = add_v2(scale_v2(ep->vel, t), scale_v2(ep->accel, t*t*0.5f));
-
-          new_pos.tile_offset = add_v2(new_pos.tile_offset, delta_pos);
-
-          new_pos = recanonicalize_pos(gp, new_pos);
-
-          { /* tile collisions */
-
-            v2 move_dir = norm_v2(delta_pos);
-
-            u32 start_x = (u32)MIN((s32)cur_pos.tile_x, (s32)new_pos.tile_x);
-            u32 end_x   = (u32)MAX((s32)cur_pos.tile_x, (s32)new_pos.tile_x);
-            u32 start_y = (u32)MIN((s32)cur_pos.tile_y, (s32)new_pos.tile_y);
-            u32 end_y   = (u32)MAX((s32)cur_pos.tile_y, (s32)new_pos.tile_y);
-
-            if((s32)end_x < 0) {
-              end_x = 0;
-            } else {
-              end_x++;
-            }
-
-            if((s32)end_y < 0) {
-              end_y = 0;
-            } else {
-              end_y++;
-            }
-
-            Tile_map_pos hit_tile_pos = {0};
-            u8 hit_tile_value = 0;
-            v2 hit_tile_point = { new_pos.tile_x*TILE_SIZE_METERS + 0.5f, new_pos.tile_y*TILE_SIZE_METERS + 0.5f };
-            f32 hit_tile_point_dot = dot_v2(move_dir, hit_tile_point);
-
-            for(u32 tile_y = start_y; tile_y != end_y; tile_y++) {
-              for(u32 tile_x = start_x; tile_x != end_x; tile_x++) {
-                Tile_map_pos tile_pos = {
-                  .tile_x = tile_x,
-                  .tile_y = tile_y,
-                  .tile_z = cur_pos.tile_z,
-                  .tile_offset = { 0.5f, 0.5f },
-                };
-
-                u8 tile_value = tile_from_tile_map_pos(gp, tile_pos);
-
-                if(tile_value > 1) {
-
-                  v2 tile_point = { tile_x*TILE_SIZE_METERS + 0.5f, tile_y*TILE_SIZE_METERS + 0.5f };
-                  f32 tile_point_dot = dot_v2(move_dir, tile_point);
-
-                  if(tile_point_dot <= hit_tile_point_dot) {
-                    hit_tile_pos = tile_pos;
-                    hit_tile_point = tile_point;
-                    hit_tile_point_dot = tile_point_dot;
-                    hit_tile_value = tile_value;
-                  }
-
-                }
-
-              }
-            }
-
-            if(hit_tile_value == 2) {
-
-              v2 normal = {0};
-
-              s32 tile_dx = (s32)new_pos.tile_x - (s32)cur_pos.tile_x;
-              s32 tile_dy = (s32)new_pos.tile_y - (s32)cur_pos.tile_y;
-
-              if(tile_dx > 0) {
-                normal = (v2){ -1, 0 };
-              }
-              if(tile_dy > 0) {
-                normal = (v2){ 0, -1 };
-              }
-              if(tile_dx < 0) {
-                normal = (v2){ 1, 0 };
-              }
-              if(tile_dy < 0) {
-                normal = (v2){ 0, 1 };
-              }
-
-              delta_pos = sub_v2(delta_pos, scale_v2(normal, dot_v2(delta_pos, normal)));
-
-              new_pos = cur_pos;
-              new_pos.tile_offset = add_v2(new_pos.tile_offset, delta_pos);
-
-              new_pos = recanonicalize_pos(gp, new_pos);
-
-            } else if(hit_tile_value == 3) {
-              if(!ep->changed_z) {
-                ep->changed_z = true;
-                new_pos.tile_z++;
-              }
-            } else if(hit_tile_value == 4) {
-              if(!ep->changed_z) {
-                ep->changed_z = true;
-                new_pos.tile_z--;
-              }
             } else {
               ep->changed_z = false;
             }
@@ -1109,10 +1074,6 @@ func game_update_and_render(Game *gp) {
 
           ep->pos = new_pos;
 
-          player_tile_col = ep->pos.tile_x;
-          player_tile_row = ep->pos.tile_y;
-
-          #endif
         } /* update world */
 
         if(ep->kind == ENTITY_KIND_PLAYER_1) {
