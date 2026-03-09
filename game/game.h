@@ -208,7 +208,7 @@ struct Game {
   s32 test_sound_pitch;
 
   Tile_map_pos camera_pos;
-  Tile_map_pos camera_offset;
+  Tile_map_pos _camera_offset;
 
   b8 once;
   b8 should_init_player;
@@ -279,10 +279,6 @@ internal void debug_silence(Game *gp);
 
 internal v2_s32 chunk_pos_from_point(Game *gp, v2 v);
 
-internal void recanonicalize_coord(Game *gp, u32 *tile, f32 *tile_offset);
-
-internal Tile_map_pos recanonicalize_pos(Game *gp, Tile_map_pos pos);
-
 internal Chunk_pos chunk_pos_from_tile_map_pos(Game *gp, Tile_map_pos pos);
 
 internal Chunk_pos chunk_pos_from_abs_tile_pos(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 abs_tile_z);
@@ -308,6 +304,12 @@ internal void init_camera(Game *gp);
 internal void init_tile_map(Game *gp);
 
 internal void draw_tile_map(Game *gp);
+
+internal Tile_map_pos tile_pos_from_screen_pos(Game *gp, v2 pos, u32 z);
+
+internal v2 screen_pos_from_tile_pos(Game *gp, Tile_map_pos tile_pos);
+
+internal u8 tile_value_from_screen_pos(Game *gp, v2 pos, u32 z);
 
 shared_function void game_update_and_render(Game *gp);
 
