@@ -534,6 +534,16 @@ func cast_v2_u32_to_f32(v2_u32 v) {
   return result;
 }
 
+
+force_inline v2_s32
+func cast_v2_u32_to_s32(v2_u32 v) {
+  v2_s32 result = {
+    (s32)v.x,
+    (s32)v.y,
+  };
+  return result;
+}
+
 force_inline v2_s32
 func cast_v2_f32_to_s32(v2 v) {
   v2_s32 result = {

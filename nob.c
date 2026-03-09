@@ -15,6 +15,7 @@ int win32_build_hot_reload_no_cradle(void) {
     "/DHANDMADE_INTERNAL",
     "/DHANDMADE_HOTRELOAD",
     "/DPLATFORM_CORE_IMPORT",
+    "/DGAME_FUNCTION_HEADERS",
     "/LD",
     "handmade_module_build.c",
     "platform_core.lib",

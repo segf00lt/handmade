@@ -3,7 +3,7 @@
 
 #include "platform/platform.h"
 
-#include "game/game_types.h"
+#include "game/game.h"
 
 #include "platform/platform_include.h"
 

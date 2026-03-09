@@ -118,5 +118,6 @@ force_inline v2_s32 cast_v2_f32_to_s32(v2 v);
 force_inline v2_u32 cast_v2_f32_to_u32(v2 v);
 force_inline v2     cast_v2_u32_to_f32(v2_u32 v);
 force_inline v2     cast_v2_s32_to_f32(v2_s32 v);
+force_inline v2_s32 cast_v2_u32_to_s32(v2_u32 v);
 
 #endif

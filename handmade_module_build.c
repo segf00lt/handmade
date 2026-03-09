@@ -3,7 +3,6 @@
 
 #include "platform/platform.h"
 
-#include "game/game_types.h"
 #include "game/game.h"
 
 #include "base/base_include.c"
