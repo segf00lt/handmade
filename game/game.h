@@ -18,7 +18,7 @@
 #define TILE_SIZE_METERS               M(2.0f)
 #define CHUNK_SIZE_METERS             (TILE_SIZE_METERS*(f32)CHUNK_SIZE)
 
-#define PLAYER_ACCEL             (M(512))
+#define PLAYER_ACCEL             (M(480))
 
 #define PIXELS_PER_METER (13.0f)
 #define MIN_PIXELS_PER_METER (PIXELS_PER_METER*0.1f)
@@ -138,7 +138,7 @@ struct Tile_map_pos {
   u32 tile_x;
   u32 tile_y;
   u32 tile_z;
-  v2 tile_offset;
+  v2 tile_offset; // NOTE jfd 03/10/26: this is the remainder of your floating point position by TILE_SIZE_METERS, it is not a normalized value
 };
 
 typedef struct Bitmap Bitmap;

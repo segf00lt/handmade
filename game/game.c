@@ -623,7 +623,7 @@ func init_camera(Game *gp) {
     .tile_x = gp->tiles_per_room_width / 2,
     .tile_y = gp->tiles_per_room_height / 2,
     .tile_z = 0,
-    .tile_offset = { 0.5f, 0.5f },
+    .tile_offset = { 0.5f*TILE_SIZE_METERS, 0.5f*TILE_SIZE_METERS  },
   };
 
 }
@@ -794,13 +794,16 @@ func draw_tile_map(Game *gp) {
       }
       #endif
 
-      s32 tile_row =  row;
+      s32 tile_row = row;
       s32 tile_col = col;
 
 
       v2 tile_screen_pos = { (f32)(tile_col) * TILE_SIZE_METERS, (f32)((tile_row)) * TILE_SIZE_METERS };
       tile_screen_pos = sub_v2(tile_screen_pos, camera_tile_map_pos.tile_offset);
-      tile_screen_pos = add_value_v2(tile_screen_pos, -TILE_SIZE_METERS*0.5);
+
+      // NOTE jfd 10/03/2026: this is what was causing that weird bug where stuff was a little bit off in the drawing
+      // tile_screen_pos = add_value_v2(tile_screen_pos, -TILE_SIZE_METERS*0.5);
+
       tile_screen_pos = scale_v2(tile_screen_pos, gp->pixels_per_meter);
       v2 camera_offset = { 0.5f*(f32)gp->render.width, 0.5f*(f32)gp->render.height};
       tile_screen_pos = add_v2(tile_screen_pos, camera_offset);
@@ -816,6 +819,17 @@ func draw_tile_map(Game *gp) {
         tile_screen_size.x,
         tile_screen_size.y
       );
+
+      #if 0
+      Color yellow = { 1.0f, 1.0f, 0.0f, 0.5f };
+      draw_rect(gp,
+        yellow,
+        tile_screen_pos.x + gp->pixels_per_meter*0.5f*TILE_SIZE_METERS - 2.0f,
+        tile_screen_pos.y + gp->pixels_per_meter*0.5f*TILE_SIZE_METERS - 2.0f,
+        4.0f,
+        4.0f
+      );
+      #endif
 
       #if 1
       Color debug_line_color = { 0.0f, 1.0f, 0.0f, 0.3f };
@@ -1012,11 +1026,12 @@ func game_update_and_render(Game *gp) {
 
         ep->vel = add_v2(ep->vel, scale_v2(ep->accel, t));
 
-        if(ep->flags & ENTITY_FLAG_SLOW) {
-          ep->vel = scale_v2(ep->vel, 1.0e-10f);
-        }
 
         delta_pos = add_v2(scale_v2(ep->vel, t), scale_v2(ep->accel, t*t*0.5f));
+
+        if(ep->flags & ENTITY_FLAG_SLOW) {
+          delta_pos = scale_v2(delta_pos, 1.0e-2f);
+        }
 
         new_pos = add_v2(cur_pos, delta_pos);
 
@@ -1217,11 +1232,13 @@ func game_update_and_render(Game *gp) {
           player_screen_pos = add_v2(player_screen_pos, camera_offset);
           player_screen_pos.y = gp->render.height - player_screen_pos.y;
 
+          #if 1
           {
             f32 player_bitmap_x = player_screen_pos.x - 0.5f*(f32)ep->bitmap.width;
             f32 player_bitmap_y = player_screen_pos.y - 0.5f*(f32)ep->bitmap.height;
             draw_bitmap(gp, ep->bitmap, player_bitmap_x, player_bitmap_y);
           }
+          #endif
 
           #if 1
 
