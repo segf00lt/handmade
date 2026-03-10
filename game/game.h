@@ -12,11 +12,13 @@
 #define CM(x) ((f32)(x) * 1.0e-2f)
 #define MM(x) ((f32)(x) * 1.0e-3f)
 
-#define CHUNK_SHIFT                    4
-#define CHUNK_SIZE                     (1 << CHUNK_SHIFT)
-#define CHUNK_MASK                     (CHUNK_SIZE - 1)
-#define TILE_SIZE_METERS               M(2.0f)
+#define CHUNK_SHIFT                   4
+#define CHUNK_SIZE                    (1 << CHUNK_SHIFT)
+#define CHUNK_MASK                    (CHUNK_SIZE - 1)
+#define TILE_SIZE_METERS              M(2.0f)
 #define CHUNK_SIZE_METERS             (TILE_SIZE_METERS*(f32)CHUNK_SIZE)
+#define CHUNK_HASH_TABLE_COUNT        (1 << 10)
+#define CHUNK_SAFE_MARGIN             (MAX_S32/64)
 
 #define PLAYER_ACCEL             (M(480))
 
@@ -120,27 +122,6 @@ struct Game_input {
 
 TYPEDEF_SLICE(Game_input);
 
-typedef struct Chunk Chunk;
-struct Chunk {
-  u8 *tiles;
-};
-
-typedef struct Chunk_pos Chunk_pos;
-struct Chunk_pos {
-  s32 chunk_x;
-  s32 chunk_y;
-  s32 chunk_z;
-  v2_s32 tile;
-};
-
-typedef struct Tile_map_pos Tile_map_pos;
-struct Tile_map_pos {
-  u32 tile_x;
-  u32 tile_y;
-  u32 tile_z;
-  v2 tile_offset; // NOTE jfd 03/10/26: this is the remainder of your floating point position by TILE_SIZE_METERS, it is not a normalized value
-};
-
 typedef struct Bitmap Bitmap;
 struct Bitmap {
   u32 *pixels;
@@ -151,15 +132,15 @@ struct Bitmap {
 #pragma pack(push, 1)
 typedef struct Bitmap_header Bitmap_header;
 struct Bitmap_header {
-  u16 file_type;     /* File type, always 4D42h ("BM") */
-  u32 file_size;     /* Size of the file in bytes */
-  u16 reserved_1;    /* Always 0 */
-  u16 reserved_2;    /* Always 0 */
-  u32 bitmap_offset; /* Starting position of image data in bytes */
-  u32 size;            /* Size of this header in bytes */
-  s32 width;           /* Image width in pixels */
-  s32 height;          /* Image height in pixels */
-  u16 planes;          /* Number of color planes */
+  u16 file_type;         /* File type, always 4D42h ("BM") */
+  u32 file_size;         /* Size of the file in bytes */
+  u16 reserved_1;        /* Always 0 */
+  u16 reserved_2;        /* Always 0 */
+  u32 bitmap_offset;     /* Starting position of image data in bytes */
+  u32 size;              /* Size of this header in bytes */
+  s32 width;             /* Image width in pixels */
+  s32 height;            /* Image height in pixels */
+  u16 planes;            /* Number of color planes */
   u16 bits_per_pixel;    /* Number of bits per pixel */
   u32 compression;
   u32 size_of_bitmap;
@@ -169,6 +150,14 @@ struct Bitmap_header {
   u32 colors_important;
 };
 #pragma pack(pop)
+
+typedef struct Tile_map_pos Tile_map_pos;
+struct Tile_map_pos {
+  s32 tile_x;
+  s32 tile_y;
+  s32 tile_z;
+  v2 tile_offset; // NOTE jfd 10/03/26: this is the remainder of your floating point position by TILE_SIZE_METERS, it is not a normalized value
+};
 
 typedef struct Entity Entity;
 struct Entity {
@@ -190,6 +179,26 @@ struct Entity {
 
   Bitmap bitmap;
 
+};
+
+// TODO jfd: make chunks a hash table
+typedef struct Chunk Chunk;
+struct Chunk {
+  Chunk *hash_next;
+  u8 *tiles;
+  Entity **entities;
+  s32 entities_count;
+  s32 chunk_x;
+  s32 chunk_y;
+  s32 chunk_z;
+};
+
+typedef struct Chunk_pos Chunk_pos;
+struct Chunk_pos {
+  s32 chunk_x;
+  s32 chunk_y;
+  s32 chunk_z;
+  v2_s32 tile;
 };
 
 typedef struct Game Game;
@@ -216,8 +225,7 @@ struct Game {
   u32 world_chunks_x_count;
   u32 world_chunks_y_count;
   u32 world_chunks_z_count;
-  Chunk *world_chunks;
-  Chunk chunk;
+  Chunk *world_chunks[CHUNK_HASH_TABLE_COUNT];
 
   s32 random_number_index;
 
@@ -281,7 +289,7 @@ internal v2_s32 chunk_pos_from_point(Game *gp, v2 v);
 
 internal Chunk_pos chunk_pos_from_tile_map_pos(Game *gp, Tile_map_pos pos);
 
-internal Chunk_pos chunk_pos_from_abs_tile_pos(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 abs_tile_z);
+internal Chunk_pos chunk_pos_from_abs_tile_pos(Game *gp, s32 abs_tile_x, s32 abs_tile_y, s32 abs_tile_z);
 
 internal Tile_map_pos tile_map_pos_from_point(Game *gp, f32 x, f32 y);
 
@@ -293,7 +301,7 @@ force_inline void set_tile_of_chunk(Game *gp, Chunk *chunk, s32 tile_x, s32 tile
 
 force_inline u8 tile_from_tile_map_pos(Game *gp, Tile_map_pos pos);
 
-internal void set_tile_from_abs_tile_pos(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 abs_tile_z, u8 tile_value);
+internal void set_tile_from_abs_tile_pos(Game *gp, s32 abs_tile_x, s32 abs_tile_y, s32 abs_tile_z, u8 tile_value);
 
 internal void init_player_1(Game *gp);
 

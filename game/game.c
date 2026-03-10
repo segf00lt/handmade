@@ -430,9 +430,9 @@ internal Chunk_pos
 func chunk_pos_from_tile_map_pos(Game *gp, Tile_map_pos pos) {
   Chunk_pos result;
 
-  u32 abs_tile_x = pos.tile_x;
-  u32 abs_tile_y = pos.tile_y;
-  u32 abs_tile_z = pos.tile_z;
+  s32 abs_tile_x = pos.tile_x;
+  s32 abs_tile_y = pos.tile_y;
+  s32 abs_tile_z = pos.tile_z;
 
   result = chunk_pos_from_abs_tile_pos(gp, abs_tile_x, abs_tile_y, abs_tile_z);
 
@@ -440,7 +440,7 @@ func chunk_pos_from_tile_map_pos(Game *gp, Tile_map_pos pos) {
 }
 
 internal Chunk_pos
-func chunk_pos_from_abs_tile_pos(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 abs_tile_z) {
+func chunk_pos_from_abs_tile_pos(Game *gp, s32 abs_tile_x, s32 abs_tile_y, s32 abs_tile_z) {
   Chunk_pos result;
 
   result.chunk_x = (s32)abs_tile_x >> CHUNK_SHIFT;
@@ -471,17 +471,40 @@ func tile_map_pos_from_point(Game *gp, f32 x, f32 y) {
 
 force_inline Chunk*
 func get_chunk(Game *gp, s32 chunk_x, s32 chunk_y, s32 chunk_z) {
-  Chunk *chunk = 0;
+  ASSERT(chunk_x > -CHUNK_SAFE_MARGIN);
+  ASSERT(chunk_y > -CHUNK_SAFE_MARGIN);
+  ASSERT(chunk_z > -CHUNK_SAFE_MARGIN);
+  ASSERT(chunk_x <  CHUNK_SAFE_MARGIN);
+  ASSERT(chunk_y <  CHUNK_SAFE_MARGIN);
+  ASSERT(chunk_z <  CHUNK_SAFE_MARGIN);
 
-  if(chunk_x >= 0 && chunk_x < (s32)gp->world_chunks_x_count && chunk_y >= 0 && chunk_y < (s32)gp->world_chunks_y_count) {
-    chunk = &gp->world_chunks[
-      chunk_z*gp->world_chunks_x_count*gp->world_chunks_y_count +
-      chunk_y*gp->world_chunks_x_count +
-      chunk_x
-    ];
+  Chunk *result = 0;
+
+  // TODO jfd 10/03/26: replace with a better hash function (never gonna do it)
+  u32 hash = 19*chunk_x + 7*chunk_y + 3*chunk_z;
+  u32 slot = hash & (CHUNK_HASH_TABLE_COUNT - 1);
+  ASSERT(slot < CHUNK_HASH_TABLE_COUNT);
+
+  for(Chunk *chunk = gp->world_chunks[slot]; chunk; chunk = chunk->hash_next) {
+    if(chunk->chunk_x == chunk_x && chunk->chunk_y == chunk_y && chunk->chunk_z == chunk_z) {
+      result = chunk;
+      break;
+    }
   }
 
-  return chunk;
+  if(!result) {
+    Chunk *new_chunk = push_struct(gp->main_arena, Chunk);
+    Chunk **table = gp->world_chunks;
+    // NOTE jfd: this may produce a bug, careful
+    sll_stack_push_n(table[slot], new_chunk, hash_next);
+    new_chunk->tiles = push_array(gp->main_arena, u8, CHUNK_SIZE*CHUNK_SIZE);
+    new_chunk->chunk_x = chunk_x;
+    new_chunk->chunk_y = chunk_y;
+    new_chunk->chunk_z = chunk_z;
+    result = new_chunk;
+  }
+
+  return result;
 }
 
 force_inline u8
@@ -514,26 +537,11 @@ func tile_from_tile_map_pos(Game *gp, Tile_map_pos pos) {
 }
 
 internal void
-func set_tile_from_abs_tile_pos(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 abs_tile_z, u8 tile_value) {
+func set_tile_from_abs_tile_pos(Game *gp, s32 abs_tile_x, s32 abs_tile_y, s32 abs_tile_z, u8 tile_value) {
   Chunk_pos chunk_pos = chunk_pos_from_abs_tile_pos(gp, abs_tile_x, abs_tile_y, abs_tile_z);
   Chunk *chunk = get_chunk(gp, chunk_pos.chunk_x, chunk_pos.chunk_y, chunk_pos.chunk_z);
 
   ASSERT(chunk);
-  if(!chunk->tiles) {
-
-    Chunk new_chunk = {
-      .tiles = push_array_no_zero(gp->main_arena, u8, CHUNK_SIZE*CHUNK_SIZE),
-    };
-
-    memory_set(new_chunk.tiles, 1, CHUNK_SIZE*CHUNK_SIZE);
-
-    gp->world_chunks[
-      chunk_pos.chunk_z*gp->world_chunks_x_count*gp->world_chunks_y_count +
-      chunk_pos.chunk_y*gp->world_chunks_x_count +
-      chunk_pos.chunk_x
-    ] = new_chunk;
-
-  }
 
   set_tile_of_chunk(gp, chunk, chunk_pos.tile.x, chunk_pos.tile.y, tile_value);
 }
@@ -634,14 +642,8 @@ func init_tile_map(Game *gp) {
   gp->world_chunks_y_count = 128;
   gp->world_chunks_z_count = 2;
 
-  gp->world_chunks = push_array(gp->main_arena,
-    Chunk,
-    gp->world_chunks_x_count * gp->world_chunks_y_count * gp->world_chunks_z_count
-  );
-
   u32 screen_x = 0;
   u32 screen_y = 0;
-
 
   gp->tiles_per_room_width  = 35;
   gp->tiles_per_room_height = 20;

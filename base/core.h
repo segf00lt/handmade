@@ -283,8 +283,8 @@ typedef uint64_t b64;
 
 #define MAX_U32 ((u32)~0)
 #define MAX_U64 ((u64)~0)
-#define MAX_S32 (((s32)~0)^(1u<<31))
-#define MAX_S64 (((s64)~0)^(1ull<<63))
+#define MAX_S32 ((s32)(((s32)~0)^(1u<<31)))
+#define MAX_S64 ((s64)(((s64)~0)^(1ull<<63)))
 
 
 typedef void* void_ptr;
