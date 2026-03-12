@@ -68,9 +68,6 @@ struct name {                 \
 #define arr_init_ex(array, arena, cap) arr_init_(header_ptr_from_arr((array)), (arena), arr_stride(array), (cap))
 #define arr_init_pro(array, arena, cap, stride) arr_init_(header_ptr_from_arr((array)), (arena), (stride), (cap))
 
-#define dict_init(dict, arena) dict_init_ex(dict, arena, DICT_DEFAULT_CAP)
-#define dict_init_ex(dict, arena, cap) (memory_zero(&((dict).nil_item), sizeof(*&(dict).nil_item)), arr_init_(header_ptr_from_arr((dict)), arena, dict_stride(dict), cap))
-
 #define arr_push(array, elem) ((arr_push_no_zero_(header_ptr_from_arr((array)), arr_stride(array), 1)), (array).d[(array).count-1] = (elem))
 #define arr_push_n_ptr(array, n) ((arr_push_no_zero_(header_ptr_from_arr((array)), arr_stride(array), (n))), &((array).d[(array).count - (n)]))
 #define arr_push_n_index(array, n) ((arr_push_no_zero_(header_ptr_from_arr((array)), arr_stride(array), (n))), (s64)((array).count - (n)))

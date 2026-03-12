@@ -2,10 +2,6 @@
 #define GAME_H
 
 
-// NOTE jfd 22/01/2026:
-// This file contains game function headers and macros.
-
-
 #define KM(x) ((f32)(x) * 1.0e3f)
 #define M(x) x
 #define DM(x) ((f32)(x) * 1.0e-1f)
@@ -30,7 +26,9 @@
 #define PIXELS_TO_METERS(x) ((f32)((f32)(x)*METERS_PER_PIXEL))
 
 
-#define MAX_ENTITIES 128
+#define MAX_ENTITIES_PER_CHUNK 1024
+#define MAX_ENTITIES 512
+#define MAX_LIVE_ENTITIES 512
 
 #define ENTITY_KINDS \
 X(PLAYER_1) \
@@ -159,8 +157,12 @@ struct Tile_map_pos {
   v2 tile_offset; // NOTE jfd 10/03/26: this is the remainder of your floating point position by TILE_SIZE_METERS, it is not a normalized value
 };
 
+typedef struct Chunk Chunk;
 typedef struct Entity Entity;
+
 struct Entity {
+  Entity *free_list_next;
+
   Entity_kind    kind;
   Entity_order   order;
   Entity_control control;
@@ -179,19 +181,23 @@ struct Entity {
 
   Bitmap bitmap;
 
+  // NOTE jfd: per frame data
+
 };
 
-// TODO jfd: make chunks a hash table
-typedef struct Chunk Chunk;
+TYPEDEF_ARRAY_NAME(Entity*, Entity_ptr_array);
+
 struct Chunk {
   Chunk *hash_next;
   u8 *tiles;
-  Entity **entities;
+  Entity *entities[MAX_ENTITIES_PER_CHUNK];
   s32 entities_count;
   s32 chunk_x;
   s32 chunk_y;
   s32 chunk_z;
 };
+
+TYPEDEF_ARRAY_NAME(Chunk*, Chunk_ptr_array);
 
 typedef struct Chunk_pos Chunk_pos;
 struct Chunk_pos {
@@ -237,6 +243,9 @@ struct Game {
 
   Entity entities[MAX_ENTITIES];
 
+  Chunk_ptr_array live_chunks;
+  Entity_ptr_array live_entities;
+
   Bitmap guy_bitmap;
 
   Tile_map_pos debug_new_player_pos;
@@ -248,6 +257,7 @@ STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
 
 #ifdef GAME_FUNCTION_HEADERS
 
+internal void add_entity_to_chunk(Game *gp, Entity *ep);
 
 internal Entity* entity_alloc(Game *gp, Entity_order order, Entity_kind kind, Entity_control control, Entity_flags flags);
 

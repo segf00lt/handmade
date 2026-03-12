@@ -600,6 +600,8 @@ func init_player_1(Game *gp) {
   ep->height = CM(400);
   ep->bitmap = gp->guy_bitmap;
 
+  add_entity_to_chunk(gp, ep);
+
 }
 
 internal void
@@ -620,6 +622,8 @@ func init_player_2(Game *gp) {
   ep->width = CM(200);
   ep->height = CM(400);
   ep->bitmap = gp->guy_bitmap;
+
+  add_entity_to_chunk(gp, ep);
 
 }
 
@@ -905,6 +909,20 @@ func tile_value_from_screen_pos(Game *gp, v2 pos, u32 z) {
   return result;
 }
 
+internal void
+func add_entity_to_chunk(Game *gp, Entity *ep) {
+
+  Chunk_pos entity_chunk_pos = chunk_pos_from_tile_map_pos(gp, ep->tile_pos);
+  Chunk *chunk = get_chunk(gp, entity_chunk_pos.chunk_x, entity_chunk_pos.chunk_y, entity_chunk_pos.chunk_z);
+
+  if(chunk->entities_count < ARRLEN(chunk->entities)) {
+    chunk->entities[chunk->entities_count++] = ep;
+  } else {
+    PANIC("too many entities in chunk");
+  }
+
+}
+
 shared_function void
 func game_update_and_render(Game *gp) {
 
@@ -944,11 +962,72 @@ func game_update_and_render(Game *gp) {
   s32 camera_viewport_width_tiles = gp->tiles_per_room_width;
   s32 camera_viewport_height_tiles = gp->tiles_per_room_height;
 
+  // TODO jfd 12/03/26: flags on arrays to say they can't grow
+  arr_init_ex(gp->live_chunks, gp->frame_arena, 64);
+  arr_init_ex(gp->live_entities, gp->frame_arena, MAX_LIVE_ENTITIES);
+
+  { /* stream entities in to live set */
+
+    // NOTE jfd 12/03/26: get all visible chunks
+    {
+      Tile_map_pos camera_tile_map_pos = gp->camera_pos;
+      Chunk_pos camera_chunk_pos = chunk_pos_from_tile_map_pos(gp, camera_tile_map_pos);
+
+      s32 half_rows_in_view = 2 + ( (s32)( ((f32)gp->render.height) / (TILE_SIZE_METERS * gp->pixels_per_meter) ) >> 1);
+      s32 half_cols_in_view = 2 + ( (s32)( ((f32)gp->render.width)  / (TILE_SIZE_METERS * gp->pixels_per_meter) ) >> 1);
+
+      Tile_map_pos view_origin_tile_map_pos = camera_tile_map_pos;
+      view_origin_tile_map_pos.tile_x -= half_cols_in_view;
+      view_origin_tile_map_pos.tile_y -= half_rows_in_view;
+      Chunk_pos view_origin_chunk_pos = chunk_pos_from_tile_map_pos(gp, view_origin_tile_map_pos);
+      view_origin_chunk_pos.tile = (v2_s32){0};
+
+      s32 chunk_window_x_apron = 2;
+      s32 chunk_window_y_apron = 2;
+
+      s32 chunk_window_width  = chunk_window_x_apron + ((camera_chunk_pos.chunk_x - view_origin_chunk_pos.chunk_x) << 1);
+      s32 chunk_window_height = chunk_window_y_apron + ((camera_chunk_pos.chunk_y - view_origin_chunk_pos.chunk_y) << 1);
+
+      for(s32 chunk_window_y = -chunk_window_y_apron; chunk_window_y <= chunk_window_height; chunk_window_y++) {
+        for(s32 chunk_window_x = -chunk_window_x_apron; chunk_window_x < chunk_window_width; chunk_window_x++) {
+
+          Chunk_pos cur_chunk_pos = view_origin_chunk_pos;
+          cur_chunk_pos.chunk_x += chunk_window_x;
+          cur_chunk_pos.chunk_y += chunk_window_y;
+
+          Chunk *chunk = get_chunk(gp, cur_chunk_pos.chunk_x, cur_chunk_pos.chunk_y, cur_chunk_pos.chunk_z);
+
+          arr_push(gp->live_chunks, chunk);
+
+        }
+      }
+    }
+
+    // NOTE jfd 12/03/26:
+    // - save pointers to them in an array here for later (????)
+    // - load entities from those chunks
+    // - store the current chunk and the position the entity is at in that chunk
+    // - on the entity during the frame so that we can easily evict it from that chunk later
+    // - maybe set the camera relative positions as you load them?
+
+    for(int i = 0; i < gp->live_chunks.count; i++) {
+      Chunk *chunk = gp->live_chunks.d[i];
+      for(int j = 0; j < chunk->entities_count; j++) {
+        Entity *ep = chunk->entities[j];
+        arr_push(gp->live_entities, ep);
+      }
+      // NOTE jfd 12/03/26: clear chunks when we load from them
+      chunk->entities_count = 0;
+    }
+
+  } /* stream entities in to live set */
+
 
   for(Entity_order entity_order = 0; entity_order < ENTITY_ORDER_MAX; entity_order++) {
-    for(int entity_index = 0; entity_index < ARRLEN(gp->entities); entity_index++)
+    for(int entity_index = 0; entity_index < gp->live_entities.count; entity_index++)
     { /* update entities */
-      Entity *ep = gp->entities + entity_index;
+
+      Entity *ep = gp->live_entities.d[entity_index];
 
       if(ep->kind == ENTITY_KIND_NONE) {
         continue;
@@ -1213,9 +1292,10 @@ func game_update_and_render(Game *gp) {
 
     draw_tile_map(gp);
 
-    for(int entity_index = 0; entity_index < ARRLEN(gp->entities); entity_index++)
+    for(int entity_index = 0; entity_index < gp->live_entities.count; entity_index++)
     { /* draw entities */
-      Entity *ep = gp->entities + entity_index;
+
+      Entity *ep = gp->live_entities.d[entity_index];
 
       if(ep->kind == ENTITY_KIND_NONE) {
         continue;
@@ -1296,6 +1376,18 @@ func game_update_and_render(Game *gp) {
     } /* draw entities */
 
   } /* draw */
+
+  { /* stream entities back out to chunks */
+
+    // NOTE jfd 12/03/26: put all simulated entities in to the new chunks they should occupy according to their screen pos
+
+    for(int entity_index = 0; entity_index < gp->live_entities.count; entity_index++) {
+      Entity *ep = gp->live_entities.d[entity_index];
+      add_entity_to_chunk(gp, ep);
+    }
+
+  } /* stream entities back out to chunks */
+
 
   arena_clear(gp->frame_arena);
 
