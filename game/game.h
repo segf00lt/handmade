@@ -27,18 +27,30 @@
 
 
 #define MAX_ENTITIES_PER_CHUNK 1024
-#define MAX_ENTITIES 512
+#define MAX_ENTITIES 4096
 #define MAX_LIVE_ENTITIES 512
 
 #define ENTITY_KINDS \
 X(PLAYER_1) \
 X(PLAYER_2) \
+X(WALL) \
+X(DOOR_UP) \
+X(DOOR_DOWN) \
 
 #define ENTITY_FLAGS \
 X(APPLY_FRICTION) \
 X(ACCEL_MOTION) \
 X(SLOW) \
 X(TILE_COLLISION) \
+/* TODO jfd 12/03/26: remove these flags once we change to a better collision system */ \
+X(TILE_LEFT_ENABLED) \
+X(TILE_RIGHT_ENABLED) \
+X(TILE_TOP_ENABLED) \
+X(TILE_BOTTOM_ENABLED) \
+X(TILE_BOTTOM_LEFT_CORNER_ENABLED) \
+X(TILE_BOTTOM_RIGHT_CORNER_ENABLED) \
+X(TILE_TOP_LEFT_CORNER_ENABLED) \
+X(TILE_TOP_RIGHT_CORNER_ENABLED) \
 
 #define ENTITY_ORDERS   \
 X(FIRST) \
@@ -78,7 +90,7 @@ typedef enum Entity_order {
 } Entity_order;
 
 typedef enum Entity_control {
-  ENTITY_CONTROL_MIN = -1,
+  ENTITY_CONTROL_NONE = 0,
   #define X(x) ENTITY_CONTROL_##x,
   ENTITY_CONTROLS
   #undef X
@@ -242,6 +254,7 @@ struct Game {
   s32 tiles_per_room_height;
 
   Entity entities[MAX_ENTITIES];
+  Entity *free_entity;
 
   Chunk_ptr_array live_chunks;
   Entity_ptr_array live_entities;

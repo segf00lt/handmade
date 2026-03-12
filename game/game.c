@@ -20,14 +20,14 @@ internal Entity*
 func entity_alloc(Game *gp, Entity_order order, Entity_kind kind, Entity_control control, Entity_flags flags) {
   Entity *ep = 0;
 
-  for(int entity_index = 0; entity_index < ARRLEN(gp->entities); entity_index++) {
-    if(gp->entities[entity_index].kind == ENTITY_KIND_NONE) {
-      ep = &gp->entities[entity_index];
-      break;
-    }
+  if(gp->free_entity) {
+    ep = gp->free_entity;
+    sll_stack_pop_n(gp->free_entity, free_list_next);
+  } else {
+    ep = push_struct(gp->main_arena, Entity);
   }
 
-  memory_zero(ep, sizeof(*ep));
+  ASSERT(ep);
 
   ep->order   = order;
   ep->kind    = kind;
@@ -641,10 +641,28 @@ func init_camera(Game *gp) {
 }
 
 internal void
+func create_tile_entity(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 abs_tile_z, Entity_kind tile_entity_kind, Entity_flags tile_entity_flags) {
+  Entity *ep = entity_alloc(gp,
+    ENTITY_ORDER_LAST,
+    tile_entity_kind,
+    ENTITY_CONTROL_NONE,
+    tile_entity_flags |
+    0
+  );
+
+  ep->tile_pos = (Tile_map_pos){
+    .tile_x = abs_tile_x,
+    .tile_y = abs_tile_y,
+    .tile_z = abs_tile_z,
+    .tile_offset = { 0.5f*TILE_SIZE_METERS, 0.5f*TILE_SIZE_METERS },
+  };
+
+  add_entity_to_chunk(gp, ep);
+
+}
+
+internal void
 func init_tile_map(Game *gp) {
-  gp->world_chunks_x_count = 128;
-  gp->world_chunks_y_count = 128;
-  gp->world_chunks_z_count = 2;
 
   u32 screen_x = 0;
   u32 screen_y = 0;
@@ -692,39 +710,127 @@ func init_tile_map(Game *gp) {
       door_right = true;
     }
 
+    u8 *neighbour_grid = push_array(gp->temp_arena, u8, tiles_per_height*tiles_per_width);
+
+    for(u32 tile_y = 0; tile_y < tiles_per_height; tile_y++) {
+      for(u32 tile_x = 0; tile_x < tiles_per_width; tile_x++) {
+
+        Entity_kind tile_entity_kind = 0;
+
+        if((tile_x == 0) && (!door_left || (tile_y != (tiles_per_height / 2)))) {
+          tile_entity_kind = ENTITY_KIND_WALL;
+        }
+
+        if((tile_x == (tiles_per_width - 1) && (!door_right || (tile_y != (tiles_per_height / 2))))) {
+          tile_entity_kind = ENTITY_KIND_WALL;
+        }
+
+        if((tile_y == 0) && (!door_bottom || (tile_x != (tiles_per_width / 2)))) {
+          tile_entity_kind = ENTITY_KIND_WALL;
+        }
+
+        if((tile_y == (tiles_per_height - 1) && (!door_top || (tile_x != (tiles_per_width / 2))))) {
+          tile_entity_kind = ENTITY_KIND_WALL;
+        }
+
+        if(tile_entity_kind == ENTITY_KIND_WALL) {
+          neighbour_grid[tile_y*tiles_per_width + tile_x] = 1;
+        }
+
+      }
+    }
+
     for(u32 tile_y = 0; tile_y < tiles_per_height; tile_y++) {
       for(u32 tile_x = 0; tile_x < tiles_per_width; tile_x++) {
         u32 abs_tile_x = screen_x*tiles_per_width + tile_x;
         u32 abs_tile_y = screen_y*tiles_per_height + tile_y;
 
-        u8 tile_value = 1;
+        Entity_kind tile_entity_kind = 0;
 
         if((tile_x == 0) && (!door_left || (tile_y != (tiles_per_height / 2)))) {
-          tile_value = 2;
+          tile_entity_kind = ENTITY_KIND_WALL;
         }
 
         if((tile_x == (tiles_per_width - 1) && (!door_right || (tile_y != (tiles_per_height / 2))))) {
-          tile_value = 2;
+          tile_entity_kind = ENTITY_KIND_WALL;
         }
 
         if((tile_y == 0) && (!door_bottom || (tile_x != (tiles_per_width / 2)))) {
-          tile_value = 2;
+          tile_entity_kind = ENTITY_KIND_WALL;
         }
 
         if((tile_y == (tiles_per_height - 1) && (!door_top || (tile_x != (tiles_per_width / 2))))) {
-          tile_value = 2;
+          tile_entity_kind = ENTITY_KIND_WALL;
         }
 
         if(tile_x == 10 && tile_y == 6) {
           if(door_up && abs_tile_z < gp->world_chunks_z_count - 1) {
-            tile_value = 3;
+            tile_entity_kind = ENTITY_KIND_DOOR_UP;
           }
           if(door_down && abs_tile_z > 0) {
-            tile_value = 4;
+            tile_entity_kind = ENTITY_KIND_DOOR_DOWN;
           }
         }
 
-        set_tile_from_abs_tile_pos(gp, abs_tile_x, abs_tile_y, abs_tile_z, tile_value);
+        if(tile_entity_kind != 0) {
+
+          Entity_flags tile_entity_flags = 0;
+
+          if(tile_entity_kind == ENTITY_KIND_WALL) {
+            neighbour_grid[tile_y*tiles_per_width + tile_x] = 1;
+
+            u8 top_tile_value    = 0;
+            u8 right_tile_value  = 0;
+            u8 bottom_tile_value = 0;
+            u8 left_tile_value   = 0;
+
+            if(tile_x == 0) {
+              left_tile_value = 0;
+              right_tile_value = neighbour_grid[tile_y*tiles_per_width + tile_x + 1];
+            } else if(tile_x == tiles_per_width - 1) {
+              right_tile_value = 0;
+              left_tile_value = neighbour_grid[tile_y*tiles_per_width + tile_x - 1];
+            } else {
+              right_tile_value = neighbour_grid[tile_y*tiles_per_width + tile_x + 1];
+              left_tile_value = neighbour_grid[tile_y*tiles_per_width + tile_x - 1];
+            }
+
+            if(tile_y == 0) {
+              bottom_tile_value = 0;
+              top_tile_value = neighbour_grid[(tile_y + 1)*tiles_per_width + tile_x];
+            } else if(tile_y == tiles_per_height - 1) {
+              top_tile_value = 0;
+              bottom_tile_value = neighbour_grid[(tile_y - 1)*tiles_per_width + tile_x];
+            } else {
+              top_tile_value = neighbour_grid[(tile_y + 1)*tiles_per_width + tile_x];
+              bottom_tile_value = neighbour_grid[(tile_y - 1)*tiles_per_width + tile_x];
+            }
+
+            b32 top_enabled    = (top_tile_value    != 1);
+            b32 right_enabled  = (right_tile_value  != 1);
+            b32 bottom_enabled = (bottom_tile_value != 1);
+            b32 left_enabled   = (left_tile_value   != 1);
+
+            b32 top_left_corner_enabled     = (!left_enabled && !top_enabled);
+            b32 top_right_corner_enabled    = (!right_enabled && !top_enabled);
+            b32 bottom_right_corner_enabled = (!right_enabled && !bottom_enabled);
+            b32 bottom_left_corner_enabled  = (!left_enabled && !bottom_enabled);
+
+            tile_entity_flags =
+            (top_enabled                 << ENTITY_FLAG_INDEX_TILE_TOP_ENABLED) |
+            (right_enabled               << ENTITY_FLAG_INDEX_TILE_RIGHT_ENABLED) |
+            (bottom_enabled              << ENTITY_FLAG_INDEX_TILE_BOTTOM_ENABLED) |
+            (left_enabled                << ENTITY_FLAG_INDEX_TILE_LEFT_ENABLED) |
+            (top_left_corner_enabled     << ENTITY_FLAG_INDEX_TILE_TOP_LEFT_CORNER_ENABLED) |
+            (top_right_corner_enabled    << ENTITY_FLAG_INDEX_TILE_TOP_RIGHT_CORNER_ENABLED) |
+            (bottom_right_corner_enabled << ENTITY_FLAG_INDEX_TILE_BOTTOM_RIGHT_CORNER_ENABLED) |
+            (bottom_left_corner_enabled  << ENTITY_FLAG_INDEX_TILE_BOTTOM_LEFT_CORNER_ENABLED) |
+            0;
+
+          }
+
+          create_tile_entity(gp, abs_tile_x, abs_tile_y, abs_tile_z, tile_entity_kind, tile_entity_flags);
+        }
 
       }
     }
@@ -982,8 +1088,8 @@ func game_update_and_render(Game *gp) {
       Chunk_pos view_origin_chunk_pos = chunk_pos_from_tile_map_pos(gp, view_origin_tile_map_pos);
       view_origin_chunk_pos.tile = (v2_s32){0};
 
-      s32 chunk_window_x_apron = 2;
-      s32 chunk_window_y_apron = 2;
+      s32 chunk_window_x_apron = 4;
+      s32 chunk_window_y_apron = 4;
 
       s32 chunk_window_width  = chunk_window_x_apron + ((camera_chunk_pos.chunk_x - view_origin_chunk_pos.chunk_x) << 1);
       s32 chunk_window_height = chunk_window_y_apron + ((camera_chunk_pos.chunk_y - view_origin_chunk_pos.chunk_y) << 1);
@@ -1037,7 +1143,8 @@ func game_update_and_render(Game *gp) {
         continue;
       }
 
-      v2 cur_pos = screen_pos_from_tile_pos(gp, ep->tile_pos);
+      ep->pos = screen_pos_from_tile_pos(gp, ep->tile_pos);
+      v2 cur_pos = ep->pos;
       v2 new_pos = cur_pos;
 
       v2 delta_pos = {0};
@@ -1129,107 +1236,92 @@ func game_update_and_render(Game *gp) {
         Tile_map_pos cur_tile_pos = tile_pos_from_screen_pos(gp, cur_pos, ep->tile_pos.tile_z);
         Tile_map_pos new_tile_pos = tile_pos_from_screen_pos(gp, new_pos, ep->tile_pos.tile_z);
 
-        u8 new_tile_value = tile_value_from_screen_pos(gp, new_pos, new_tile_pos.tile_z);
+        b32 didnt_touch_any_tiles = true;
 
-        if(ep->kind == ENTITY_KIND_PLAYER_1) {
-          gp->debug_new_player_pos = new_tile_pos;
-        }
+        for(int i = 0; i < gp->live_entities.count; i++) {
+          Entity *tile_ep = gp->live_entities.d[i];
 
-        if(new_tile_value > 1) {
-
-          if(new_tile_value == 2) {
-
-            v2 normal = {0};
-
-            s32 tile_dx = (s32)new_tile_pos.tile_x - (s32)cur_tile_pos.tile_x;
-            s32 tile_dy = (s32)new_tile_pos.tile_y - (s32)cur_tile_pos.tile_y;
-
-            Tile_map_pos top_tile_pos = new_tile_pos;
-            top_tile_pos.tile_y++;
-
-            Tile_map_pos right_tile_pos = new_tile_pos;
-            right_tile_pos.tile_x++;
-
-            Tile_map_pos bottom_tile_pos = new_tile_pos;
-            bottom_tile_pos.tile_y--;
-
-            Tile_map_pos left_tile_pos = new_tile_pos;
-            left_tile_pos.tile_x--;
-
-            u8 top_tile_value    = tile_from_tile_map_pos(gp, top_tile_pos);
-            u8 right_tile_value  = tile_from_tile_map_pos(gp, right_tile_pos);
-            u8 bottom_tile_value = tile_from_tile_map_pos(gp, bottom_tile_pos);
-            u8 left_tile_value   = tile_from_tile_map_pos(gp, left_tile_pos);
-
-            b32 top_enabled    = (top_tile_value != 2);
-            b32 right_enabled  = (right_tile_value != 2);
-            b32 bottom_enabled = (bottom_tile_value != 2);
-            b32 left_enabled   = (left_tile_value != 2);
-
-            b32 top_left_corner_enabled     = (!left_enabled && !top_enabled);
-            b32 top_right_corner_enabled    = (!right_enabled && !top_enabled);
-            b32 bottom_right_corner_enabled = (!right_enabled && !bottom_enabled);
-            b32 bottom_left_corner_enabled  = (!left_enabled && !bottom_enabled);
-
-            if(tile_dx > 0 && left_enabled) {
-              normal.x = -1;
-            }
-            if(tile_dx < 0 && right_enabled) {
-              normal.x = 1;
-            }
-            if(tile_dy > 0 && bottom_enabled) {
-              normal.y = -1;
-            }
-            if(tile_dy < 0 && top_enabled) {
-              normal.y = 1;
-            }
-
-            if(tile_dx > 0 && tile_dy > 0 && bottom_left_corner_enabled) {
-              normal = (v2){ -1, -1 };
-            }
-            if(tile_dx < 0 && tile_dy > 0 && bottom_right_corner_enabled) {
-              normal = (v2){ 1, -1 };
-            }
-            if(tile_dx > 0 && tile_dy < 0 && top_left_corner_enabled) {
-              normal = (v2){ -1, 1 };
-            }
-            if(tile_dx < 0 && tile_dy < 0 && top_right_corner_enabled) {
-              normal = (v2){ 1, 1 };
-            }
-
-            if(normal.x != 0.0f && normal.y != 0.0f) {
-              // normal = scale_v2(normal, 0.70710678118654752440084436210485f);
-              normal = scale_v2(normal, 0.85f);
-            }
-
-            delta_pos = sub_v2(delta_pos, scale_v2(normal, 1.f*dot_v2(delta_pos, normal)));
-
-            new_pos = add_v2(cur_pos, delta_pos);
-
-            ep->changed_z = false;
-
-          } else if(new_tile_value == 3) {
-            if(!ep->changed_z) {
-              ep->changed_z = true;
-              new_tile_pos.tile_z++;
-            }
-          } else if(new_tile_value == 4) {
-            if(!ep->changed_z) {
-              ep->changed_z = true;
-              new_tile_pos.tile_z--;
-            }
+          if(tile_ep->kind != ENTITY_KIND_WALL && tile_ep->kind != ENTITY_KIND_DOOR_UP && tile_ep->kind != ENTITY_KIND_DOOR_DOWN) {
+            continue;
           }
 
-        } else {
-          ep->changed_z = false;
+          Tile_map_pos tile_entity_tile_pos = tile_pos_from_screen_pos(gp, tile_ep->pos, tile_ep->tile_pos.tile_z);
+
+          if(new_tile_pos.tile_x == tile_entity_tile_pos.tile_x && new_tile_pos.tile_y == tile_entity_tile_pos.tile_y) {
+
+            didnt_touch_any_tiles = false;
+
+            if(tile_ep->kind == ENTITY_KIND_WALL) {
+
+              v2 normal = {0};
+
+              s32 tile_dx = (s32)new_tile_pos.tile_x - (s32)cur_tile_pos.tile_x;
+              s32 tile_dy = (s32)new_tile_pos.tile_y - (s32)cur_tile_pos.tile_y;
+
+              if(tile_dx > 0 && (tile_ep->flags & ENTITY_FLAG_TILE_LEFT_ENABLED)) {
+                normal.x = -1;
+              }
+              if(tile_dx < 0 && (tile_ep->flags & ENTITY_FLAG_TILE_RIGHT_ENABLED)) {
+                normal.x = 1;
+              }
+              if(tile_dy > 0 && (tile_ep->flags & ENTITY_FLAG_TILE_BOTTOM_ENABLED)) {
+                normal.y = -1;
+              }
+              if(tile_dy < 0 && (tile_ep->flags & ENTITY_FLAG_TILE_TOP_ENABLED)) {
+                normal.y = 1;
+              }
+
+              if(tile_dx > 0 && tile_dy > 0 && (tile_ep->flags & ENTITY_FLAG_TILE_BOTTOM_LEFT_CORNER_ENABLED)) {
+                normal = (v2){ -1, -1 };
+              }
+              if(tile_dx < 0 && tile_dy > 0 && (tile_ep->flags & ENTITY_FLAG_TILE_BOTTOM_RIGHT_CORNER_ENABLED)) {
+                normal = (v2){ 1, -1 };
+              }
+              if(tile_dx > 0 && tile_dy < 0 && (tile_ep->flags & ENTITY_FLAG_TILE_TOP_LEFT_CORNER_ENABLED)) {
+                normal = (v2){ -1, 1 };
+              }
+              if(tile_dx < 0 && tile_dy < 0 && (tile_ep->flags & ENTITY_FLAG_TILE_TOP_RIGHT_CORNER_ENABLED)) {
+                normal = (v2){ 1, 1 };
+              }
+
+              if(normal.x != 0.0f && normal.y != 0.0f) {
+                // normal = scale_v2(normal, 0.70710678118654752440084436210485f);
+                normal = scale_v2(normal, 0.85f);
+              }
+
+              delta_pos = sub_v2(delta_pos, scale_v2(normal, 1.f*dot_v2(delta_pos, normal)));
+
+              new_pos = add_v2(cur_pos, delta_pos);
+
+              ep->changed_z = false;
+
+            } else if(tile_ep->kind == ENTITY_KIND_DOOR_UP) {
+              if(!ep->changed_z) {
+                ep->changed_z = true;
+                new_tile_pos.tile_z++;
+              }
+            } else if(tile_ep->kind == ENTITY_KIND_DOOR_DOWN) {
+              if(!ep->changed_z) {
+                ep->changed_z = true;
+                new_tile_pos.tile_z--;
+              }
+            }
+
+          }
+
+          // HERE
+          // TODO jfd: fix the changed_z bug
+          if(didnt_touch_any_tiles) {
+            ep->changed_z = false;
+          }
+
+          ep->pos = new_pos;
+
+          ep->tile_pos = tile_pos_from_screen_pos(gp, new_pos, new_tile_pos.tile_z);
+
         }
 
-        ep->pos = new_pos;
-
-        ep->tile_pos = tile_pos_from_screen_pos(gp, new_pos, new_tile_pos.tile_z);
-
-      } /* tile collisions */
-
+      } /* ENTITY_FLAG_TILE_COLLISION */
 
 
       if(ep->kind == ENTITY_KIND_PLAYER_1) {
@@ -1290,7 +1382,63 @@ func game_update_and_render(Game *gp) {
 
     clear_screen(gp);
 
-    draw_tile_map(gp);
+    // draw_tile_map(gp);
+
+    for(int entity_index = 0; entity_index < gp->live_entities.count; entity_index++)
+    { /* draw tile entities */
+
+      Entity *ep = gp->live_entities.d[entity_index];
+
+      if(ep->kind == ENTITY_KIND_NONE) {
+        continue;
+      }
+
+      switch(ep->kind) {
+        default:
+        break;
+
+        case ENTITY_KIND_WALL:
+        case ENTITY_KIND_DOOR_UP:
+        case ENTITY_KIND_DOOR_DOWN:
+        {
+          Color color = { 0.8f,  0.8f, 0.8f, 1 };
+          if(ep->kind == ENTITY_KIND_DOOR_UP) {
+            color = (Color){ 0.0f,  0.8f, 0.4f, 1 };
+          } else if(ep->kind == ENTITY_KIND_DOOR_DOWN) {
+            color = (Color){ 0.96f, 1.0f, 0.0f, 1 };
+          }
+
+          v2 tile_screen_pos = scale_v2(ep->pos, gp->pixels_per_meter);
+          v2 camera_offset = { 0.5f*(f32)gp->render.width, 0.5f*(f32)gp->render.height};
+          tile_screen_pos = add_v2(tile_screen_pos, camera_offset);
+          tile_screen_pos.y = gp->render.height - tile_screen_pos.y;
+
+          v2 tile_screen_rect_size = scale_v2((v2){ TILE_SIZE_METERS, TILE_SIZE_METERS }, gp->pixels_per_meter);
+          v2 half_tile_screen_rect_size = scale_v2(tile_screen_rect_size, 0.5f);
+          v2 tile_screen_rect_pos = sub_v2(tile_screen_pos, half_tile_screen_rect_size);
+
+          draw_rect(gp,
+            color,
+            tile_screen_rect_pos.x,
+            tile_screen_rect_pos.y,
+            tile_screen_rect_size.x,
+            tile_screen_rect_size.y
+          );
+
+          #if 1
+          Color yellow = { 1.0f, 1.0f, 0.0f, 0.5f };
+          draw_rect(gp,
+            yellow,
+            tile_screen_pos.x- 2.0f,
+            tile_screen_pos.y- 2.0f,
+            4.0f,
+            4.0f
+          );
+          #endif
+
+        } break;
+      }
+    } /* draw tile entities */
 
     for(int entity_index = 0; entity_index < gp->live_entities.count; entity_index++)
     { /* draw entities */
@@ -1305,6 +1453,12 @@ func game_update_and_render(Game *gp) {
         default:
         UNREACHABLE;
         break;
+
+        case ENTITY_KIND_WALL:
+        case ENTITY_KIND_DOOR_UP:
+        case ENTITY_KIND_DOOR_DOWN:
+        break;
+
         case ENTITY_KIND_PLAYER_1:
         case ENTITY_KIND_PLAYER_2:
         {
@@ -1348,32 +1502,34 @@ func game_update_and_render(Game *gp) {
 
           #endif
 
-          #if 1
-          {
-            Color color = { 1.0f, 0, 0, 1 };
-
-            draw_rect(gp,
-              color,
-              0.5f*(f32)gp->render.width,
-              0,
-              1,
-              (f32)gp->render.height
-            );
-
-            draw_rect(gp,
-              color,
-              0,
-              0.5f*(f32)gp->render.height,
-              (f32)gp->render.width,
-              1
-            );
-
-          }
-          #endif
 
         } break;
       }
     } /* draw entities */
+
+
+    #if 1
+    {
+      Color color = { 1.0f, 0, 0, 1 };
+
+      draw_rect(gp,
+        color,
+        0.5f*(f32)gp->render.width,
+        0,
+        1,
+        (f32)gp->render.height
+      );
+
+      draw_rect(gp,
+        color,
+        0,
+        0.5f*(f32)gp->render.height,
+        (f32)gp->render.width,
+        1
+      );
+
+    }
+    #endif
 
   } /* draw */
 
