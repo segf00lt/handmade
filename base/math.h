@@ -77,6 +77,7 @@ force_inline v2  gte_v2(v2 a, v2 b);
 force_inline v2  lte_v2(v2 a, v2 b);
 force_inline v2  gt_v2(v2 a, v2 b);
 force_inline v2  add_value_v2(v2 v, f32 a);
+force_inline v2  round_v2(v2 v);
 
 force_inline v2_s16 add_v2_s16(v2_s16 a, v2_s16 b);
 force_inline v2_s16 sub_v2_s16(v2_s16 a, v2_s16 b);

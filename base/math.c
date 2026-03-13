@@ -60,6 +60,16 @@ func wrap_f32(f32 value, f32 min, f32 max)
 }
 
 force_inline v2
+func round_v2(v2 v) {
+  v2 result = {
+    round_f32(v.x),
+    round_f32(v.y),
+  };
+  return result;
+}
+
+
+force_inline v2
 func wrap_v2(v2 v, v2 min, v2 max) {
   v2 result = {
     wrap_f32(v.x, min.x, max.x),

@@ -117,8 +117,8 @@ int macos_build_virutal_memory_test(void) {
 int main(int argc, char **argv) {
   NOB_GO_REBUILD_URSELF(argc, argv);
 
-  if(!win32_build_hot_reload_no_cradle()) return 1;
 
+  if(!win32_build_hot_reload_no_cradle()) return 1;
   return 0;
   if(!win32_build_hot_reload()) return 1;
   if(!win32_build()) return 1;

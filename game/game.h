@@ -161,16 +161,17 @@ struct Bitmap_header {
 };
 #pragma pack(pop)
 
-typedef struct Tile_map_pos Tile_map_pos;
-struct Tile_map_pos {
-  s32 tile_x;
-  s32 tile_y;
-  s32 tile_z;
-  v2 tile_offset; // NOTE jfd 10/03/26: this is the remainder of your floating point position by TILE_SIZE_METERS, it is not a normalized value
-};
-
 typedef struct Chunk Chunk;
 typedef struct Entity Entity;
+
+typedef struct Chunk_pos Chunk_pos;
+struct Chunk_pos {
+  s32 chunk_x;
+  s32 chunk_y;
+  s32 chunk_z;
+  v2_s32 tile;
+  v2 chunk_offset;
+};
 
 struct Entity {
   Entity *free_list_next;
@@ -180,7 +181,7 @@ struct Entity {
   Entity_control control;
   Entity_flags   flags;
 
-  Tile_map_pos tile_pos;
+  Chunk_pos chunk_pos;
 
   v2  pos;
   f32 width;
@@ -201,7 +202,6 @@ TYPEDEF_ARRAY_NAME(Entity*, Entity_ptr_array);
 
 struct Chunk {
   Chunk *hash_next;
-  u8 *tiles;
   Entity *entities[MAX_ENTITIES_PER_CHUNK];
   s32 entities_count;
   s32 chunk_x;
@@ -210,14 +210,6 @@ struct Chunk {
 };
 
 TYPEDEF_ARRAY_NAME(Chunk*, Chunk_ptr_array);
-
-typedef struct Chunk_pos Chunk_pos;
-struct Chunk_pos {
-  s32 chunk_x;
-  s32 chunk_y;
-  s32 chunk_z;
-  v2_s32 tile;
-};
 
 typedef struct Game Game;
 struct Game {
@@ -235,8 +227,7 @@ struct Game {
 
   s32 test_sound_pitch;
 
-  Tile_map_pos camera_pos;
-  Tile_map_pos _camera_offset;
+  Chunk_pos camera_chunk_pos;
 
   b8 once;
   b8 should_init_player;
@@ -262,16 +253,12 @@ struct Game {
 
   Bitmap guy_bitmap;
 
-  Tile_map_pos debug_new_player_pos;
-
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
 #define GAME_STATE_SIZE ((u64)MB(1))
 
 
 #ifdef GAME_FUNCTION_HEADERS
-
-internal void add_entity_to_chunk(Game *gp, Entity *ep);
 
 internal Entity* entity_alloc(Game *gp, Entity_order order, Entity_kind kind, Entity_control control, Entity_flags flags);
 
@@ -309,23 +296,9 @@ internal b32 was_key_released(Game *gp, Keyboard_key key);
 
 internal void debug_silence(Game *gp);
 
-internal v2_s32 chunk_pos_from_point(Game *gp, v2 v);
-
-internal Chunk_pos chunk_pos_from_tile_map_pos(Game *gp, Tile_map_pos pos);
-
-internal Chunk_pos chunk_pos_from_abs_tile_pos(Game *gp, s32 abs_tile_x, s32 abs_tile_y, s32 abs_tile_z);
-
-internal Tile_map_pos tile_map_pos_from_point(Game *gp, f32 x, f32 y);
+internal Chunk_pos chunk_pos_from_point(Game *gp, v2 pos, s32 z);
 
 force_inline Chunk* get_chunk(Game *gp, s32 chunk_x, s32 chunk_y, s32 chunk_z);
-
-force_inline u8 get_tile_of_chunk(Game *gp, Chunk *chunk, s32 tile_x, s32 tile_y);
-
-force_inline void set_tile_of_chunk(Game *gp, Chunk *chunk, s32 tile_x, s32 tile_y, u8 tile_value);
-
-force_inline u8 tile_from_tile_map_pos(Game *gp, Tile_map_pos pos);
-
-internal void set_tile_from_abs_tile_pos(Game *gp, s32 abs_tile_x, s32 abs_tile_y, s32 abs_tile_z, u8 tile_value);
 
 internal void init_player_1(Game *gp);
 
@@ -333,21 +306,25 @@ internal void init_player_2(Game *gp);
 
 internal void init_camera(Game *gp);
 
+internal void create_tile_entity(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 abs_tile_z, Entity_kind tile_entity_kind, Entity_flags tile_entity_flags);
+
 internal void init_tile_map(Game *gp);
 
-internal void draw_tile_map(Game *gp);
+internal v2_s32 tile_pos_from_screen_pos(Game *gp, v2 pos);
 
-internal Tile_map_pos tile_pos_from_screen_pos(Game *gp, v2 pos, u32 z);
+internal void add_entity_to_chunk(Game *gp, Entity *ep);
 
-internal v2 screen_pos_from_tile_pos(Game *gp, Tile_map_pos tile_pos);
+internal v2 screen_pos_from_chunk_pos(Game *gp, Chunk_pos chunk_pos);
 
-internal u8 tile_value_from_screen_pos(Game *gp, v2 pos, u32 z);
+internal Chunk_pos chunk_pos_from_screen_pos(Game *gp, v2 screen_pos, s32 z);
 
 shared_function void game_update_and_render(Game *gp);
 
 shared_function void game_get_sound_samples(Game *gp);
 
 shared_function Game* game_init(Platform *pp);
+
+
 
 #endif
 
