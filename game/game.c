@@ -11,7 +11,7 @@
 
 
 global Tile_map_pos debug_new_pos;
-
+global b32 debug_changed_z = false;
 
 /////////////////////////////////
 // functions
@@ -1218,7 +1218,7 @@ func game_update_and_render(Game *gp) {
         delta_pos = add_v2(scale_v2(ep->vel, t), scale_v2(ep->accel, t*t*0.5f));
 
         if(ep->flags & ENTITY_FLAG_SLOW) {
-          delta_pos = scale_v2(delta_pos, 1.0e-2f);
+          delta_pos = scale_v2(delta_pos, 1.0e-1f);
         }
 
         new_pos = add_v2(cur_pos, delta_pos);
@@ -1307,19 +1307,17 @@ func game_update_and_render(Game *gp) {
               }
             }
 
+            break;
           }
-
-          // HERE
-          // TODO jfd: fix the changed_z bug
-          if(didnt_touch_any_tiles) {
-            ep->changed_z = false;
-          }
-
-          ep->pos = new_pos;
-
-          ep->tile_pos = tile_pos_from_screen_pos(gp, new_pos, new_tile_pos.tile_z);
-
         }
+
+        if(didnt_touch_any_tiles) {
+          ep->changed_z = false;
+        }
+
+        ep->pos = new_pos;
+
+        ep->tile_pos = tile_pos_from_screen_pos(gp, new_pos, new_tile_pos.tile_z);
 
       } /* ENTITY_FLAG_TILE_COLLISION */
 
@@ -1546,6 +1544,8 @@ func game_update_and_render(Game *gp) {
 
 
   arena_clear(gp->frame_arena);
+
+  gp->frame_counter++;
 
 }
 

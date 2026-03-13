@@ -221,6 +221,7 @@ struct Chunk_pos {
 
 typedef struct Game Game;
 struct Game {
+  u32 frame_counter;
   f32 t;
   b32 did_reload;
 
