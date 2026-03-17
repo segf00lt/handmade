@@ -244,6 +244,13 @@ STATIC_ASSERT(sizeof(Entity) <= 256, entity_is_less_than_256_bytes);
 
 TYPEDEF_ARRAY_NAME(Entity*, Entity_ptr_array);
 
+typedef struct Sim_region Sim_region;
+struct Sim_region {
+  Chunk_pos        origin_chunk_pos;
+  Chunk_ptr_array  live_chunks;
+  Entity_ptr_array live_entities;
+};
+
 typedef struct Game Game;
 struct Game {
   u32 frame_counter;
@@ -281,12 +288,12 @@ struct Game {
   Entity entities[MAX_ENTITIES];
   Entity *free_entity;
 
-  Chunk_ptr_array live_chunks;
-  Entity_ptr_array live_entities;
-
   Bitmap guy_bitmap;
   Bitmap monster_bitmap;
   Bitmap frog_bitmap;
+
+  b32 camera_jitter;
+  f32 camera_jitter_time;
 
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
@@ -302,6 +309,8 @@ internal void entity_free(Game *gp, Entity *ep);
 internal Bitmap load_bitmap(Game *gp, Str8 path);
 
 internal u32 get_random(Game *gp);
+
+internal f32 get_random_f32(Game *gp, f32 begin, f32 end, s32 steps);
 
 internal void debug_render_weird_gradient(Game *gp, int x_offset, int y_offset);
 
@@ -333,11 +342,17 @@ internal void debug_silence(Game *gp);
 
 internal Chunk_pos chunk_pos_from_point(Game *gp, v2 pos, s32 z);
 
+internal v2 point_from_chunk_pos(Game *gp, Chunk_pos chunk_pos);
+
 force_inline Chunk* get_chunk(Game *gp, s32 chunk_x, s32 chunk_y, s32 chunk_z);
 
 internal void init_player_1(Game *gp);
 
 internal void init_player_2(Game *gp);
+
+internal void init_monster(Game *gp);
+
+internal void init_frog(Game *gp);
 
 internal void init_camera(Game *gp);
 
@@ -349,16 +364,19 @@ internal v2_s32 tile_pos_from_screen_pos(Game *gp, v2 pos);
 
 internal void add_entity_to_chunk(Game *gp, Entity *ep);
 
-internal v2 screen_pos_from_chunk_pos(Game *gp, Chunk_pos chunk_pos);
+internal v2 screen_pos_from_chunk_pos(Game *gp, Chunk_pos camera_origin_chunk_pos, Chunk_pos chunk_pos);
 
-internal Chunk_pos chunk_pos_from_screen_pos(Game *gp, v2 screen_pos, s32 z);
+internal Chunk_pos chunk_pos_from_screen_pos(Game *gp, Chunk_pos camera_origin_chunk_pos, v2 screen_pos, s32 z);
+
+internal Sim_region begin_sim_region(Game *gp, Chunk_pos origin_chunk_pos, f32 width, f32 height, s32 apron);
+
+internal void end_sim_region(Game *gp, Sim_region sim_region);
 
 shared_function void game_update_and_render(Game *gp);
 
 shared_function void game_get_sound_samples(Game *gp);
 
 shared_function Game* game_init(Platform *pp);
-
 
 
 #endif

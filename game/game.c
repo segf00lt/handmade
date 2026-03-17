@@ -75,6 +75,15 @@ func get_random(Game *gp) {
   return result;
 }
 
+internal f32
+func get_random_f32(Game *gp, f32 begin, f32 end, s32 steps) {
+  u32 random = get_random(gp);
+  random %= steps;
+  f32 t = (f32)(steps - random) / steps;
+  f32 result = lerp_f32(t, begin, end);
+  return result;
+}
+
 internal void
 func debug_render_weird_gradient(Game *gp, int x_offset, int y_offset) {
   u8 *row = gp->render.pixels;
@@ -887,22 +896,22 @@ func add_entity_to_chunk(Game *gp, Entity *ep) {
 }
 
 internal v2
-func screen_pos_from_chunk_pos(Game *gp, Chunk_pos chunk_pos) {
+func screen_pos_from_chunk_pos(Game *gp, Chunk_pos camera_origin_chunk_pos, Chunk_pos chunk_pos) {
   v2 result = {0};
 
   // TODO jfd 13/03/26: make positions full 3d
-  v2_s32 camera_chunk_pos = { gp->camera_chunk_pos.chunk_x, gp->camera_chunk_pos.chunk_y };
-  v2_s32 cur_chunk_pos = { chunk_pos.chunk_x, chunk_pos.chunk_y };
-  v2 camera_chunk_offset = gp->camera_chunk_pos.chunk_offset;
+  v2_s32 camera_chunk = { camera_origin_chunk_pos.chunk_x, camera_origin_chunk_pos.chunk_y };
+  v2_s32 cur_chunk = { chunk_pos.chunk_x, chunk_pos.chunk_y };
+  v2 camera_chunk_offset = camera_origin_chunk_pos.chunk_offset;
   v2 cur_chunk_offset = chunk_pos.chunk_offset;
 
-  cur_chunk_pos = sub_v2_s32(cur_chunk_pos, camera_chunk_pos);
+  cur_chunk = sub_v2_s32(cur_chunk, camera_chunk);
   cur_chunk_offset = sub_v2(cur_chunk_offset, camera_chunk_offset);
 
   result = add_v2(
     cur_chunk_offset,
     scale_v2(
-      cast_v2_s32_to_f32(cur_chunk_pos),
+      cast_v2_s32_to_f32(cur_chunk),
       CHUNK_SIZE_METERS
     )
   );
@@ -911,19 +920,19 @@ func screen_pos_from_chunk_pos(Game *gp, Chunk_pos chunk_pos) {
 }
 
 internal Chunk_pos
-func chunk_pos_from_screen_pos(Game *gp, v2 screen_pos, s32 z) {
+func chunk_pos_from_screen_pos(Game *gp, Chunk_pos camera_origin_chunk_pos, v2 screen_pos, s32 z) {
   Chunk_pos result = {0};
 
   v2 chunk_pos_float = scale_v2(screen_pos, 1.0f/CHUNK_SIZE_METERS);
   chunk_pos_float.x = round_f32(chunk_pos_float.x);
   chunk_pos_float.y = round_f32(chunk_pos_float.y);
 
-  v2 chunk_offset = gp->camera_chunk_pos.chunk_offset;
+  v2 chunk_offset = camera_origin_chunk_pos.chunk_offset;
   chunk_offset = add_v2(chunk_offset, sub_v2(screen_pos, scale_v2(chunk_pos_float, CHUNK_SIZE_METERS)));
 
   v2_s32 chunk_pos = cast_v2_f32_to_s32(chunk_pos_float);
-  chunk_pos.x += (s32)gp->camera_chunk_pos.chunk_x;
-  chunk_pos.y += (s32)gp->camera_chunk_pos.chunk_y;
+  chunk_pos.x += (s32)camera_origin_chunk_pos.chunk_x;
+  chunk_pos.y += (s32)camera_origin_chunk_pos.chunk_y;
 
   result.chunk_x = chunk_pos.x;
   result.chunk_y = chunk_pos.y;
@@ -932,6 +941,82 @@ func chunk_pos_from_screen_pos(Game *gp, v2 screen_pos, s32 z) {
 
   return result;
 }
+
+internal Sim_region
+func begin_sim_region(Game *gp, Chunk_pos origin_chunk_pos, f32 width, f32 height, s32 apron) {
+  Sim_region result = {0};
+
+  result.origin_chunk_pos = origin_chunk_pos;
+
+  // TODO jfd 12/03/26: flags on arrays to say they can't grow
+  arr_init_ex(result.live_chunks, gp->frame_arena, MAX_LIVE_CHUNKS);
+  arr_init_ex(result.live_entities, gp->frame_arena, MAX_LIVE_ENTITIES);
+
+  v2 viewport_bottom_left_corner = { width, height };
+  viewport_bottom_left_corner = scale_v2(viewport_bottom_left_corner, -0.5f);
+
+  Chunk_pos viewport_bottom_left_corner_chunk_pos = chunk_pos_from_screen_pos(gp, gp->camera_chunk_pos, viewport_bottom_left_corner, origin_chunk_pos.chunk_z);
+
+  s32 chunk_window_x_apron = apron;
+  s32 chunk_window_y_apron = apron;
+
+  s32 chunk_window_width  = chunk_window_x_apron + ((origin_chunk_pos.chunk_x - viewport_bottom_left_corner_chunk_pos.chunk_x) << 1);
+  s32 chunk_window_height = chunk_window_y_apron + ((origin_chunk_pos.chunk_y - viewport_bottom_left_corner_chunk_pos.chunk_y) << 1);
+
+  /* NOTE jfd 17/03/26: stream entities in to live set */
+
+  for(s32 chunk_window_y = -chunk_window_y_apron; chunk_window_y <= chunk_window_height; chunk_window_y++) {
+    for(s32 chunk_window_x = -chunk_window_x_apron; chunk_window_x < chunk_window_width; chunk_window_x++) {
+
+      Chunk_pos cur_chunk_pos = viewport_bottom_left_corner_chunk_pos;
+      cur_chunk_pos.chunk_x += chunk_window_x;
+      cur_chunk_pos.chunk_y += chunk_window_y;
+
+      Chunk *chunk = get_chunk(gp, cur_chunk_pos.chunk_x, cur_chunk_pos.chunk_y, cur_chunk_pos.chunk_z);
+
+      arr_push(result.live_chunks, chunk);
+
+    }
+  }
+
+  // NOTE jfd 12/03/26:
+  // - save pointers to them in an array here for later (????)
+  // - load entities from those chunks
+  // - store the current chunk and the position the entity is at in that chunk
+  // - on the entity during the frame so that we can easily evict it from that chunk later
+  // - maybe set the camera relative positions as you load them?
+
+  for(int i = 0; i < result.live_chunks.count; i++) {
+    Chunk *chunk = result.live_chunks.d[i];
+    for(int j = 0; j < chunk->entities_count; j++) {
+      Entity *ep = chunk->entities[j];
+      ep->pos = screen_pos_from_chunk_pos(gp, result.origin_chunk_pos, ep->chunk_pos);
+      arr_push(result.live_entities, ep);
+    }
+    chunk->entities_count = 0;
+  }
+
+  return result;
+}
+
+internal void
+func end_sim_region(Game *gp, Sim_region sim_region) {
+  // NOTE jfd 12/03/26: put all simulated entities in to the new chunks they should occupy according to their screen pos
+
+  for(int entity_index = 0; entity_index < sim_region.live_entities.count; entity_index++) {
+    Entity *ep = sim_region.live_entities.d[entity_index];
+
+    if(ep->flags & ENTITY_FLAG_DIE_NOW) {
+      ep->free_list_next = gp->free_entity;
+      gp->free_entity = ep;
+    } else {
+      add_entity_to_chunk(gp, ep);
+    }
+
+  }
+
+}
+
 
 shared_function void
 func game_update_and_render(Game *gp) {
@@ -975,68 +1060,16 @@ func game_update_and_render(Game *gp) {
   s32 camera_viewport_width_tiles = gp->tiles_per_room_width;
   s32 camera_viewport_height_tiles = gp->tiles_per_room_height;
 
-  // TODO jfd 12/03/26: flags on arrays to say they can't grow
-  arr_init_ex(gp->live_chunks, gp->frame_arena, MAX_LIVE_CHUNKS);
-  arr_init_ex(gp->live_entities, gp->frame_arena, MAX_LIVE_ENTITIES);
+  f32 sim_region_width = gp->meters_per_pixel*gp->render.width;
+  f32 sim_region_height = gp->meters_per_pixel*gp->render.height;
 
-  { /* stream entities in to live set */
-
-    // NOTE jfd 12/03/26: get all visible chunks
-    {
-
-      Chunk_pos camera_chunk_pos = gp->camera_chunk_pos;
-
-      v2 viewport_bottom_left_corner = { (f32)gp->render.width, (f32)gp->render.height };
-      viewport_bottom_left_corner = scale_v2(viewport_bottom_left_corner, -0.5f*gp->meters_per_pixel);
-
-      Chunk_pos viewport_bottom_left_corner_chunk_pos = chunk_pos_from_screen_pos(gp, viewport_bottom_left_corner, camera_chunk_pos.chunk_z);
-
-      s32 chunk_window_x_apron = 2;
-      s32 chunk_window_y_apron = 2;
-
-      s32 chunk_window_width  = chunk_window_x_apron + ((camera_chunk_pos.chunk_x - viewport_bottom_left_corner_chunk_pos.chunk_x) << 1);
-      s32 chunk_window_height = chunk_window_y_apron + ((camera_chunk_pos.chunk_y - viewport_bottom_left_corner_chunk_pos.chunk_y) << 1);
-
-      for(s32 chunk_window_y = -chunk_window_y_apron; chunk_window_y <= chunk_window_height; chunk_window_y++) {
-        for(s32 chunk_window_x = -chunk_window_x_apron; chunk_window_x < chunk_window_width; chunk_window_x++) {
-
-          Chunk_pos cur_chunk_pos = viewport_bottom_left_corner_chunk_pos;
-          cur_chunk_pos.chunk_x += chunk_window_x;
-          cur_chunk_pos.chunk_y += chunk_window_y;
-
-          Chunk *chunk = get_chunk(gp, cur_chunk_pos.chunk_x, cur_chunk_pos.chunk_y, cur_chunk_pos.chunk_z);
-
-          arr_push(gp->live_chunks, chunk);
-
-        }
-      }
-    }
-
-    // NOTE jfd 12/03/26:
-    // - save pointers to them in an array here for later (????)
-    // - load entities from those chunks
-    // - store the current chunk and the position the entity is at in that chunk
-    // - on the entity during the frame so that we can easily evict it from that chunk later
-    // - maybe set the camera relative positions as you load them?
-
-    for(int i = 0; i < gp->live_chunks.count; i++) {
-      Chunk *chunk = gp->live_chunks.d[i];
-      for(int j = 0; j < chunk->entities_count; j++) {
-        Entity *ep = chunk->entities[j];
-        ep->pos = screen_pos_from_chunk_pos(gp, ep->chunk_pos);
-        arr_push(gp->live_entities, ep);
-      }
-      chunk->entities_count = 0;
-    }
-
-  } /* stream entities in to live set */
-
+  Sim_region sim_region = begin_sim_region(gp, gp->camera_chunk_pos, sim_region_width, sim_region_height, 2);
 
   for(Entity_order entity_order = 0; entity_order < ENTITY_ORDER_MAX; entity_order++) {
-    for(int entity_index = 0; entity_index < gp->live_entities.count; entity_index++)
+    for(int entity_index = 0; entity_index < sim_region.live_entities.count; entity_index++)
     { /* update entities */
 
-      Entity *ep = gp->live_entities.d[entity_index];
+      Entity *ep = sim_region.live_entities.d[entity_index];
 
       if(ep->kind == ENTITY_KIND_NONE) {
         continue;
@@ -1099,13 +1132,18 @@ func game_update_and_render(Game *gp) {
             ep->flags &= ~ENTITY_FLAG_SLOW;
           }
 
+          if(ep->damage_received > 0) {
+            gp->camera_jitter = true;
+            gp->camera_jitter_time = 0.5f;
+          }
+
         } break;
 
         case ENTITY_CONTROL_FROG_FOLLOW: {
 
           Entity *player_1_ep = 0;
-          for(int i = 0; i < gp->live_entities.count; i++) {
-            Entity *cur_ep = gp->live_entities.d[i];
+          for(int i = 0; i < sim_region.live_entities.count; i++) {
+            Entity *cur_ep = sim_region.live_entities.d[i];
             if(cur_ep->kind == ENTITY_KIND_PLAYER_1) {
               player_1_ep = cur_ep;
               break;
@@ -1129,8 +1167,8 @@ func game_update_and_render(Game *gp) {
         case ENTITY_CONTROL_MONSTER_FOLLOW_AND_ATTACK: {
 
           Entity *player_1_ep = 0;
-          for(int i = 0; i < gp->live_entities.count; i++) {
-            Entity *cur_ep = gp->live_entities.d[i];
+          for(int i = 0; i < sim_region.live_entities.count; i++) {
+            Entity *cur_ep = sim_region.live_entities.d[i];
             if(cur_ep->kind == ENTITY_KIND_PLAYER_1) {
               player_1_ep = cur_ep;
               break;
@@ -1196,12 +1234,8 @@ func game_update_and_render(Game *gp) {
         s32 step_in_z = 0;
         b32 didnt_touch_any_tiles = true;
 
-        // Chunk *cur_live_chunk = ep->cur_live_chunk;
-
-        for(int i = 0; i < gp->live_entities.count; i++) {
-          Entity *tile_ep = gp->live_entities.d[i];
-        // for(int i = 0; i < cur_live_chunk->entities_count; i++) {
-        //   Entity *tile_ep = cur_live_chunk->entities[i];
+        for(int i = 0; i < sim_region.live_entities.count; i++) {
+          Entity *tile_ep = sim_region.live_entities.d[i];
 
           if(tile_ep == ep) {
             continue;
@@ -1283,7 +1317,7 @@ func game_update_and_render(Game *gp) {
 
         ep->pos = new_pos;
 
-        ep->chunk_pos = chunk_pos_from_screen_pos(gp, ep->pos, ep->chunk_pos.chunk_z + step_in_z);
+        ep->chunk_pos = chunk_pos_from_screen_pos(gp, gp->camera_chunk_pos, ep->pos, ep->chunk_pos.chunk_z + step_in_z);
 
       } /* ENTITY_FLAG_TILE_COLLISION */
 
@@ -1311,8 +1345,8 @@ func game_update_and_render(Game *gp) {
 
           ep->flags |= ENTITY_FLAG_BLINK_RED;
           ep->flags |= ENTITY_FLAG_DRAW_RED_TINT;
-          ep->blink_red_time = 2.0f;
-          ep->red_tint_time = 0.001f;
+          ep->blink_red_time = 1.0f;
+          ep->red_tint_time = 0.01f;
 
           if(ep->health <= 0) {
             ep->flags |= ENTITY_FLAG_DIE_NOW;
@@ -1347,7 +1381,7 @@ func game_update_and_render(Game *gp) {
         }
 
         s32 new_camera_chunk_pos_z = ep->chunk_pos.chunk_z;
-        new_camera_chunk_pos = chunk_pos_from_screen_pos(gp, new_camera_screen_pos, new_camera_chunk_pos_z);
+        new_camera_chunk_pos = chunk_pos_from_screen_pos(gp, gp->camera_chunk_pos, new_camera_screen_pos, new_camera_chunk_pos_z);
         update_camera_location = true;
 
       }
@@ -1383,10 +1417,29 @@ func game_update_and_render(Game *gp) {
 
     clear_screen(gp);
 
-    for(int entity_index = 0; entity_index < gp->live_entities.count; entity_index++)
+    v2 camera_offset = { 0.5f*(f32)gp->render.width, 0.5f*(f32)gp->render.height};
+
+    if(gp->camera_jitter) {
+
+      // TODO jfd 17/03/26: make the camera jitter based on the direction that the attack came from
+      f32 x = get_random_f32(gp, -2.0f, 2.0f, 4);
+      f32 y = get_random_f32(gp, -2.0f, 2.0f, 4);
+
+      v2 v = { x, y };
+      camera_offset = add_v2(camera_offset, v);
+
+      gp->camera_jitter_time -= gp->t;
+      if(gp->camera_jitter_time <= 0.0f) {
+        gp->camera_jitter = false;
+        gp->camera_jitter_time = 0.0f;
+      }
+
+    }
+
+    for(int entity_index = 0; entity_index < sim_region.live_entities.count; entity_index++)
     { /* draw tile entities */
 
-      Entity *ep = gp->live_entities.d[entity_index];
+      Entity *ep = sim_region.live_entities.d[entity_index];
 
       if(ep->kind == ENTITY_KIND_NONE) {
         continue;
@@ -1408,7 +1461,6 @@ func game_update_and_render(Game *gp) {
           }
 
           v2 tile_screen_pos = scale_v2(ep->pos, gp->pixels_per_meter);
-          v2 camera_offset = { 0.5f*(f32)gp->render.width, 0.5f*(f32)gp->render.height};
           tile_screen_pos = add_v2(tile_screen_pos, camera_offset);
           tile_screen_pos.y = gp->render.height - tile_screen_pos.y;
 
@@ -1439,10 +1491,10 @@ func game_update_and_render(Game *gp) {
       }
     } /* draw tile entities */
 
-    for(int entity_index = 0; entity_index < gp->live_entities.count; entity_index++)
+    for(int entity_index = 0; entity_index < sim_region.live_entities.count; entity_index++)
     { /* draw entities */
 
-      Entity *ep = gp->live_entities.d[entity_index];
+      Entity *ep = sim_region.live_entities.d[entity_index];
 
       if(ep->kind == ENTITY_KIND_NONE) {
         continue;
@@ -1450,7 +1502,6 @@ func game_update_and_render(Game *gp) {
 
       if(ep->flags & ENTITY_FLAG_DRAW_BITMAP) {
         v2 entity_screen_pos = scale_v2(ep->pos, gp->pixels_per_meter);
-        v2 camera_offset = { 0.5f*(f32)gp->render.width, 0.5f*(f32)gp->render.height};
         entity_screen_pos = add_v2(entity_screen_pos, camera_offset);
         entity_screen_pos.y = gp->render.height - entity_screen_pos.y;
 
@@ -1527,24 +1578,7 @@ func game_update_and_render(Game *gp) {
 
   } /* draw */
 
-  { /* stream entities back out to chunks */
-
-    // NOTE jfd 12/03/26: put all simulated entities in to the new chunks they should occupy according to their screen pos
-
-    for(int entity_index = 0; entity_index < gp->live_entities.count; entity_index++) {
-      Entity *ep = gp->live_entities.d[entity_index];
-
-      if(ep->flags & ENTITY_FLAG_DIE_NOW) {
-        ep->free_list_next = gp->free_entity;
-        gp->free_entity = ep;
-      } else {
-        add_entity_to_chunk(gp, ep);
-      }
-
-    }
-
-  } /* stream entities back out to chunks */
-
+  end_sim_region(gp, sim_region);
 
   arena_clear(gp->frame_arena);
 
