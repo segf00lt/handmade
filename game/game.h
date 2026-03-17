@@ -16,7 +16,11 @@
 #define CHUNK_HASH_TABLE_COUNT        (1 << 10)
 #define CHUNK_SAFE_MARGIN             (MAX_S32/64)
 
-#define PLAYER_ACCEL             (M(480))
+#define PLAYER_ACCEL   (M(230))
+#define FROG_ACCEL     (M(40))
+#define MONSTER_ACCEL  (M(180))
+
+#define MONSTER_ATTACK_DAMAGE 1
 
 #define PIXELS_PER_METER (13.0f)
 #define MIN_PIXELS_PER_METER (PIXELS_PER_METER*0.1f)
@@ -25,22 +29,31 @@
 #define METERS_TO_PIXELS(x) ((f32)((f32)(x)*PIXELS_PER_METER))
 #define PIXELS_TO_METERS(x) ((f32)((f32)(x)*METERS_PER_PIXEL))
 
-
-#define MAX_ENTITIES_PER_CHUNK 1024
+#define MAX_ENTITIES_PER_CHUNK 512
 #define MAX_ENTITIES 4096
-#define MAX_LIVE_ENTITIES 512
+#define MAX_LIVE_ENTITIES 256
+#define MAX_LIVE_CHUNKS 64
 
 #define ENTITY_KINDS \
 X(PLAYER_1) \
 X(PLAYER_2) \
+X(MONSTER) \
+X(BULLET) \
+X(FROG) \
 X(WALL) \
 X(DOOR_UP) \
 X(DOOR_DOWN) \
 
 #define ENTITY_FLAGS \
+X(DIE_NOW) \
+X(DRAW_BITMAP) \
 X(APPLY_FRICTION) \
 X(ACCEL_MOTION) \
 X(SLOW) \
+X(APPLY_DAMAGE) \
+X(IGNORE_DAMAGE) \
+X(APPLY_COLLISION) \
+X(IGNORE_COLLISION) \
 X(TILE_COLLISION) \
 /* TODO jfd 12/03/26: remove these flags once we change to a better collision system */ \
 X(TILE_LEFT_ENABLED) \
@@ -51,14 +64,20 @@ X(TILE_BOTTOM_LEFT_CORNER_ENABLED) \
 X(TILE_BOTTOM_RIGHT_CORNER_ENABLED) \
 X(TILE_TOP_LEFT_CORNER_ENABLED) \
 X(TILE_TOP_RIGHT_CORNER_ENABLED) \
+X(BLINK_RED) \
+X(DRAW_RED_TINT) \
 
 #define ENTITY_ORDERS   \
 X(FIRST) \
+X(SECOND) \
 X(LAST) \
 
 #define ENTITY_CONTROLS \
 X(PLAYER_1) \
 X(PLAYER_2) \
+X(MONSTER_FOLLOW_AND_ATTACK) \
+X(FROG_FOLLOW) \
+X(BULLET) \
 
 typedef enum Entity_kind {
   ENTITY_KIND_NONE = 0,
@@ -96,6 +115,8 @@ typedef enum Entity_control {
   #undef X
   ENTITY_CONTROL_MAX,
 } Entity_control;
+
+TYPEDEF_ARRAY_NAME(int, Int_array);
 
 typedef struct Color Color;
 struct Color {
@@ -169,9 +190,19 @@ struct Chunk_pos {
   s32 chunk_x;
   s32 chunk_y;
   s32 chunk_z;
-  v2_s32 tile;
   v2 chunk_offset;
 };
+
+struct Chunk {
+  Chunk *hash_next;
+  Entity *entities[MAX_ENTITIES_PER_CHUNK];
+  s32 entities_count;
+  s32 chunk_x;
+  s32 chunk_y;
+  s32 chunk_z;
+};
+
+TYPEDEF_ARRAY_NAME(Chunk*, Chunk_ptr_array);
 
 struct Entity {
   Entity *free_list_next;
@@ -187,29 +218,31 @@ struct Entity {
   f32 width;
   f32 height;
   f32 mass;
+  f32 friction;
   v2  vel;
   v2  accel;
 
+  s32 health;
+  s32 damage_received;
+  s32 damage_to_deal;
+  b32 collision_received;
+
   b32 changed_z;
+  f32 blink_red_time;
+  f32 red_tint_time;
+
+  f32 monster_attack_delay_time;
 
   Bitmap bitmap;
 
   // NOTE jfd: per frame data
 
+
 };
+STATIC_ASSERT(sizeof(Entity) <= 256, entity_is_less_than_256_bytes);
+#define ENTITY_SIZE ((u64)256)
 
 TYPEDEF_ARRAY_NAME(Entity*, Entity_ptr_array);
-
-struct Chunk {
-  Chunk *hash_next;
-  Entity *entities[MAX_ENTITIES_PER_CHUNK];
-  s32 entities_count;
-  s32 chunk_x;
-  s32 chunk_y;
-  s32 chunk_z;
-};
-
-TYPEDEF_ARRAY_NAME(Chunk*, Chunk_ptr_array);
 
 typedef struct Game Game;
 struct Game {
@@ -252,6 +285,8 @@ struct Game {
   Entity_ptr_array live_entities;
 
   Bitmap guy_bitmap;
+  Bitmap monster_bitmap;
+  Bitmap frog_bitmap;
 
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
@@ -278,7 +313,7 @@ force_inline u32 pixel_from_color(Color color);
 
 internal void draw_rect_min_max(Game *gp, Color color, f32 min_x, f32 min_y, f32 max_x, f32 max_y);
 
-internal void draw_bitmap(Game *gp, Bitmap bitmap, f32 x, f32 y);
+internal void draw_bitmap(Game *gp, Bitmap bitmap, f32 x, f32 y, Color tint);
 
 internal void draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_x, f32 min_y, f32 max_x, f32 max_y);
 

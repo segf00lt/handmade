@@ -20,10 +20,12 @@ func entity_alloc(Game *gp, Entity_order order, Entity_kind kind, Entity_control
     ep = gp->free_entity;
     sll_stack_pop_n(gp->free_entity, free_list_next);
   } else {
-    ep = push_struct(gp->main_arena, Entity);
+    ep = (Entity*)push_array_no_zero_aligned(gp->main_arena, u8, ENTITY_SIZE, alignof(Entity)); // TODO jfd 16/03/26: add an entity arena
   }
 
   ASSERT(ep);
+
+  memory_zero(ep, ENTITY_SIZE);
 
   ep->order   = order;
   ep->kind    = kind;
@@ -199,7 +201,7 @@ func draw_rect_min_max(Game *gp, Color color, f32 min_x, f32 min_y, f32 max_x, f
 }
 
 internal void
-func draw_bitmap(Game *gp, Bitmap bitmap, f32 x, f32 y) {
+func draw_bitmap(Game *gp, Bitmap bitmap, f32 x, f32 y, Color tint) {
 
   f32 x0 = x;
   f32 y0 = y;
@@ -247,7 +249,13 @@ func draw_bitmap(Game *gp, Bitmap bitmap, f32 x, f32 y) {
 
       Color bitmap_pixel_color = color_from_pixel(bitmap_pixel_row[bitmap_x]);
 
-      Color final_color = alpha_blend(cur_color, bitmap_pixel_color);
+      Color tinted_color;
+      if(cur_color.a > 0.0f && bitmap_pixel_color.a > 0.0f) {
+        tinted_color = alpha_blend(bitmap_pixel_color, tint);
+      } else {
+        tinted_color = bitmap_pixel_color;
+      }
+      Color final_color = alpha_blend(cur_color, tinted_color);
 
       u32 final_pixel_color = pixel_from_color(final_color);
 
@@ -435,6 +443,14 @@ func chunk_pos_from_point(Game *gp, v2 pos, s32 z) {
   return result;
 }
 
+internal v2
+func point_from_chunk_pos(Game *gp, Chunk_pos chunk_pos) {
+  v2 result = chunk_pos.chunk_offset;
+  result.x += CHUNK_SIZE_METERS * (f32)chunk_pos.chunk_x;
+  result.y += CHUNK_SIZE_METERS * (f32)chunk_pos.chunk_y;
+  return result;
+}
+
 force_inline Chunk*
 func get_chunk(Game *gp, s32 chunk_x, s32 chunk_y, s32 chunk_z) {
   ASSERT(chunk_x > -CHUNK_SAFE_MARGIN);
@@ -518,13 +534,16 @@ func init_player_1(Game *gp) {
     ENTITY_FLAG_ACCEL_MOTION |
     ENTITY_FLAG_APPLY_FRICTION |
     ENTITY_FLAG_TILE_COLLISION |
+    ENTITY_FLAG_DRAW_BITMAP |
     0
   );
 
   ep->chunk_pos = chunk_pos_from_point(gp, (v2){ 6, 4 }, 0);
   ep->width = CM(200);
   ep->height = CM(400);
+  ep->friction = 19.0f;
   ep->bitmap = gp->guy_bitmap;
+  ep->health = 100;
 
   add_entity_to_chunk(gp, ep);
 
@@ -533,7 +552,6 @@ func init_player_1(Game *gp) {
 internal void
 func init_player_2(Game *gp) {
 
-
   Entity *ep = entity_alloc(gp,
     ENTITY_ORDER_FIRST,
     ENTITY_KIND_PLAYER_2,
@@ -541,16 +559,70 @@ func init_player_2(Game *gp) {
     ENTITY_FLAG_APPLY_FRICTION |
     ENTITY_FLAG_ACCEL_MOTION |
     ENTITY_FLAG_TILE_COLLISION |
+    ENTITY_FLAG_DRAW_BITMAP |
     0
   );
 
   ep->chunk_pos = chunk_pos_from_point(gp, (v2){ 12, 14 }, 0);
   ep->width = CM(200);
   ep->height = CM(400);
+  ep->friction = 19.0f;
   ep->bitmap = gp->guy_bitmap;
+  ep->health = 100;
 
   add_entity_to_chunk(gp, ep);
 
+}
+
+internal void
+func init_monster(Game *gp) {
+
+  Entity *ep = entity_alloc(gp,
+    ENTITY_ORDER_SECOND,
+    ENTITY_KIND_MONSTER,
+    ENTITY_CONTROL_MONSTER_FOLLOW_AND_ATTACK,
+    ENTITY_FLAG_APPLY_FRICTION |
+    ENTITY_FLAG_ACCEL_MOTION |
+    ENTITY_FLAG_TILE_COLLISION |
+    ENTITY_FLAG_APPLY_DAMAGE |
+    ENTITY_FLAG_APPLY_COLLISION |
+    ENTITY_FLAG_DRAW_BITMAP |
+    0
+  );
+
+  // ep->chunk_pos = chunk_pos_from_point(gp, (v2){150.755142211914062, 65.5780410766601563}, 0);
+  ep->chunk_pos = chunk_pos_from_point(gp, (v2){ 16, 14 }, 0);
+  ep->width = CM(200);
+  ep->height = CM(400);
+  ep->friction = 19.0f;
+  ep->bitmap = gp->monster_bitmap;
+  ep->health = 100;
+
+  add_entity_to_chunk(gp, ep);
+}
+
+internal void
+func init_frog(Game *gp) {
+
+  Entity *ep = entity_alloc(gp,
+    ENTITY_ORDER_SECOND,
+    ENTITY_KIND_FROG,
+    ENTITY_CONTROL_FROG_FOLLOW,
+    ENTITY_FLAG_APPLY_FRICTION |
+    ENTITY_FLAG_ACCEL_MOTION |
+    ENTITY_FLAG_TILE_COLLISION |
+    ENTITY_FLAG_DRAW_BITMAP |
+    0
+  );
+
+  ep->chunk_pos = chunk_pos_from_point(gp, (v2){ 22, 14 }, 0);
+  ep->width = CM(200);
+  ep->height = CM(400);
+  ep->friction = 4.0f;
+  ep->bitmap = gp->frog_bitmap;
+  ep->health = 100;
+
+  add_entity_to_chunk(gp, ep);
 }
 
 internal void
@@ -897,11 +969,14 @@ func game_update_and_render(Game *gp) {
 
   } /* run_once */
 
+  b32 update_camera_location = false;
+  Chunk_pos new_camera_chunk_pos = {0};
+
   s32 camera_viewport_width_tiles = gp->tiles_per_room_width;
   s32 camera_viewport_height_tiles = gp->tiles_per_room_height;
 
   // TODO jfd 12/03/26: flags on arrays to say they can't grow
-  arr_init_ex(gp->live_chunks, gp->frame_arena, 64);
+  arr_init_ex(gp->live_chunks, gp->frame_arena, MAX_LIVE_CHUNKS);
   arr_init_ex(gp->live_entities, gp->frame_arena, MAX_LIVE_ENTITIES);
 
   { /* stream entities in to live set */
@@ -916,8 +991,8 @@ func game_update_and_render(Game *gp) {
 
       Chunk_pos viewport_bottom_left_corner_chunk_pos = chunk_pos_from_screen_pos(gp, viewport_bottom_left_corner, camera_chunk_pos.chunk_z);
 
-      s32 chunk_window_x_apron = 4;
-      s32 chunk_window_y_apron = 4;
+      s32 chunk_window_x_apron = 2;
+      s32 chunk_window_y_apron = 2;
 
       s32 chunk_window_width  = chunk_window_x_apron + ((camera_chunk_pos.chunk_x - viewport_bottom_left_corner_chunk_pos.chunk_x) << 1);
       s32 chunk_window_height = chunk_window_y_apron + ((camera_chunk_pos.chunk_y - viewport_bottom_left_corner_chunk_pos.chunk_y) << 1);
@@ -948,9 +1023,9 @@ func game_update_and_render(Game *gp) {
       Chunk *chunk = gp->live_chunks.d[i];
       for(int j = 0; j < chunk->entities_count; j++) {
         Entity *ep = chunk->entities[j];
+        ep->pos = screen_pos_from_chunk_pos(gp, ep->chunk_pos);
         arr_push(gp->live_entities, ep);
       }
-      // NOTE jfd 12/03/26: clear chunks when we load from them
       chunk->entities_count = 0;
     }
 
@@ -971,7 +1046,6 @@ func game_update_and_render(Game *gp) {
         continue;
       }
 
-      ep->pos = screen_pos_from_chunk_pos(gp, ep->chunk_pos);
       v2 cur_pos = ep->pos;
       v2 new_pos = cur_pos;
 
@@ -1026,13 +1100,72 @@ func game_update_and_render(Game *gp) {
           }
 
         } break;
+
+        case ENTITY_CONTROL_FROG_FOLLOW: {
+
+          Entity *player_1_ep = 0;
+          for(int i = 0; i < gp->live_entities.count; i++) {
+            Entity *cur_ep = gp->live_entities.d[i];
+            if(cur_ep->kind == ENTITY_KIND_PLAYER_1) {
+              player_1_ep = cur_ep;
+              break;
+            }
+          }
+
+          if(player_1_ep) {
+
+            v2 delta = sub_v2(player_1_ep->pos, ep->pos);
+            f32 dist_sq = dot_v2(delta, delta);
+            if(dist_sq <= SQUARE(6.0f)) {
+              ep->accel = (v2){0};
+            } else {
+              ep->accel = scale_v2(norm_v2(delta), FROG_ACCEL);
+            }
+
+          }
+
+        } break;
+
+        case ENTITY_CONTROL_MONSTER_FOLLOW_AND_ATTACK: {
+
+          Entity *player_1_ep = 0;
+          for(int i = 0; i < gp->live_entities.count; i++) {
+            Entity *cur_ep = gp->live_entities.d[i];
+            if(cur_ep->kind == ENTITY_KIND_PLAYER_1) {
+              player_1_ep = cur_ep;
+              break;
+            }
+          }
+
+          if(player_1_ep) {
+            v2 delta = sub_v2(player_1_ep->pos, ep->pos);
+            f32 dist_sq = dot_v2(delta, delta);
+            if(dist_sq < SQUARE(25.0f) ) {
+              ep->accel = scale_v2(norm_v2(delta), MONSTER_ACCEL);
+            } else {
+              ep->accel = (v2){0};
+            }
+
+            if(dist_sq < SQUARE(4.0f)) {
+              if(ep->monster_attack_delay_time <= 0.0f) {
+                ep->monster_attack_delay_time = 1.8f;
+                player_1_ep->damage_received += MONSTER_ATTACK_DAMAGE;
+              } else {
+                ep->monster_attack_delay_time -= gp->t;
+              }
+            } else {
+              ep->monster_attack_delay_time = 0;
+            }
+          }
+
+        } break;
+
       }
 
       /* handle entity flags */
 
       if(ep->flags & ENTITY_FLAG_APPLY_FRICTION) {
-        f32 friction = 19.0f;
-        ep->vel = sub_v2(ep->vel, scale_v2(ep->vel, friction*t));
+        ep->vel = sub_v2(ep->vel, scale_v2(ep->vel, ep->friction*t));
       }
 
       if(ep->flags & ENTITY_FLAG_ACCEL_MOTION) {
@@ -1063,8 +1196,16 @@ func game_update_and_render(Game *gp) {
         s32 step_in_z = 0;
         b32 didnt_touch_any_tiles = true;
 
+        // Chunk *cur_live_chunk = ep->cur_live_chunk;
+
         for(int i = 0; i < gp->live_entities.count; i++) {
           Entity *tile_ep = gp->live_entities.d[i];
+        // for(int i = 0; i < cur_live_chunk->entities_count; i++) {
+        //   Entity *tile_ep = cur_live_chunk->entities[i];
+
+          if(tile_ep == ep) {
+            continue;
+          }
 
           if(tile_ep->kind != ENTITY_KIND_WALL && tile_ep->kind != ENTITY_KIND_DOOR_UP && tile_ep->kind != ENTITY_KIND_DOOR_DOWN) {
             continue;
@@ -1142,10 +1283,48 @@ func game_update_and_render(Game *gp) {
 
         ep->pos = new_pos;
 
-        ep->chunk_pos = chunk_pos_from_screen_pos(gp, new_pos, ep->chunk_pos.chunk_z + step_in_z);
+        ep->chunk_pos = chunk_pos_from_screen_pos(gp, ep->pos, ep->chunk_pos.chunk_z + step_in_z);
 
       } /* ENTITY_FLAG_TILE_COLLISION */
 
+      if(ep->flags & ENTITY_FLAG_BLINK_RED) {
+        ep->blink_red_time -= gp->t;
+
+        if(ep->blink_red_time <= 0.0f) {
+          ep->flags &= ~ENTITY_FLAG_BLINK_RED;
+          ep->flags &= ~ENTITY_FLAG_DRAW_RED_TINT;
+        } else {
+          ep->red_tint_time -= gp->t;
+          if(ep->red_tint_time <= 0.0f) {
+            ep->flags ^= ENTITY_FLAG_DRAW_RED_TINT;
+            ep->red_tint_time = 0.001f;
+          }
+        }
+
+      }
+
+      if(!(ep->flags & ENTITY_FLAG_IGNORE_DAMAGE)) {
+
+        if(ep->damage_received > 0) {
+          ep->health -= ep->damage_received;
+          ep->damage_received = 0;
+
+          ep->flags |= ENTITY_FLAG_BLINK_RED;
+          ep->flags |= ENTITY_FLAG_DRAW_RED_TINT;
+          ep->blink_red_time = 2.0f;
+          ep->red_tint_time = 0.001f;
+
+          if(ep->health <= 0) {
+            ep->flags |= ENTITY_FLAG_DIE_NOW;
+          }
+        }
+
+      }
+
+
+
+      if(ep->flags & ENTITY_FLAG_DIE_NOW) {
+      }
 
       if(ep->kind == ENTITY_KIND_PLAYER_1) {
 
@@ -1168,10 +1347,11 @@ func game_update_and_render(Game *gp) {
         }
 
         s32 new_camera_chunk_pos_z = ep->chunk_pos.chunk_z;
-        Chunk_pos new_camera_chunk_pos = chunk_pos_from_screen_pos(gp, new_camera_screen_pos, new_camera_chunk_pos_z);
-        gp->camera_chunk_pos = new_camera_chunk_pos;
+        new_camera_chunk_pos = chunk_pos_from_screen_pos(gp, new_camera_screen_pos, new_camera_chunk_pos_z);
+        update_camera_location = true;
 
       }
+
     } /* update entities */
   }
 
@@ -1244,7 +1424,7 @@ func game_update_and_render(Game *gp) {
             tile_screen_rect_size.y
           );
 
-          #if 1
+          #if 0
           Color yellow = { 1.0f, 1.0f, 0.0f, 0.5f };
           draw_rect(gp,
             yellow,
@@ -1268,66 +1448,61 @@ func game_update_and_render(Game *gp) {
         continue;
       }
 
-      switch(ep->kind) {
-        default:
-        UNREACHABLE;
-        break;
+      if(ep->flags & ENTITY_FLAG_DRAW_BITMAP) {
+        v2 entity_screen_pos = scale_v2(ep->pos, gp->pixels_per_meter);
+        v2 camera_offset = { 0.5f*(f32)gp->render.width, 0.5f*(f32)gp->render.height};
+        entity_screen_pos = add_v2(entity_screen_pos, camera_offset);
+        entity_screen_pos.y = gp->render.height - entity_screen_pos.y;
 
-        case ENTITY_KIND_WALL:
-        case ENTITY_KIND_DOOR_UP:
-        case ENTITY_KIND_DOOR_DOWN:
-        break;
+        Color tint = {0};
+        if(ep->flags & ENTITY_FLAG_DRAW_RED_TINT) {
+          tint = (Color){ 1.0f, 0.0f, 0.0f, 0.5f };
+        }
 
-        case ENTITY_KIND_PLAYER_1:
-        case ENTITY_KIND_PLAYER_2:
+        #if 1
         {
+          f32 entity_bitmap_x = entity_screen_pos.x - 0.5f*(f32)ep->bitmap.width;
+          f32 entity_bitmap_y = entity_screen_pos.y - 0.5f*(f32)ep->bitmap.height;
+          draw_bitmap(gp, ep->bitmap, entity_bitmap_x, entity_bitmap_y, tint);
+        }
+        #endif
 
-          v2 player_screen_pos = scale_v2(ep->pos, gp->pixels_per_meter);
-          v2 camera_offset = { 0.5f*(f32)gp->render.width, 0.5f*(f32)gp->render.height};
-          player_screen_pos = add_v2(player_screen_pos, camera_offset);
-          player_screen_pos.y = gp->render.height - player_screen_pos.y;
+        #if 0
 
-          #if 1
-          {
-            f32 player_bitmap_x = player_screen_pos.x - 0.5f*(f32)ep->bitmap.width;
-            f32 player_bitmap_y = player_screen_pos.y - 0.5f*(f32)ep->bitmap.height;
-            draw_bitmap(gp, ep->bitmap, player_bitmap_x, player_bitmap_y);
-          }
-          #endif
+        v2 entity_rect_screen_size        = scale_v2((v2){ ep->width, ep->height }, gp->pixels_per_meter);
+        v2 half_entity_screen_size        = scale_v2(entity_rect_screen_size, 0.5f);
+        v2 entity_rect_screen_pos         = sub_v2(entity_screen_pos, half_entity_screen_size);
+        v2 entity_center_rect_screen_pos  = sub_v2(entity_screen_pos, scale_v2(half_entity_screen_size, 0.2f));
+        v2 entity_center_rect_screen_size = scale_v2(entity_rect_screen_size, 0.2f);
 
-          #if 1
+        draw_rect(gp,
+          (Color){ 0.95f, 0.2f, 0.4f, 0.5f },
+          entity_rect_screen_pos.x,
+          entity_rect_screen_pos.y,
+          entity_rect_screen_size.x,
+          entity_rect_screen_size.y
+        );
 
-          v2 player_rect_screen_size        = scale_v2((v2){ ep->width, ep->height }, gp->pixels_per_meter);
-          v2 half_player_screen_size        = scale_v2(player_rect_screen_size, 0.5f);
-          v2 player_rect_screen_pos         = sub_v2(player_screen_pos, half_player_screen_size);
-          v2 player_center_rect_screen_pos  = sub_v2(player_screen_pos, scale_v2(half_player_screen_size, 0.2f));
-          v2 player_center_rect_screen_size = scale_v2(player_rect_screen_size, 0.2f);
+        draw_rect(gp,
+          (Color){ 0.95f, 0.8f, 0.0f, 0.5f },
+          entity_center_rect_screen_pos.x,
+          entity_center_rect_screen_pos.y,
+          entity_center_rect_screen_size.x,
+          entity_center_rect_screen_size.y
+        );
 
-          draw_rect(gp,
-            (Color){ 0.95f, 0.2f, 0.4f, 0.5f },
-            player_rect_screen_pos.x,
-            player_rect_screen_pos.y,
-            player_rect_screen_size.x,
-            player_rect_screen_size.y
-          );
-
-          draw_rect(gp,
-            (Color){ 0.95f, 0.8f, 0.0f, 0.5f },
-            player_center_rect_screen_pos.x,
-            player_center_rect_screen_pos.y,
-            player_center_rect_screen_size.x,
-            player_center_rect_screen_size.y
-          );
-
-          #endif
-
-
-        } break;
+        #endif
       }
+
     } /* draw entities */
 
+    if(update_camera_location) {
+      update_camera_location = false;
+      gp->camera_chunk_pos = new_camera_chunk_pos;
+    }
 
-    #if 1
+
+    #if 0
     {
       Color color = { 1.0f, 0, 0, 1 };
 
@@ -1358,7 +1533,14 @@ func game_update_and_render(Game *gp) {
 
     for(int entity_index = 0; entity_index < gp->live_entities.count; entity_index++) {
       Entity *ep = gp->live_entities.d[entity_index];
-      add_entity_to_chunk(gp, ep);
+
+      if(ep->flags & ENTITY_FLAG_DIE_NOW) {
+        ep->free_list_next = gp->free_entity;
+        gp->free_entity = ep;
+      } else {
+        add_entity_to_chunk(gp, ep);
+      }
+
     }
 
   } /* stream entities back out to chunks */
@@ -1416,7 +1598,9 @@ func game_init(Platform *pp) {
 
   gp->did_reload = true;
 
-  gp->guy_bitmap = load_bitmap(gp, str8_lit("assets/guy.bmp"));
+  gp->guy_bitmap     = load_bitmap(gp, str8_lit("assets/guy.bmp"));
+  gp->monster_bitmap = load_bitmap(gp, str8_lit("assets/monster.bmp"));
+  gp->frog_bitmap    = load_bitmap(gp, str8_lit("assets/frog.bmp"));
 
   init_tile_map(gp);
 
@@ -1424,6 +1608,8 @@ func game_init(Platform *pp) {
 
   init_player_1(gp);
   init_player_2(gp);
+  init_monster(gp);
+  init_frog(gp);
 
   return gp;
 }
