@@ -942,15 +942,15 @@ func chunk_pos_from_screen_pos(Game *gp, Chunk_pos camera_origin_chunk_pos, v2 s
   return result;
 }
 
-internal Sim_region
+internal Sim_region*
 func begin_sim_region(Game *gp, Chunk_pos origin_chunk_pos, f32 width, f32 height, s32 apron) {
-  Sim_region result = {0};
+  Sim_region *result = push_struct(gp->frame_arena, Sim_region);
 
-  result.origin_chunk_pos = origin_chunk_pos;
+  result->origin_chunk_pos = origin_chunk_pos;
+  result->width = width;
+  result->height = height;
 
   // TODO jfd 12/03/26: flags on arrays to say they can't grow
-  arr_init_ex(result.live_chunks, gp->frame_arena, MAX_LIVE_CHUNKS);
-  arr_init_ex(result.live_entities, gp->frame_arena, MAX_LIVE_ENTITIES);
 
   v2 viewport_bottom_left_corner = { width, height };
   viewport_bottom_left_corner = scale_v2(viewport_bottom_left_corner, -0.5f);
@@ -974,7 +974,11 @@ func begin_sim_region(Game *gp, Chunk_pos origin_chunk_pos, f32 width, f32 heigh
 
       Chunk *chunk = get_chunk(gp, cur_chunk_pos.chunk_x, cur_chunk_pos.chunk_y, cur_chunk_pos.chunk_z);
 
-      arr_push(result.live_chunks, chunk);
+      if(result->chunks_count < ARRLEN(result->chunks)) {
+        result->chunks[result->chunks_count++] = chunk;
+      } else {
+        UNREACHABLE;
+      }
 
     }
   }
@@ -986,12 +990,16 @@ func begin_sim_region(Game *gp, Chunk_pos origin_chunk_pos, f32 width, f32 heigh
   // - on the entity during the frame so that we can easily evict it from that chunk later
   // - maybe set the camera relative positions as you load them?
 
-  for(int i = 0; i < result.live_chunks.count; i++) {
-    Chunk *chunk = result.live_chunks.d[i];
+  for(int i = 0; i < result->chunks_count; i++) {
+    Chunk *chunk = result->chunks[i];
     for(int j = 0; j < chunk->entities_count; j++) {
       Entity *ep = chunk->entities[j];
-      ep->pos = screen_pos_from_chunk_pos(gp, result.origin_chunk_pos, ep->chunk_pos);
-      arr_push(result.live_entities, ep);
+      ep->pos = screen_pos_from_chunk_pos(gp, result->origin_chunk_pos, ep->chunk_pos);
+      if(result->entities_count < ARRLEN(result->entities)) {
+        result->entities[result->entities_count++] = ep;
+      } else {
+        UNREACHABLE;
+      }
     }
     chunk->entities_count = 0;
   }
@@ -1000,11 +1008,11 @@ func begin_sim_region(Game *gp, Chunk_pos origin_chunk_pos, f32 width, f32 heigh
 }
 
 internal void
-func end_sim_region(Game *gp, Sim_region sim_region) {
+func end_sim_region(Game *gp, Sim_region *sim_region) {
   // NOTE jfd 12/03/26: put all simulated entities in to the new chunks they should occupy according to their screen pos
 
-  for(int entity_index = 0; entity_index < sim_region.live_entities.count; entity_index++) {
-    Entity *ep = sim_region.live_entities.d[entity_index];
+  for(int entity_index = 0; entity_index < sim_region->entities_count; entity_index++) {
+    Entity *ep = sim_region->entities[entity_index];
 
     if(ep->flags & ENTITY_FLAG_DIE_NOW) {
       ep->free_list_next = gp->free_entity;
@@ -1063,13 +1071,13 @@ func game_update_and_render(Game *gp) {
   f32 sim_region_width = gp->meters_per_pixel*gp->render.width;
   f32 sim_region_height = gp->meters_per_pixel*gp->render.height;
 
-  Sim_region sim_region = begin_sim_region(gp, gp->camera_chunk_pos, sim_region_width, sim_region_height, 2);
+  Sim_region *sim_region = begin_sim_region(gp, gp->camera_chunk_pos, sim_region_width, sim_region_height, 2);
 
   for(Entity_order entity_order = 0; entity_order < ENTITY_ORDER_MAX; entity_order++) {
-    for(int entity_index = 0; entity_index < sim_region.live_entities.count; entity_index++)
+    for(int entity_index = 0; entity_index < sim_region->entities_count; entity_index++)
     { /* update entities */
 
-      Entity *ep = sim_region.live_entities.d[entity_index];
+      Entity *ep = sim_region->entities[entity_index];
 
       if(ep->kind == ENTITY_KIND_NONE) {
         continue;
@@ -1142,8 +1150,8 @@ func game_update_and_render(Game *gp) {
         case ENTITY_CONTROL_FROG_FOLLOW: {
 
           Entity *player_1_ep = 0;
-          for(int i = 0; i < sim_region.live_entities.count; i++) {
-            Entity *cur_ep = sim_region.live_entities.d[i];
+          for(int i = 0; i < sim_region->entities_count; i++) {
+            Entity *cur_ep = sim_region->entities[i];
             if(cur_ep->kind == ENTITY_KIND_PLAYER_1) {
               player_1_ep = cur_ep;
               break;
@@ -1167,8 +1175,8 @@ func game_update_and_render(Game *gp) {
         case ENTITY_CONTROL_MONSTER_FOLLOW_AND_ATTACK: {
 
           Entity *player_1_ep = 0;
-          for(int i = 0; i < sim_region.live_entities.count; i++) {
-            Entity *cur_ep = sim_region.live_entities.d[i];
+          for(int i = 0; i < sim_region->entities_count; i++) {
+            Entity *cur_ep = sim_region->entities[i];
             if(cur_ep->kind == ENTITY_KIND_PLAYER_1) {
               player_1_ep = cur_ep;
               break;
@@ -1234,8 +1242,8 @@ func game_update_and_render(Game *gp) {
         s32 step_in_z = 0;
         b32 didnt_touch_any_tiles = true;
 
-        for(int i = 0; i < sim_region.live_entities.count; i++) {
-          Entity *tile_ep = sim_region.live_entities.d[i];
+        for(int i = 0; i < sim_region->entities_count; i++) {
+          Entity *tile_ep = sim_region->entities[i];
 
           if(tile_ep == ep) {
             continue;
@@ -1436,10 +1444,10 @@ func game_update_and_render(Game *gp) {
 
     }
 
-    for(int entity_index = 0; entity_index < sim_region.live_entities.count; entity_index++)
+    for(int entity_index = 0; entity_index < sim_region->entities_count; entity_index++)
     { /* draw tile entities */
 
-      Entity *ep = sim_region.live_entities.d[entity_index];
+      Entity *ep = sim_region->entities[entity_index];
 
       if(ep->kind == ENTITY_KIND_NONE) {
         continue;
@@ -1491,10 +1499,10 @@ func game_update_and_render(Game *gp) {
       }
     } /* draw tile entities */
 
-    for(int entity_index = 0; entity_index < sim_region.live_entities.count; entity_index++)
+    for(int entity_index = 0; entity_index < sim_region->entities_count; entity_index++)
     { /* draw entities */
 
-      Entity *ep = sim_region.live_entities.d[entity_index];
+      Entity *ep = sim_region->entities[entity_index];
 
       if(ep->kind == ENTITY_KIND_NONE) {
         continue;

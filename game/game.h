@@ -31,8 +31,8 @@
 
 #define MAX_ENTITIES_PER_CHUNK 512
 #define MAX_ENTITIES 4096
-#define MAX_LIVE_ENTITIES 256
-#define MAX_LIVE_CHUNKS 64
+#define MAX_SIM_REGION_ENTITIES 1024
+#define MAX_SIM_REGION_CHUNKS 512
 
 #define ENTITY_KINDS \
 X(PLAYER_1) \
@@ -247,8 +247,12 @@ TYPEDEF_ARRAY_NAME(Entity*, Entity_ptr_array);
 typedef struct Sim_region Sim_region;
 struct Sim_region {
   Chunk_pos        origin_chunk_pos;
-  Chunk_ptr_array  live_chunks;
-  Entity_ptr_array live_entities;
+  f32              width;
+  f32              height;
+  s32              chunks_count;
+  s32              entities_count;
+  Chunk           *chunks[MAX_SIM_REGION_CHUNKS];
+  Entity          *entities[MAX_SIM_REGION_ENTITIES];
 };
 
 typedef struct Game Game;
@@ -368,9 +372,9 @@ internal v2 screen_pos_from_chunk_pos(Game *gp, Chunk_pos camera_origin_chunk_po
 
 internal Chunk_pos chunk_pos_from_screen_pos(Game *gp, Chunk_pos camera_origin_chunk_pos, v2 screen_pos, s32 z);
 
-internal Sim_region begin_sim_region(Game *gp, Chunk_pos origin_chunk_pos, f32 width, f32 height, s32 apron);
+internal Sim_region* begin_sim_region(Game *gp, Chunk_pos origin_chunk_pos, f32 width, f32 height, s32 apron);
 
-internal void end_sim_region(Game *gp, Sim_region sim_region);
+internal void end_sim_region(Game *gp, Sim_region* sim_region);
 
 shared_function void game_update_and_render(Game *gp);
 
