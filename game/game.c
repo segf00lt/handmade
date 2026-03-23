@@ -866,6 +866,20 @@ func init_tile_map(Game *gp) {
 
 }
 
+internal b32
+func point_in_rect(v2 rect_min, v2 rect_max, v2 p) {
+  b32 result = 0;
+
+  v2 sorted_min = { fminf(rect_min.x, rect_max.x), fminf(rect_min.y, rect_max.y) };
+  v2 sorted_max = { fmaxf(rect_min.x, rect_max.x), fmaxf(rect_min.y, rect_max.y) };
+
+  if(p.x >= sorted_min.x && p.y >= sorted_min.x && p.x <= sorted_max.x && p.y <= sorted_max.y) {
+    result = 1;
+  }
+
+  return result;
+}
+
 internal v2_s32
 func tile_pos_from_screen_pos(Game *gp, v2 pos) {
   v2_s32 result = {0};
@@ -955,13 +969,16 @@ func begin_sim_region(Game *gp, Chunk_pos origin_chunk_pos, f32 width, f32 heigh
   v2 viewport_bottom_left_corner = { width, height };
   viewport_bottom_left_corner = scale_v2(viewport_bottom_left_corner, -0.5f);
 
-  Chunk_pos viewport_bottom_left_corner_chunk_pos = chunk_pos_from_screen_pos(gp, gp->camera_chunk_pos, viewport_bottom_left_corner, origin_chunk_pos.chunk_z);
+  Chunk_pos viewport_bottom_left_corner_chunk_pos = chunk_pos_from_screen_pos(gp, origin_chunk_pos, viewport_bottom_left_corner, origin_chunk_pos.chunk_z);
 
   s32 chunk_window_x_apron = apron;
   s32 chunk_window_y_apron = apron;
 
   s32 chunk_window_width  = chunk_window_x_apron + ((origin_chunk_pos.chunk_x - viewport_bottom_left_corner_chunk_pos.chunk_x) << 1);
   s32 chunk_window_height = chunk_window_y_apron + ((origin_chunk_pos.chunk_y - viewport_bottom_left_corner_chunk_pos.chunk_y) << 1);
+
+  v2 sim_rect_min = add_value_v2(viewport_bottom_left_corner, -CHUNK_SIZE_METERS*0.5f - CHUNK_SIZE_METERS*(f32)(apron >> 1));
+  v2 sim_rect_max = scale_v2(sim_rect_min, -1.0f);
 
   /* NOTE jfd 17/03/26: stream entities in to live set */
 
@@ -995,6 +1012,11 @@ func begin_sim_region(Game *gp, Chunk_pos origin_chunk_pos, f32 width, f32 heigh
     for(int j = 0; j < chunk->entities_count; j++) {
       Entity *ep = chunk->entities[j];
       ep->pos = screen_pos_from_chunk_pos(gp, result->origin_chunk_pos, ep->chunk_pos);
+
+      if(!point_in_rect(sim_rect_min, sim_rect_max, ep->pos)) {
+        ep->flags |= ENTITY_FLAG_DONT_UPDATE_THIS_FRAME;
+      }
+
       if(result->entities_count < ARRLEN(result->entities)) {
         result->entities[result->entities_count++] = ep;
       } else {
@@ -1071,7 +1093,7 @@ func game_update_and_render(Game *gp) {
   f32 sim_region_width = gp->meters_per_pixel*gp->render.width;
   f32 sim_region_height = gp->meters_per_pixel*gp->render.height;
 
-  Sim_region *sim_region = begin_sim_region(gp, gp->camera_chunk_pos, sim_region_width, sim_region_height, 2);
+  Sim_region *sim_region = begin_sim_region(gp, gp->camera_chunk_pos, sim_region_width, sim_region_height, 3);
 
   for(Entity_order entity_order = 0; entity_order < ENTITY_ORDER_MAX; entity_order++) {
     for(int entity_index = 0; entity_index < sim_region->entities_count; entity_index++)
@@ -1084,6 +1106,11 @@ func game_update_and_render(Game *gp) {
       }
 
       if(ep->order != entity_order) {
+        continue;
+      }
+
+      if(ep->flags & ENTITY_FLAG_DONT_UPDATE_THIS_FRAME) {
+        ep->flags &= ~ENTITY_FLAG_DONT_UPDATE_THIS_FRAME;
         continue;
       }
 

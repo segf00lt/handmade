@@ -23,8 +23,8 @@
 #define MONSTER_ATTACK_DAMAGE 1
 
 #define PIXELS_PER_METER (13.0f)
-#define MIN_PIXELS_PER_METER (PIXELS_PER_METER*0.1f)
-#define MAX_PIXELS_PER_METER (PIXELS_PER_METER*4.0f)
+#define MIN_PIXELS_PER_METER (4.0f)
+#define MAX_PIXELS_PER_METER (PIXELS_PER_METER*2.0f)
 #define METERS_PER_PIXEL (1.0f/PIXELS_PER_METER)
 #define METERS_TO_PIXELS(x) ((f32)((f32)(x)*PIXELS_PER_METER))
 #define PIXELS_TO_METERS(x) ((f32)((f32)(x)*METERS_PER_PIXEL))
@@ -66,6 +66,7 @@ X(TILE_TOP_LEFT_CORNER_ENABLED) \
 X(TILE_TOP_RIGHT_CORNER_ENABLED) \
 X(BLINK_RED) \
 X(DRAW_RED_TINT) \
+X(DONT_UPDATE_THIS_FRAME) \
 
 #define ENTITY_ORDERS   \
 X(FIRST) \
@@ -236,7 +237,6 @@ struct Entity {
   Bitmap bitmap;
 
   // NOTE jfd: per frame data
-
 
 };
 STATIC_ASSERT(sizeof(Entity) <= 256, entity_is_less_than_256_bytes);
