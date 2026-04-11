@@ -573,6 +573,306 @@ func cast_v2_s32_to_f32(v2_s32 v) {
 }
 
 
+///////////////////////////
+// v3
+
+force_inline v3
+func add_v3(v3 a, v3 b) {
+  v3 result = {
+    .x = a.x + b.x,
+    .y = a.y + b.y,
+    .z = a.z + b.z,
+  };
+  return result;
+}
+
+force_inline v3
+func sub_v3(v3 a, v3 b) {
+  v3 result = {
+    .x = a.x - b.x,
+    .y = a.y - b.y,
+    .z = a.z - b.z,
+  };
+  return result;
+}
+
+force_inline v3
+func mul_v3(v3 a, v3 b) {
+  v3 result = {
+    .x = a.x * b.x,
+    .y = a.y * b.y,
+    .z = a.z * b.z,
+  };
+  return result;
+}
+
+force_inline f32
+func dot_v3(v3 a, v3 b) {
+  f32 result =
+  a.x * b.x +
+  a.y * b.y +
+  a.z * b.z;
+  return result;
+}
+
+force_inline f32
+func len_sq_v3(v3 v) {
+  f32 result = dot_v3(v, v);
+  return result;
+}
+
+force_inline f32
+func len_v3(v3 v) {
+  f32 result = sqrt_f32(dot_v3(v, v));
+  return result;
+}
+
+force_inline v3
+func norm_v3(v3 v) {
+  v3 result = scale_v3(v, 1.0f / len_v3(v));
+  return result;
+}
+
+force_inline v3
+func div_v3(v3 a, v3 b) {
+  v3 result = {
+    .x = a.x / b.x,
+    .y = a.y / b.y,
+    .z = a.z / b.z,
+  };
+  return result;
+}
+
+force_inline v3
+func scale_v3(v3 v, f32 a) {
+  v3 result = {
+    .x = v.x * a,
+    .y = v.y * a,
+    .z = v.z * a,
+  };
+  return result;
+}
+
+force_inline v3
+func lt_v3(v3 a, v3 b) {
+  v3 result = {
+    .x = (f32)(a.x < b.x),
+    .y = (f32)(a.y < b.y),
+    .z = (f32)(a.z < b.z),
+  };
+  return result;
+}
+
+force_inline v3
+func gte_v3(v3 a, v3 b) {
+  v3 result = {
+    (f32)(a.x >= b.x),
+    (f32)(a.y >= b.y),
+    (f32)(a.z >= b.z),
+  };
+  return result;
+}
+
+force_inline v3
+func lte_v3(v3 a, v3 b) {
+  v3 result = {
+    (f32)(a.x <= b.x),
+    (f32)(a.y <= b.y),
+    (f32)(a.z <= b.z),
+  };
+  return result;
+}
+
+force_inline v3
+func gt_v3(v3 a, v3 b) {
+  v3 result = {
+    (f32)(a.x > b.x),
+    (f32)(a.y > b.y),
+    (f32)(a.z > b.z),
+  };
+  return result;
+}
+
+force_inline v3
+func add_value_v3(v3 v, f32 a) {
+  v3 result = {
+    .x = v.x + a,
+    .y = v.y + a,
+    .z = v.z + a,
+  };
+  return result;
+}
+
+force_inline v3
+func round_v3(v3 v) {
+  v3 result = {
+    .x = round_f32(v.x),
+    .y = round_f32(v.y),
+    .z = round_f32(v.z),
+  };
+  return result;
+}
+
+
+force_inline v3_s32
+func add_v3_s32(v3_s32 a, v3_s32 b) {
+  v3_s32 result = {
+    a.x + b.x,
+    a.y + b.y,
+    a.z + b.z,
+  };
+  return result;
+}
+
+force_inline v3_s32
+func sub_v3_s32(v3_s32 a, v3_s32 b) {
+  v3_s32 result = {
+    a.x - b.x,
+    a.y - b.y,
+    a.z - b.z,
+  };
+  return result;
+}
+
+force_inline v3_s32
+func mul_v3_s32(v3_s32 a, v3_s32 b) {
+  v3_s32 result = {
+    a.x * b.x,
+    a.y * b.y,
+    a.z * b.z,
+  };
+  return result;
+}
+
+force_inline s32
+func dot_v3_s32(v3_s32 a, v3_s32 b) {
+  s32 result =
+  a.x * b.x +
+  a.y * b.y +
+  a.z * b.z;
+  return result;
+}
+
+force_inline v3_s32
+func div_v3_s32(v3_s32 a, v3_s32 b) {
+  v3_s32 result = {
+    a.x / b.x,
+    a.y / b.y,
+    a.z / b.z,
+  };
+  return result;
+}
+
+force_inline v3_s32
+func scale_v3_s32(v3_s32 v, s32 a) {
+  v3_s32 result = {
+    v.x * a,
+    v.y * a,
+    v.z * a,
+  };
+  return result;
+}
+
+force_inline v3_s32
+func lt_v3_s32(v3_s32 a, v3_s32 b) {
+  v3_s32 result = {
+    a.x < b.x,
+    a.y < b.y,
+    a.z < b.z,
+  };
+  return result;
+}
+
+force_inline v3_s32
+func gte_v3_s32(v3_s32 a, v3_s32 b) {
+  v3_s32 result = {
+    a.x >= b.x,
+    a.y >= b.y,
+    a.z >= b.z,
+  };
+  return result;
+}
+
+force_inline v3_s32
+func lte_v3_s32(v3_s32 a, v3_s32 b) {
+  v3_s32 result = {
+    a.x <= b.x,
+    a.y <= b.y,
+    a.z <= b.z,
+  };
+  return result;
+}
+
+force_inline v3_s32
+func gt_v3_s32(v3_s32 a, v3_s32 b) {
+  v3_s32 result = {
+    a.x > b.x,
+    a.y > b.y,
+    a.z > b.z,
+  };
+  return result;
+}
+
+force_inline v3_s32
+func add_value_v3_s32(v3_s32 v, s32 a) {
+  v3_s32 result = {
+    v.x + a,
+    v.y + a,
+    v.z + a,
+  };
+  return result;
+}
+
+
+force_inline v3_s32
+func cast_v3_f32_to_s32(v3 v) {
+  v3_s32 result = {
+    (s32)v.x,
+    (s32)v.y,
+    (s32)v.z,
+  };
+  return result;
+}
+
+force_inline v3_u32
+func cast_v3_f32_to_u32(v3 v) {
+  v3_u32 result = {
+    (u32)v.x,
+    (u32)v.y,
+    (u32)v.z,
+  };
+  return result;
+}
+
+force_inline v3
+func cast_v3_u32_to_f32(v3_u32 v) {
+  v3 result = {
+    (f32)v.x,
+    (f32)v.y,
+    (f32)v.z,
+  };
+  return result;
+}
+
+force_inline v3
+func cast_v3_s32_to_f32(v3_s32 v) {
+  v3 result = {
+    (f32)v.x,
+    (f32)v.y,
+    (f32)v.z,
+  };
+  return result;
+}
+
+force_inline v3_s32
+func cast_v3_u32_to_s32(v3_u32 v) {
+  v3_s32 result = {
+    (s32)v.x,
+    (s32)v.y,
+    (s32)v.z,
+  };
+  return result;
+}
 
 
 #endif

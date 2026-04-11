@@ -121,4 +121,38 @@ force_inline v2     cast_v2_u32_to_f32(v2_u32 v);
 force_inline v2     cast_v2_s32_to_f32(v2_s32 v);
 force_inline v2_s32 cast_v2_u32_to_s32(v2_u32 v);
 
+force_inline v3  add_v3(v3 a, v3 b);
+force_inline v3  sub_v3(v3 a, v3 b);
+force_inline v3  mul_v3(v3 a, v3 b);
+force_inline f32 dot_v3(v3 a, v3 b);
+force_inline f32 len_sq_v3(v3 v);
+force_inline f32 len_v3(v3 v);
+force_inline v3  norm_v3(v3 v);
+force_inline v3  div_v3(v3 a, v3 b);
+force_inline v3  scale_v3(v3 v, f32 a);
+force_inline v3  lt_v3(v3 a, v3 b);
+force_inline v3  gte_v3(v3 a, v3 b);
+force_inline v3  lte_v3(v3 a, v3 b);
+force_inline v3  gt_v3(v3 a, v3 b);
+force_inline v3  add_value_v3(v3 v, f32 a);
+force_inline v3  round_v3(v3 v);
+
+force_inline v3_s32 add_v3_s32(v3_s32 a, v3_s32 b);
+force_inline v3_s32 sub_v3_s32(v3_s32 a, v3_s32 b);
+force_inline v3_s32 mul_v3_s32(v3_s32 a, v3_s32 b);
+force_inline s32    dot_v3_s32(v3_s32 a, v3_s32 b);
+force_inline v3_s32 div_v3_s32(v3_s32 a, v3_s32 b);
+force_inline v3_s32 scale_v3_s32(v3_s32 v, s32 a);
+force_inline v3_s32 lt_v3_s32(v3_s32 a, v3_s32 b);
+force_inline v3_s32 gte_v3_s32(v3_s32 a, v3_s32 b);
+force_inline v3_s32 lte_v3_s32(v3_s32 a, v3_s32 b);
+force_inline v3_s32 gt_v3_s32(v3_s32 a, v3_s32 b);
+force_inline v3_s32 add_value_v3_s32(v3_s32 v, s32 a);
+
+force_inline v3_s32 cast_v3_f32_to_s32(v3 v);
+force_inline v3_u32 cast_v3_f32_to_u32(v3 v);
+force_inline v3     cast_v3_u32_to_f32(v3_u32 v);
+force_inline v3     cast_v3_s32_to_f32(v3_s32 v);
+force_inline v3_s32 cast_v3_u32_to_s32(v3_u32 v);
+
 #endif

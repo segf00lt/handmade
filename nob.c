@@ -118,11 +118,11 @@ int macos_build_virutal_memory_test(void) {
 int main(int argc, char **argv) {
   NOB_GO_REBUILD_URSELF(argc, argv);
 
-  if(!build_raylib_win32()) return 1;
+  if(!win32_build_hot_reload_no_cradle()) return 1;
 
   return 0;
-  if(!win32_build_hot_reload_no_cradle()) return 1;
   if(!win32_build_hot_reload()) return 1;
+  if(!build_raylib_win32()) return 1;
   if(!win32_build()) return 1;
 
 
@@ -130,47 +130,6 @@ int main(int argc, char **argv) {
   if(!macos_build_virutal_memory_test()) return 1;
 
 
-
-
-
-  #if 0
-  {
-    Nob_Cmd cmd = {0};
-    nob_cmd_append(&cmd, CC,
-      "-std=c99",
-      "-Wall",
-      "-Wextra",
-      "-Wno-unused-parameter",
-      "-g",
-      "-fno-omit-frame-pointer",
-      "-no-pie",
-      "-O0",
-      "-pthread",
-      "-o",
-      "job_system_example",
-      "job_system_example.c");
-
-    if (!nob_cmd_run_sync(cmd)) return 1;
-  }
-
-  {
-    Nob_Cmd cmd = {0};
-    nob_cmd_append(&cmd, CC,
-      "-std=c99",
-      "-Wall",
-      "-Wextra",
-      "-Wno-unused-parameter",
-      "-g",
-      "-fno-omit-frame-pointer",
-      "-no-pie",
-      "-O0",
-      "-pthread",
-      "-o",
-      "semaphore_exercise",
-      "semaphore_exercise.c");
-    if (!nob_cmd_run_sync(cmd)) return 1;
-  }
-  #endif
 
   return 0;
 }

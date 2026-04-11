@@ -3,7 +3,7 @@
 
 
 #define KM(x) ((f32)(x) * 1.0e3f)
-#define M(x) x
+#define M(x)  ((f32)x)
 #define DM(x) ((f32)(x) * 1.0e-1f)
 #define CM(x) ((f32)(x) * 1.0e-2f)
 #define MM(x) ((f32)(x) * 1.0e-3f)
@@ -17,6 +17,7 @@
 #define CHUNK_SAFE_MARGIN             (MAX_S32/64)
 
 #define PLAYER_ACCEL   (M(230))
+// #define PLAYER_ACCEL   (M(500))
 #define FROG_ACCEL     (M(40))
 #define MONSTER_ACCEL  (M(180))
 
@@ -191,7 +192,9 @@ struct Chunk_pos {
   s32 chunk_x;
   s32 chunk_y;
   s32 chunk_z;
-  v2 chunk_offset;
+  // nocheckin
+  // v2 chunk_offset;
+  v3 chunk_offset;
 };
 
 struct Chunk {
@@ -215,13 +218,18 @@ struct Entity {
 
   Chunk_pos chunk_pos;
 
-  v2  pos;
   f32 width;
   f32 height;
   f32 mass;
   f32 friction;
-  v2  vel;
-  v2  accel;
+  // nocheckin
+  // v2  pos;
+  // v2  vel;
+  // v2  accel;
+
+  v3  pos;
+  v3  vel;
+  v3  accel;
 
   s32 health;
   s32 damage_received;
@@ -286,8 +294,9 @@ struct Game {
   f32 pixels_per_meter;
   f32 meters_per_pixel;
 
-  s32 tiles_per_room_width;
-  s32 tiles_per_room_height;
+  s32 tiles_per_room_x;
+  s32 tiles_per_room_y;
+  s32 tiles_per_room_z;
 
   Entity entities[MAX_ENTITIES];
   Entity *free_entity;
@@ -344,9 +353,13 @@ internal b32 was_key_released(Game *gp, Keyboard_key key);
 
 internal void debug_silence(Game *gp);
 
-internal Chunk_pos chunk_pos_from_point(Game *gp, v2 pos, s32 z);
+// nocheckin
+// internal Chunk_pos chunk_pos_from_point(Game *gp, v2 pos, s32 z);
+internal Chunk_pos chunk_pos_from_point(Game *gp, v3 pos);
 
-internal v2 point_from_chunk_pos(Game *gp, Chunk_pos chunk_pos);
+// nocheckin
+// internal v2 point_from_chunk_pos(Game *gp, Chunk_pos chunk_pos);
+internal v3 point_from_chunk_pos(Game *gp, Chunk_pos chunk_pos);
 
 force_inline Chunk* get_chunk(Game *gp, s32 chunk_x, s32 chunk_y, s32 chunk_z);
 
@@ -364,13 +377,13 @@ internal void create_tile_entity(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 a
 
 internal void init_tile_map(Game *gp);
 
-internal v2_s32 tile_pos_from_screen_pos(Game *gp, v2 pos);
+internal v3_s32 tile_pos_from_screen_pos(Game *gp, v3 pos);
 
 internal void add_entity_to_chunk(Game *gp, Entity *ep);
 
-internal v2 screen_pos_from_chunk_pos(Game *gp, Chunk_pos camera_origin_chunk_pos, Chunk_pos chunk_pos);
+internal v3 screen_pos_from_chunk_pos(Game *gp, Chunk_pos camera_origin_chunk_pos, Chunk_pos chunk_pos);
 
-internal Chunk_pos chunk_pos_from_screen_pos(Game *gp, Chunk_pos camera_origin_chunk_pos, v2 screen_pos, s32 z);
+internal Chunk_pos chunk_pos_from_screen_pos(Game *gp, Chunk_pos camera_origin_chunk_pos, v3 screen_pos);
 
 internal Sim_region* begin_sim_region(Game *gp, Chunk_pos origin_chunk_pos, f32 width, f32 height, s32 apron);
 
