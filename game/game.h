@@ -12,12 +12,11 @@
 #define CHUNK_SIZE                    (1 << CHUNK_SHIFT)
 #define CHUNK_MASK                    (CHUNK_SIZE - 1)
 #define TILE_SIZE_METERS              M(2.0f)
-#define CHUNK_SIZE_METERS             (TILE_SIZE_METERS*(f32)CHUNK_SIZE)
 #define CHUNK_HASH_TABLE_COUNT        (1 << 10)
 #define CHUNK_SAFE_MARGIN             (MAX_S32/64)
 
-#define PLAYER_ACCEL   (M(230))
-// #define PLAYER_ACCEL   (M(500))
+// #define PLAYER_ACCEL   (M(230))
+#define PLAYER_ACCEL   (M(500))
 #define FROG_ACCEL     (M(40))
 #define MONSTER_ACCEL  (M(180))
 
@@ -30,10 +29,10 @@
 #define METERS_TO_PIXELS(x) ((f32)((f32)(x)*PIXELS_PER_METER))
 #define PIXELS_TO_METERS(x) ((f32)((f32)(x)*METERS_PER_PIXEL))
 
-#define MAX_ENTITIES_PER_CHUNK 512
+#define MAX_ENTITIES_PER_CHUNK 1024
 #define MAX_ENTITIES 4096
-#define MAX_SIM_REGION_ENTITIES 1024
-#define MAX_SIM_REGION_CHUNKS 512
+#define MAX_SIM_REGION_ENTITIES (8*MAX_ENTITIES_PER_CHUNK)
+#define MAX_SIM_REGION_CHUNKS 1024
 
 #define ENTITY_KINDS \
 X(PLAYER_1) \
@@ -255,8 +254,7 @@ TYPEDEF_ARRAY_NAME(Entity*, Entity_ptr_array);
 typedef struct Sim_region Sim_region;
 struct Sim_region {
   Chunk_pos        origin_chunk_pos;
-  f32              width;
-  f32              height;
+  v3               size_meters;
   s32              chunks_count;
   s32              entities_count;
   Chunk           *chunks[MAX_SIM_REGION_CHUNKS];
@@ -307,6 +305,8 @@ struct Game {
 
   b32 camera_jitter;
   f32 camera_jitter_time;
+
+  v3 chunk_size;
 
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
@@ -377,15 +377,15 @@ internal void create_tile_entity(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 a
 
 internal void init_tile_map(Game *gp);
 
-internal v3_s32 tile_pos_from_screen_pos(Game *gp, v3 pos);
+internal v3_s32 tile_pos_from_sim_pos(Game *gp, v3 pos);
 
 internal void add_entity_to_chunk(Game *gp, Entity *ep);
 
-internal v3 screen_pos_from_chunk_pos(Game *gp, Chunk_pos camera_origin_chunk_pos, Chunk_pos chunk_pos);
+internal v3 sim_pos_from_chunk_pos(Game *gp, Chunk_pos camera_origin_chunk_pos, Chunk_pos chunk_pos);
 
-internal Chunk_pos chunk_pos_from_screen_pos(Game *gp, Chunk_pos camera_origin_chunk_pos, v3 screen_pos);
+internal Chunk_pos chunk_pos_from_sim_pos(Game *gp, Chunk_pos camera_origin_chunk_pos, v3 sim_pos);
 
-internal Sim_region* begin_sim_region(Game *gp, Chunk_pos origin_chunk_pos, f32 width, f32 height, s32 apron);
+internal Sim_region* begin_sim_region(Game *gp, Chunk_pos origin_chunk_pos, v3 size_meters, s32 apron);
 
 internal void end_sim_region(Game *gp, Sim_region* sim_region);
 
