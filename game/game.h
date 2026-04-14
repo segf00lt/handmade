@@ -8,6 +8,8 @@
 #define CM(x) ((f32)(x) * 1.0e-2f)
 #define MM(x) ((f32)(x) * 1.0e-3f)
 
+#define G 400.0f
+
 #define CHUNK_SHIFT                   4
 #define CHUNK_SIZE                    (1 << CHUNK_SHIFT)
 #define CHUNK_MASK                    (CHUNK_SIZE - 1)
@@ -15,8 +17,10 @@
 #define CHUNK_HASH_TABLE_COUNT        (1 << 10)
 #define CHUNK_SAFE_MARGIN             (MAX_S32/64)
 
-// #define PLAYER_ACCEL   (M(230))
-#define PLAYER_ACCEL   (M(500))
+#define PLAYER_ACCEL   (M(230))
+#define PLAYER_JUMP_ACCEL   (M(900))
+#define PLAYER_JUMP_TIME 0.16f
+// #define PLAYER_ACCEL   (M(500))
 #define FROG_ACCEL     (M(40))
 #define MONSTER_ACCEL  (M(180))
 
@@ -49,6 +53,7 @@ X(DIE_NOW) \
 X(DRAW_BITMAP) \
 X(APPLY_FRICTION) \
 X(ACCEL_MOTION) \
+X(APPLY_GRAVITY) \
 X(SLOW) \
 X(APPLY_DAMAGE) \
 X(IGNORE_DAMAGE) \
@@ -67,6 +72,7 @@ X(TILE_TOP_RIGHT_CORNER_ENABLED) \
 X(BLINK_RED) \
 X(DRAW_RED_TINT) \
 X(DONT_UPDATE_THIS_FRAME) \
+X(AIRBORNE) \
 
 #define ENTITY_ORDERS   \
 X(FIRST) \
@@ -242,6 +248,8 @@ struct Entity {
   f32 monster_attack_delay_time;
 
   Bitmap bitmap;
+
+  f32 jump_time;
 
   // NOTE jfd: per frame data
 

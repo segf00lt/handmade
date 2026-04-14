@@ -548,6 +548,7 @@ func init_player_1(Game *gp) {
     ENTITY_CONTROL_PLAYER_1,
     ENTITY_FLAG_ACCEL_MOTION |
     ENTITY_FLAG_APPLY_FRICTION |
+    ENTITY_FLAG_APPLY_GRAVITY |
     ENTITY_FLAG_TILE_COLLISION |
     ENTITY_FLAG_DRAW_BITMAP |
     0
@@ -683,7 +684,7 @@ func init_tile_map(Game *gp) {
 
   gp->tiles_per_room_x  = 35;
   gp->tiles_per_room_y = 20;
-  gp->tiles_per_room_z = 4;
+  gp->tiles_per_room_z = (s32)(gp->chunk_size.z / TILE_SIZE_METERS);
 
   u32 tiles_per_x  = gp->tiles_per_room_x;
   u32 tiles_per_y = gp->tiles_per_room_y;
@@ -1045,7 +1046,7 @@ func begin_sim_region(Game *gp, Chunk_pos origin_chunk_pos, v3 size_meters, s32 
     sim_box_max.y = sim_rect_max.y;
 
     sim_box_min.z = sim_region_bottom_left_corner.z;
-    sim_box_max.z = sim_region_bottom_left_corner.z;
+    sim_box_max.z = sim_region_bottom_left_corner.z + gp->chunk_size.z;
 
   }
 
@@ -1143,7 +1144,6 @@ func game_update_and_render(Game *gp) {
 
   { /* run_once */
 
-
     if(gp->should_init_player) {
       gp->should_init_player = false;
 
@@ -1200,6 +1200,7 @@ func game_update_and_render(Game *gp) {
 
             // TODO jfd: mouse movement and clicks
             f32 player_accel = PLAYER_ACCEL;
+            f32 player_jump_accel = PLAYER_JUMP_ACCEL;
 
             ep->accel = (v3){0};
 
@@ -1216,6 +1217,22 @@ func game_update_and_render(Game *gp) {
               if(is_key_pressed(gp, KBD_KEY_D)) {
                 ep->accel.x += player_accel;
               }
+
+              if(!(ep->flags & ENTITY_FLAG_AIRBORNE)) {
+                if(is_key_pressed(gp, KBD_KEY_SPACE)) {
+                  ep->flags |= ENTITY_FLAG_AIRBORNE;
+                  ep->jump_time = PLAYER_JUMP_TIME;
+                }
+              }
+
+              if(ep->jump_time > 0.0f) {
+                ep->jump_time -= gp->t;
+                if(ep->jump_time <= 0.0f) {
+                  ep->jump_time = 0;
+                }
+                ep->accel.z += player_jump_accel;
+              }
+
             } else {
               if(is_key_pressed(gp, KBD_KEY_UP_ARROW)) {
                 ep->accel.y += player_accel;
@@ -1313,6 +1330,10 @@ func game_update_and_render(Game *gp) {
         ep->vel = sub_v3(ep->vel, scale_v3(ep->vel, ep->friction*t));
       }
 
+      if(ep->flags & ENTITY_FLAG_APPLY_GRAVITY) {
+        ep->accel.z -= G;
+      }
+
       if(ep->flags & ENTITY_FLAG_ACCEL_MOTION) {
 
         // v = v0 + at
@@ -1331,6 +1352,17 @@ func game_update_and_render(Game *gp) {
 
         // dp -= 2*dot(dp, normal_vector)*normal_vector
 
+      }
+
+      if(ep->flags & ENTITY_FLAG_APPLY_GRAVITY) {
+        if(new_pos.z <= 0.0f) {
+          ep->flags &= ~ENTITY_FLAG_AIRBORNE;
+          delta_pos.z = 0;
+          new_pos.z = 0;
+        } else if(new_pos.z >= gp->chunk_size.z) {
+          delta_pos.z = 0;
+          new_pos.z = gp->chunk_size.z;
+        }
       }
 
       if(ep->flags & ENTITY_FLAG_TILE_COLLISION) {
@@ -1422,15 +1454,11 @@ func game_update_and_render(Game *gp) {
           ep->changed_z = false;
         }
 
-        if(step_in_z > 0) {
-          new_pos.z += gp->chunk_size.z;
-        } else if(step_in_z < 0) {
-          new_pos.z -= gp->chunk_size.z;
-        }
-
         ep->pos = new_pos;
 
+        // TODO jfd 13/04/26: Think of a better way of separating the layers of the world and controlling their visibility
         ep->chunk_pos = chunk_pos_from_sim_pos(gp, gp->camera_chunk_pos, ep->pos);
+        ep->chunk_pos.chunk_z += step_in_z;
 
       } /* ENTITY_FLAG_TILE_COLLISION */
 
@@ -1494,9 +1522,9 @@ func game_update_and_render(Game *gp) {
         }
 
         // NOTE jfd 13/04/26: Camera always follows in z axis
-        new_camera_sim_pos.z = ep->pos.z;
 
         new_camera_chunk_pos = chunk_pos_from_sim_pos(gp, gp->camera_chunk_pos, new_camera_sim_pos);
+        new_camera_chunk_pos.chunk_z = ep->chunk_pos.chunk_z;
         update_camera_location = true;
 
       }
@@ -1617,7 +1645,8 @@ func game_update_and_render(Game *gp) {
       }
 
       if(ep->flags & ENTITY_FLAG_DRAW_BITMAP) {
-        v2 entity_screen_pos = { ep->pos.x, ep->pos.y };
+        f32 scale_z_for_3d_projection = 0.4f;
+        v2 entity_screen_pos = { ep->pos.x, ep->pos.y + ep->pos.z*scale_z_for_3d_projection };
         entity_screen_pos = scale_v2(entity_screen_pos, gp->pixels_per_meter);
         entity_screen_pos = add_v2(entity_screen_pos, camera_offset);
         entity_screen_pos.y = gp->render.height - entity_screen_pos.y;
@@ -1748,7 +1777,7 @@ func game_init(Platform *pp) {
   gp->chunk_size = (v3) {
     32.0f,
     32.0f,
-    8.0f,
+    32.0f,
   };
 
   gp->pixels_per_meter = PIXELS_PER_METER;

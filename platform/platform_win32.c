@@ -647,7 +647,8 @@ func platform_win32_get_game_input_from_events(Platform_event_list *event_list, 
           default: {
           } break;
         }
-        input->key_pressed[event->key] += 1 + event->repeat_count;
+        // input->key_pressed[event->key] += 1 + event->repeat_count;
+        input->key_pressed[event->key] += 1;
 
       } break;
       case EVENT_KEY_RELEASE: {
