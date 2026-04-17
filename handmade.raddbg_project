@@ -21,7 +21,7 @@ recent_file: path: "D:/a/_work/1/s/src/vctools/crt/vcstartup/src/startup/exe_com
 debug_info:
 {
   path: "C:/Users/joaod/fun/handmade/handmade.pdb"
-  timestamp: 66212082404592
+  timestamp: 66212278625654
 }
 target:
 {
@@ -33,7 +33,7 @@ target:
 debug_info:
 {
   path: "C:/Users/joaod/fun/handmade/handmade_module.pdb"
-  timestamp: 66212270719407
+  timestamp: 66212279479885
 }
 type_view:
 {
@@ -56,20 +56,6 @@ win32_datatype_misalignment: 1
 theme: "Default (Dark)"
 breakpoint:
 {
-  source_location: "game/game.c:1610:1"
-  hit_count: 0
-  enabled: 0
-}
-breakpoint:
-{
-  source_location: "game/game.c:1608:1"
-  hit_count: 0
-  enabled: 0
-}
-breakpoint:
-{
-  source_location: "game/game.c:269:1"
-  condition: "final_pixel_color != 4278190080"
-  hit_count: 0
-  enabled: 0
+  source_location: "game/game.c:1581:1"
+  hit_count: 1
 }

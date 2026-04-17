@@ -5,7 +5,6 @@
 /////////////////////////////////
 // globals
 
-#include "game_random.h"
 
 
 
@@ -64,29 +63,53 @@ func load_bitmap(Game *gp, char *path) {
   return result;
 }
 
-internal u32
-func get_random(Game *gp) {
-  if(gp->random_number_index >= ARRLEN(game_random_choices)) {
-    gp->random_number_index = 0;
+force_inline Random_series
+func get_random_series(u32 value) {
+  Random_series series;
+  series.index = value % ARRLEN(game_random_number_table);
+  return series;
+}
+
+force_inline u32
+func get_next_random_u32(Random_series *series) {
+  u32 result = game_random_number_table[series->index++];
+  if(series->index >= ARRLEN(game_random_number_table)) {
+    series->index = 0;
   }
-  u32 result = game_random_choices[gp->random_number_index++];
   return result;
 }
 
-internal f32
-func get_random_f32(Game *gp, f32 begin, f32 end, s32 steps) {
-  u32 random = get_random(gp);
-  random %= steps;
-  f32 t = (f32)(steps - random) / (f32)steps;
+force_inline u32
+func get_random_choice(Random_series *series, u32 choice_count) {
+  u32 result = get_next_random_u32(series) % choice_count;
+  return result;
+}
+
+force_inline f32
+func get_random_unilateral(Random_series *series) {
+  f32 divisor = 1.0f / (f32)MAX_RANDOM_NUMBER;
+  f32 result = divisor * (f32)get_next_random_u32(series);
+  return result;
+}
+
+force_inline f32
+func get_random_bilateral(Random_series *series) {
+  f32 result = 2.0f * get_random_unilateral(series) - 1.0f;
+  return result;
+}
+
+force_inline f32
+func get_random_between(Random_series *series, f32 begin, f32 end) {
+  f32 t = get_random_unilateral(series);
   f32 result = lerp_f32(t, begin, end);
   return result;
 }
 
 internal void
 func debug_render_weird_gradient(Game *gp, int x_offset, int y_offset) {
-  u8 *row = gp->render.pixels;
+  u32 *row = gp->render.pixels;
   for(int y = 0; y < gp->render.height; y++) {
-    u32 *pixel = (u32*)row;
+    u32 *pixel = row;
 
     for(int x = 0; x < gp->render.width; x++) {
       //
@@ -104,7 +127,7 @@ func debug_render_weird_gradient(Game *gp, int x_offset, int y_offset) {
       *pixel++ = (r << 8) | (g << 16) | b;
     }
 
-    row += gp->render.stride;
+    row += gp->render.width;
   }
 
 }
@@ -193,10 +216,10 @@ func draw_rect_min_max(Game *gp, Color color, f32 min_x, f32 min_y, f32 max_x, f
   int end_x   = (int)floor_f32(fminf(x1, (f32)render_width));
   int end_y   = (int)floor_f32(fminf(y1, (f32)render_height));
 
-  u8 *row = gp->render.pixels;
+  u32 *row = gp->render.pixels;
 
   for(int y = begin_y; y < end_y; y++) {
-    u32 *pixel_row = (u32*)(row + y * gp->render.stride);
+    u32 *pixel_row = (u32*)(row + y * gp->render.width);
 
     for(int x = begin_x; x < end_x; x++) {
       Color cur_color = color_from_pixel(pixel_row[x]);
@@ -213,15 +236,15 @@ func draw_rect_min_max(Game *gp, Color color, f32 min_x, f32 min_y, f32 max_x, f
 }
 
 internal void
-func draw_bitmap(Game *gp, Bitmap bitmap, f32 x, f32 y, Color tint) {
+func draw_bitmap(Bitmap render_dest, Bitmap bitmap, f32 x, f32 y, Color tint) {
 
   f32 x0 = x;
   f32 y0 = y;
   f32 x1 = x + bitmap.width;
   f32 y1 = y + bitmap.height;
 
-  f32 render_width = (f32)gp->render.width;
-  f32 render_height = (f32)gp->render.height;
+  f32 render_width = (f32)render_dest.width;
+  f32 render_height = (f32)render_dest.height;
 
   s32 source_offset_x = 0;
   if(x0 < 0.0f) {
@@ -248,12 +271,12 @@ func draw_bitmap(Game *gp, Bitmap bitmap, f32 x, f32 y, Color tint) {
   int end_x   = (int)floor_f32(fminf(x1, (f32)render_width));
   int end_y   = (int)floor_f32(fminf(y1, (f32)render_height));
 
-  u8 *row = gp->render.pixels;
+  u32 *row = render_dest.pixels;
   u32 *bitmap_row = bitmap.pixels;
   bitmap_row += bitmap.width*source_offset_y + source_offset_x;
 
   for(int cur_y = begin_y, bitmap_y = 0; cur_y < end_y; cur_y++, bitmap_y++) {
-    u32 *pixel_row = (u32*)(row + cur_y * gp->render.stride);
+    u32 *pixel_row = row + cur_y * render_dest.width;
     u32 *bitmap_pixel_row = bitmap_row + bitmap_y * bitmap.width;
 
     for(int cur_x = begin_x, bitmap_x = 0; cur_x < end_x; cur_x++, bitmap_x++) {
@@ -312,10 +335,10 @@ func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_
 
   line_thickness = fminf(line_thickness, fminf(x1-x0, y1-y0));
 
-  u8 *row = gp->render.pixels;
+  u32 *row = gp->render.pixels;
 
   for(int y = begin_y; y < begin_y + (int)floor_f32(line_thickness) && y < gp->render.height; y++) {
-    u32 *pixel_row = (u32*)(row + y * gp->render.stride);
+    u32 *pixel_row = row + y * gp->render.width;
 
     for(int x = begin_x; x < end_x && x < gp->render.width; x++) {
 
@@ -332,7 +355,7 @@ func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_
 
 
   for(int y = begin_y + (int)floor_f32(line_thickness); y < end_y - (int)floor_f32(line_thickness) && y < gp->render.height; y++) {
-    u32 *pixel_row = (u32*)(row + y * gp->render.stride);
+    u32 *pixel_row = row + y * gp->render.width;
 
     for(int x = begin_x; x < begin_x + (int)floor_f32(line_thickness) && x < gp->render.width; x++) {
 
@@ -359,7 +382,7 @@ func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_
   }
 
   for(int y = end_y - (int)floor_f32(line_thickness); y < end_y && y < gp->render.height; y++) {
-    u32 *pixel_row = (u32*)(row + y * gp->render.stride);
+    u32 *pixel_row = row + y * gp->render.width;
 
     for(int x = begin_x; x < end_x; x++) {
 
@@ -646,6 +669,8 @@ func create_tile_entity(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 abs_tile_z
 internal void
 func init_tile_map(Game *gp) {
 
+  Random_series series = get_random_series(12891);
+
   u32 screen_x = 0;
   u32 screen_y = 0;
 
@@ -672,9 +697,9 @@ func init_tile_map(Game *gp) {
     u32 random_choice;
 
     if(door_up || door_down) {
-      random_choice = get_random(gp) % 2;
+      random_choice = get_random_choice(&series, 2);
     } else {
-      random_choice = get_random(gp) % 3;
+      random_choice = get_random_choice(&series, 3);
     }
 
     b32 created_z_door = false;
@@ -1531,9 +1556,11 @@ func game_update_and_render(Game *gp) {
 
     if(gp->camera_jitter) {
 
+      Random_series series = get_random_series(5489);
+
       // TODO jfd 17/03/26: make the camera jitter based on the direction that the attack came from
-      f32 x = get_random_f32(gp, -2.0f, 2.0f, 4);
-      f32 y = get_random_f32(gp, -2.0f, 2.0f, 4);
+      f32 x = get_random_between(&series, -2.0f, 2.0f);
+      f32 y = get_random_between(&series, -2.0f, 2.0f);
 
       v2 v = { x, y };
       camera_offset = add_v2(camera_offset, v);
@@ -1548,40 +1575,10 @@ func game_update_and_render(Game *gp) {
 
     { /* draw ground */
 
-      gp->random_number_index = 1300;
-
-      for(int i = 0; i < 500; i++) {
-
-        f32 x = get_random_f32(gp, 0.0f, 2.0f, 64) - 1.0f;
-        f32 y = get_random_f32(gp, 0.0f, 2.0f, 64) - 1.0f;
-        f32 length = get_random_f32(gp, 0.0f, 16.0f, 5);
-
-        if(get_random(gp) % 5) {
-          length *= -1;
-        }
-
-        v2 v = { x, y };
-        v = scale_v2(v, length);
-        v = scale_v2(v, gp->pixels_per_meter);
-        v = add_v2(v, camera_offset);
-
-        u32 choice = get_random(gp) % 4;
-
-        Bitmap bmp;
-
-        if(choice == 2 || choice == 3) {
-          bmp = gp->grass_bitmap[0];
-        } else if(choice == 1) {
-          bmp = gp->grass_bitmap[1];
-        } else {
-          bmp = gp->dirt_bitmap[0];
-        }
-
-        draw_bitmap(gp, bmp, v.x, v.y, (Color){0,0,0,0});
-
-        PASS;
-
-      }
+      v2 ground_bitmap_dims = { (f32)gp->ground_bitmap_cache.width, (f32)gp->ground_bitmap_cache.height };
+      ground_bitmap_dims = scale_v2(ground_bitmap_dims, 0.5f);
+      v2 v = sub_v2(camera_offset, ground_bitmap_dims);
+      draw_bitmap(gp->render, gp->ground_bitmap_cache, v.x, v.y, (Color){0});
 
     } /* draw ground */
 
@@ -1666,7 +1663,7 @@ func game_update_and_render(Game *gp) {
         {
           f32 entity_bitmap_x = entity_screen_pos.x - 0.5f*(f32)ep->bitmap.width;
           f32 entity_bitmap_y = entity_screen_pos.y - 0.5f*(f32)ep->bitmap.height;
-          draw_bitmap(gp, ep->bitmap, entity_bitmap_x, entity_bitmap_y, tint);
+          draw_bitmap(gp->render, ep->bitmap, entity_bitmap_x, entity_bitmap_y, tint);
         }
         #endif
 
@@ -1805,6 +1802,52 @@ func game_init(Platform *pp) {
   init_player_2(gp);
   // init_monster(gp);
   init_frog(gp);
+
+  gp->ground_bitmap_cache.width = (s32)(gp->tiles_per_room_x * TILE_SIZE_METERS * gp->pixels_per_meter);
+  gp->ground_bitmap_cache.height = (s32)(gp->tiles_per_room_y * TILE_SIZE_METERS * gp->pixels_per_meter);
+  int ground_bitmap_cache_pixel_buffer_count = gp->ground_bitmap_cache.width * gp->ground_bitmap_cache.height;
+  gp->ground_bitmap_cache.pixels = push_array_no_zero(gp->main_arena, u32, ground_bitmap_cache_pixel_buffer_count);
+  memory_set(gp->ground_bitmap_cache.pixels, 0xff000000, sizeof(u32) * ground_bitmap_cache_pixel_buffer_count);
+
+  { /* cache precomposited ground bitmap */
+
+    v2 center = {
+      0.5f*gp->ground_bitmap_cache.width,
+      0.5f*gp->ground_bitmap_cache.height,
+    };
+
+    gp->random_number_index = 1300;
+
+    Random_series series = get_random_series(5489);
+
+    for(int i = 0; i < 500; i++) {
+
+      f32 x = get_random_between(&series, 0.0f, 2.0f) - 1.0f;
+      f32 y = get_random_between(&series, 0.0f, 2.0f) - 1.0f;
+      f32 length = get_random_between(&series, -16.0f, 16.0f);
+
+      v2 v = { x, y };
+      v = scale_v2(v, length);
+      v = scale_v2(v, gp->pixels_per_meter);
+      v = add_v2(v, center);
+
+      u32 choice = get_random_choice(&series, 4);
+
+      Bitmap bmp;
+
+      if(choice == 2 || choice == 3) {
+        bmp = gp->grass_bitmap[0];
+      } else if(choice == 1) {
+        bmp = gp->grass_bitmap[1];
+      } else {
+        bmp = gp->dirt_bitmap[0];
+      }
+
+      draw_bitmap(gp->ground_bitmap_cache, bmp, v.x, v.y, (Color){0,0,0,0});
+
+    }
+
+  } /* cache precomposited ground bitmap */
 
   return gp;
 }

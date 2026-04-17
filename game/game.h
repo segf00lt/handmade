@@ -1,6 +1,7 @@
 #ifndef GAME_H
 #define GAME_H
 
+#include "game_random.h"
 
 #define KM(x) ((f32)(x) * 1.0e3f)
 #define M(x)  ((f32)x)
@@ -140,14 +141,6 @@ struct Game_sound_buffer {
   s16 *samples;
 };
 
-typedef struct Game_render_buffer Game_render_buffer;
-struct Game_render_buffer {
-  u8 *pixels;
-  s32 width;
-  s32 height;
-  u32 stride; // NOTE jfd: This comes from the backbuffer thing
-};
-
 typedef struct Game_input Game_input;
 struct Game_input {
   Keyboard_modifier modifier_mask;
@@ -197,8 +190,6 @@ struct Chunk_pos {
   s32 chunk_x;
   s32 chunk_y;
   s32 chunk_z;
-  // nocheckin
-  // v2 chunk_offset;
   v3 chunk_offset;
 };
 
@@ -227,10 +218,6 @@ struct Entity {
   f32 height;
   f32 mass;
   f32 friction;
-  // nocheckin
-  // v2  pos;
-  // v2  vel;
-  // v2  accel;
 
   v3  pos;
   v3  vel;
@@ -279,7 +266,7 @@ struct Game {
   Arena *frame_arena;
   Arena *temp_arena;
 
-  Game_render_buffer render;
+  Bitmap render;
   Game_sound_buffer sound;
   Game_input input;
 
@@ -317,6 +304,8 @@ struct Game {
   Bitmap grass_bitmap[2];
   Bitmap dirt_bitmap[1];
 
+  Bitmap ground_bitmap_cache;
+
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
 #define GAME_STATE_SIZE ((u64)MB(1))
@@ -330,9 +319,17 @@ internal void entity_free(Game *gp, Entity *ep);
 
 internal Bitmap load_bitmap(Game *gp, char *path);
 
-internal u32 get_random(Game *gp);
+force_inline Random_series get_random_series(u32 seed);
 
-internal f32 get_random_f32(Game *gp, f32 begin, f32 end, s32 steps);
+force_inline u32 get_next_random_u32(Random_series *series);
+
+force_inline u32 get_random_choice(Random_series *series, u32 choice_count);
+
+force_inline f32 get_random_unilateral(Random_series *series);
+
+force_inline f32 get_random_bilateral(Random_series *series);
+
+force_inline f32 get_random_between(Random_series *series, f32 begin, f32 end);
 
 internal void debug_render_weird_gradient(Game *gp, int x_offset, int y_offset);
 
@@ -344,7 +341,7 @@ force_inline u32 pixel_from_color(Color color);
 
 internal void draw_rect_min_max(Game *gp, Color color, f32 min_x, f32 min_y, f32 max_x, f32 max_y);
 
-internal void draw_bitmap(Game *gp, Bitmap bitmap, f32 x, f32 y, Color tint);
+internal void draw_bitmap(Bitmap render_dest, Bitmap bitmap, f32 x, f32 y, Color tint);
 
 internal void draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_x, f32 min_y, f32 max_x, f32 max_y);
 

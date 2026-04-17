@@ -1,7 +1,10 @@
 #ifndef GAME_RANDOM_H
 #define GAME_RANDOM_H
 
-u32 game_random_choices[] = {
+#define MAX_RANDOM_NUMBER 0x5f5c209
+#define MIN_RANDOM_NUMBER 0x0006408
+
+u32 game_random_number_table[] = {
   0x34af965, 0x145ed11, 0x0b8bcb1, 0x15455d2, 0x517b2e3,
   0x385210b, 0x351fcae, 0x4549233, 0x33c739e, 0x08fe32f,
   0x31954fe, 0x1d77021, 0x0d5deab, 0x08e91f7, 0x1d6e639,
@@ -822,6 +825,11 @@ u32 game_random_choices[] = {
   0x5d00f13, 0x26e3e4a, 0x59aae75, 0x29ff072, 0x13eb7cc,
   0x40b3c01, 0x2dc65fe, 0x302b4c0, 0x1abe446, 0x3c5dca1,
   0x06d63ed,
+};
+
+typedef struct Random_series Random_series;
+struct Random_series {
+  u32 index;
 };
 
 #endif

@@ -1504,10 +1504,9 @@ WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCode)
 
     // TODO jfd: cleanup how we pass render data to and from the game
     gp->t = platform_target_seconds_per_frame;
-    gp->render.pixels = global_backbuffer.bitmap_memory;
+    gp->render.pixels = (u32*)global_backbuffer.bitmap_memory;
     gp->render.width  = global_backbuffer.bitmap_width;
     gp->render.height = global_backbuffer.bitmap_height;
-    gp->render.stride = global_backbuffer.stride;
 
     game_update_and_render(gp);
 
