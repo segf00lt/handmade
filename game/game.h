@@ -319,7 +319,7 @@ internal void entity_free(Game *gp, Entity *ep);
 
 internal Bitmap load_bitmap(Game *gp, char *path);
 
-force_inline Random_series get_random_series(u32 seed);
+force_inline Random_series get_random_series(u32 value);
 
 force_inline u32 get_next_random_u32(Random_series *series);
 
@@ -335,6 +335,10 @@ internal void debug_render_weird_gradient(Game *gp, int x_offset, int y_offset);
 
 force_inline Color alpha_blend(Color bottom, Color top);
 
+force_inline Color alpha_blend_premultiplied(Color bottom, Color top);
+
+force_inline Color premultiply_alpha(Color color);
+
 force_inline Color color_from_pixel(u32 pixel);
 
 force_inline u32 pixel_from_color(Color color);
@@ -345,7 +349,7 @@ internal void draw_bitmap(Bitmap render_dest, Bitmap bitmap, f32 x, f32 y, Color
 
 internal void draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_x, f32 min_y, f32 max_x, f32 max_y);
 
-internal void clear_screen(Game *gp);
+force_inline void clear_screen(Game *gp);
 
 internal void draw_rect(Game *gp, Color color, f32 x, f32 y, f32 width, f32 height);
 
@@ -400,7 +404,6 @@ shared_function void game_update_and_render(Game *gp);
 shared_function void game_get_sound_samples(Game *gp);
 
 shared_function Game* game_init(Platform *pp);
-
 
 #endif
 

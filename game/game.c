@@ -52,6 +52,16 @@ func load_bitmap(Game *gp, char *path) {
     u32 *write_row = result_pixels + y*header->width;
     u32 *read_row = pixels + (header->height - 1 - y)*header->width;
     memory_copy(write_row, read_row, sizeof(*write_row)*header->width);
+
+    for(int x = 0; x < header->width; x++) {
+      Color color = color_from_pixel(write_row[x]);
+      color.r *= color.a;
+      color.g *= color.a;
+      color.b *= color.a;
+      u32 pixel_with_premultiplied_alpha = pixel_from_color(color);
+      write_row[x] = pixel_with_premultiplied_alpha;
+    }
+
   }
 
   arena_clear(gp->temp_arena);
@@ -122,8 +132,6 @@ func debug_render_weird_gradient(Game *gp, int x_offset, int y_offset) {
       u8 g = 0;
       u8 b = (u8)(y + y_offset);
 
-      // *pixel++ = (r << 16) | (g << 8) | b;
-      // *pixel++ = (r << 16) | (b << 8) | g;
       *pixel++ = (r << 8) | (g << 16) | b;
     }
 
@@ -138,7 +146,7 @@ func alpha_blend(Color bottom, Color top) {
   Color final;
   final.a = top.a + bottom.a * (1.0f - top.a);
 
-  if (final.a > 0.0f) {
+  if(final.a > 0.0f) {
     final.r = (top.r*top.a + bottom.r*bottom.a*(1.0f - top.a)) / final.a;
     final.g = (top.g*top.a + bottom.g*bottom.a*(1.0f - top.a)) / final.a;
     final.b = (top.b*top.a + bottom.b*bottom.a*(1.0f - top.a)) / final.a;
@@ -147,6 +155,31 @@ func alpha_blend(Color bottom, Color top) {
   }
 
   return final;
+}
+
+force_inline Color
+func alpha_blend_premultiplied(Color bottom, Color top) {
+
+  Color final;
+  final.a = top.a + bottom.a * (1.0f - top.a);
+
+  if(final.a > 0.0f) {
+    final.r = top.r + bottom.r*(1.0f - top.a);
+    final.g = top.g + bottom.g*(1.0f - top.a);
+    final.b = top.b + bottom.b*(1.0f - top.a);
+  } else {
+    final.r = final.g = final.b = 0.0f;
+  }
+
+  return final;
+}
+
+force_inline Color
+func premultiply_alpha(Color color) {
+  color.r *= color.a;
+  color.g *= color.a;
+  color.b *= color.a;
+  return color;
 }
 
 force_inline Color
@@ -218,13 +251,14 @@ func draw_rect_min_max(Game *gp, Color color, f32 min_x, f32 min_y, f32 max_x, f
 
   u32 *row = gp->render.pixels;
 
+  color = premultiply_alpha(color);
+
   for(int y = begin_y; y < end_y; y++) {
     u32 *pixel_row = (u32*)(row + y * gp->render.width);
 
     for(int x = begin_x; x < end_x; x++) {
       Color cur_color = color_from_pixel(pixel_row[x]);
-
-      Color final_color = alpha_blend(cur_color, color);
+      Color final_color = alpha_blend_premultiplied(cur_color, color);
 
       u32 final_pixel_color = pixel_from_color(final_color);
 
@@ -271,6 +305,8 @@ func draw_bitmap(Bitmap render_dest, Bitmap bitmap, f32 x, f32 y, Color tint) {
   int end_x   = (int)floor_f32(fminf(x1, (f32)render_width));
   int end_y   = (int)floor_f32(fminf(y1, (f32)render_height));
 
+  tint = premultiply_alpha(tint);
+
   u32 *row = render_dest.pixels;
   u32 *bitmap_row = bitmap.pixels;
   bitmap_row += bitmap.width*source_offset_y + source_offset_x;
@@ -286,11 +322,11 @@ func draw_bitmap(Bitmap render_dest, Bitmap bitmap, f32 x, f32 y, Color tint) {
 
       Color tinted_color;
       if(cur_color.a > 0.0f && bitmap_pixel_color.a > 0.0f) {
-        tinted_color = alpha_blend(bitmap_pixel_color, tint);
+        tinted_color = alpha_blend_premultiplied(bitmap_pixel_color, tint);
       } else {
         tinted_color = bitmap_pixel_color;
       }
-      Color final_color = alpha_blend(cur_color, tinted_color);
+      Color final_color = alpha_blend_premultiplied(cur_color, tinted_color);
 
       u32 final_pixel_color = pixel_from_color(final_color);
 
@@ -337,6 +373,8 @@ func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_
 
   u32 *row = gp->render.pixels;
 
+  color = premultiply_alpha(color);
+
   for(int y = begin_y; y < begin_y + (int)floor_f32(line_thickness) && y < gp->render.height; y++) {
     u32 *pixel_row = row + y * gp->render.width;
 
@@ -344,7 +382,7 @@ func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_
 
       Color cur_color = color_from_pixel(pixel_row[x]);
 
-      Color final_color = alpha_blend(cur_color, color);
+      Color final_color = alpha_blend_premultiplied(cur_color, color);
 
       u32 final_pixel_color = pixel_from_color(final_color);
 
@@ -400,14 +438,10 @@ func draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_
 
 }
 
-internal void
+force_inline void
 func clear_screen(Game *gp) {
-  u64 *pixels = (u64*)gp->render.pixels;
-  s32 total_pixels = (gp->render.width * gp->render.height) >> 1;
 
-  for(int i = 0; i < total_pixels; i++) {
-    pixels[i] = ((u64)255 << (32 + 24)) | ((u64)255 << 24);
-  }
+  memory_zero(gp->render.pixels, gp->render.width*gp->render.height*sizeof(*gp->render.pixels));
 
 }
 
@@ -924,7 +958,6 @@ func tile_pos_from_sim_pos(Game *gp, v3 pos) {
     (f32)gp->camera_chunk_pos.chunk_x,
     (f32)gp->camera_chunk_pos.chunk_y,
     (f32)gp->camera_chunk_pos.chunk_z,
-      // 0,
   };
   abs_camera_pos =
   add_v3(abs_camera_pos, mul_v3(camera_chunk_pos_float, gp->chunk_size));
@@ -1806,8 +1839,7 @@ func game_init(Platform *pp) {
   gp->ground_bitmap_cache.width = (s32)(gp->tiles_per_room_x * TILE_SIZE_METERS * gp->pixels_per_meter);
   gp->ground_bitmap_cache.height = (s32)(gp->tiles_per_room_y * TILE_SIZE_METERS * gp->pixels_per_meter);
   int ground_bitmap_cache_pixel_buffer_count = gp->ground_bitmap_cache.width * gp->ground_bitmap_cache.height;
-  gp->ground_bitmap_cache.pixels = push_array_no_zero(gp->main_arena, u32, ground_bitmap_cache_pixel_buffer_count);
-  memory_set(gp->ground_bitmap_cache.pixels, 0xff000000, sizeof(u32) * ground_bitmap_cache_pixel_buffer_count);
+  gp->ground_bitmap_cache.pixels = push_array(gp->main_arena, u32, ground_bitmap_cache_pixel_buffer_count);
 
   { /* cache precomposited ground bitmap */
 
