@@ -306,15 +306,16 @@ struct Game {
 
   Entity entities[MAX_ENTITIES];
   Entity *free_entity;
-
-  Bitmap guy_bitmap;
-  Bitmap monster_bitmap;
-  Bitmap frog_bitmap;
-
   b32 camera_jitter;
   f32 camera_jitter_time;
 
   v3 chunk_size;
+
+  Bitmap guy_bitmap;
+  Bitmap monster_bitmap;
+  Bitmap frog_bitmap;
+  Bitmap grass_bitmap[2];
+  Bitmap dirt_bitmap[1];
 
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
@@ -327,7 +328,7 @@ internal Entity* entity_alloc(Game *gp, Entity_order order, Entity_kind kind, En
 
 internal void entity_free(Game *gp, Entity *ep);
 
-internal Bitmap load_bitmap(Game *gp, Str8 path);
+internal Bitmap load_bitmap(Game *gp, char *path);
 
 internal u32 get_random(Game *gp);
 
@@ -361,12 +362,8 @@ internal b32 was_key_released(Game *gp, Keyboard_key key);
 
 internal void debug_silence(Game *gp);
 
-// nocheckin
-// internal Chunk_pos chunk_pos_from_point(Game *gp, v2 pos, s32 z);
 internal Chunk_pos chunk_pos_from_point(Game *gp, v3 pos);
 
-// nocheckin
-// internal v2 point_from_chunk_pos(Game *gp, Chunk_pos chunk_pos);
 internal v3 point_from_chunk_pos(Game *gp, Chunk_pos chunk_pos);
 
 force_inline Chunk* get_chunk(Game *gp, s32 chunk_x, s32 chunk_y, s32 chunk_z);
@@ -385,6 +382,10 @@ internal void create_tile_entity(Game *gp, u32 abs_tile_x, u32 abs_tile_y, u32 a
 
 internal void init_tile_map(Game *gp);
 
+internal b32 point_in_box(v3 box_min, v3 box_max, v3 p);
+
+internal b32 point_in_rect(v2 rect_min, v2 rect_max, v2 p);
+
 internal v3_s32 tile_pos_from_sim_pos(Game *gp, v3 pos);
 
 internal void add_entity_to_chunk(Game *gp, Entity *ep);
@@ -395,7 +396,7 @@ internal Chunk_pos chunk_pos_from_sim_pos(Game *gp, Chunk_pos camera_origin_chun
 
 internal Sim_region* begin_sim_region(Game *gp, Chunk_pos origin_chunk_pos, v3 size_meters, s32 apron);
 
-internal void end_sim_region(Game *gp, Sim_region* sim_region);
+internal void end_sim_region(Game *gp, Sim_region *sim_region);
 
 shared_function void game_update_and_render(Game *gp);
 

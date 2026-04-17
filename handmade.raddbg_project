@@ -1,0 +1,75 @@
+// raddbg 0.9.24 project file
+
+recent_file: path: "game/game.c"
+recent_file: path: "platform/platform_core_win32.c"
+recent_file: path: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memset.asm"
+recent_file: path: "base/arena.c"
+recent_file: path: "platform/platform_win32.c"
+recent_file: path: "D:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memcpy.asm"
+recent_file: path: "base/math.c"
+recent_file: path: "d:/os/obj/amd64fre/minkernel/crts/ucrt/src/appcrt/tran/mt/objfre/amd64/minkernel/crts/ucrt/src/appcrt/tran/_fmax.h"
+recent_file: path: "d:/os/obj/amd64fre/minkernel/crts/ucrt/src/appcrt/convert/mt/objfre/amd64/minkernel/crts/ucrt/inc/corecrt_internal_fltintrn.h"
+recent_file: path: "D:/a/_work/1/s/src/vctools/crt/vcstartup/src/gs/amd64/amdsecgs.asm"
+recent_file: path: "game.c"
+recent_file: path: "hotreload/cradle_win32.c"
+recent_file: path: "hotreload/module_win32.c"
+recent_file: path: "platform_win32.c"
+recent_file: path: "win32_handmade.c"
+recent_file: path: "handmade.c"
+recent_file: path: "test/handmade.c"
+recent_file: path: "D:/a/_work/1/s/src/vctools/crt/vcstartup/src/startup/exe_common.inl"
+debug_info:
+{
+  path: "C:/Users/joaod/fun/handmade/handmade.pdb"
+  timestamp: 66212082404592
+}
+target:
+{
+  executable: "handmade.exe"
+  working_directory: "../handmade"
+  enabled: 1
+  entry_point: WinMain
+}
+debug_info:
+{
+  path: "C:/Users/joaod/fun/handmade/handmade_module.pdb"
+  timestamp: 66212270719407
+}
+type_view:
+{
+  type: Str8
+  expr: "no_addr(array(s, len))"
+}
+type_view:
+{
+  type: Game_render_buffer
+  expr: "bitmap(pixels, width, height, bgra8)"
+}
+type_view:
+{
+  type: Bitmap
+  expr: "bitmap(pixels, width, height, bgra8)"
+}
+win32_array_bounds_exceeded: 1
+win32_illegal_instruction: 1
+win32_datatype_misalignment: 1
+theme: "Default (Dark)"
+breakpoint:
+{
+  source_location: "game/game.c:1610:1"
+  hit_count: 0
+  enabled: 0
+}
+breakpoint:
+{
+  source_location: "game/game.c:1608:1"
+  hit_count: 0
+  enabled: 0
+}
+breakpoint:
+{
+  source_location: "game/game.c:269:1"
+  condition: "final_pixel_color != 4278190080"
+  hit_count: 0
+  enabled: 0
+}

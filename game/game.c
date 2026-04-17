@@ -41,12 +41,10 @@ func entity_free(Game *gp, Entity *ep) {
 }
 
 internal Bitmap
-func load_bitmap(Game *gp, Str8 path) {
+func load_bitmap(Game *gp, char *path) {
   Bitmap result = {0};
 
-  char *path_cstr = cstr_from_str8(gp->temp_arena, path);
-
-  Str8 data = platform_read_entire_file(gp->temp_arena, path_cstr);
+  Str8 data = platform_read_entire_file(gp->temp_arena, path);
   Bitmap_header *header = (Bitmap_header*)data.s;
   u32 *pixels = (u32*)(data.s + header->bitmap_offset);
   u32 *result_pixels = push_array_no_zero(gp->main_arena, u32, header->width*header->height);
@@ -79,7 +77,7 @@ internal f32
 func get_random_f32(Game *gp, f32 begin, f32 end, s32 steps) {
   u32 random = get_random(gp);
   random %= steps;
-  f32 t = (f32)(steps - random) / steps;
+  f32 t = (f32)(steps - random) / (f32)steps;
   f32 result = lerp_f32(t, begin, end);
   return result;
 }
@@ -115,10 +113,15 @@ force_inline Color
 func alpha_blend(Color bottom, Color top) {
 
   Color final;
-  final.a = 1.0f / (top.a + bottom.a*(1.0f - top.a));
-  final.r = (top.r*top.a + bottom.r*bottom.a*(1.0f - top.a)) * final.a;
-  final.g = (top.g*top.a + bottom.g*bottom.a*(1.0f - top.a)) * final.a;
-  final.b = (top.b*top.a + bottom.b*bottom.a*(1.0f - top.a)) * final.a;
+  final.a = top.a + bottom.a * (1.0f - top.a);
+
+  if (final.a > 0.0f) {
+    final.r = (top.r*top.a + bottom.r*bottom.a*(1.0f - top.a)) / final.a;
+    final.g = (top.g*top.a + bottom.g*bottom.a*(1.0f - top.a)) / final.a;
+    final.b = (top.b*top.a + bottom.b*bottom.a*(1.0f - top.a)) / final.a;
+  } else {
+    final.r = final.g = final.b = 0.0f;
+  }
 
   return final;
 }
@@ -502,42 +505,6 @@ func get_chunk(Game *gp, s32 chunk_x, s32 chunk_y, s32 chunk_z) {
 
   return result;
 }
-
-#if 0
-// TODO jfd 06/03/26: line segment intersection
-internal Line_segment_intersection
-func get_line_segment_intersection(v2 p1, v2 p2, v2 p3, v2 p4) {
-  f32 numerator_t = 0, numerator_u = 0, denominator = 0;
-
-  f32 p12x = p1.x - p2.x;
-  f32 p12y = p1.y - p2.y;
-  f32 p34x = p3.x - p4.x;
-  f32 p34y = p3.y - p4.y;
-  f32 p13x = p1.x - p3.x;
-  f32 p13y = p1.y - p3.y;
-
-  denominator = p12x*p34y - p12y*p34x;
-  denominator = 1.0f/denominator;
-
-  numerator_t = p13x * p34y - p13y * p34x;
-  numerator_u = p13x * p12y - p13y * p12x;
-
-  f32 t = numerator_t * denominator;
-  f32 u = numerator_u * denominator;
-
-  Vector2 contact = (Vector2){ p1.x - t*p12x, p1.y - t*p12y };
-
-  b32 collided = !!((0.0 <= t && t <= 1.0) && (0.0 <= u && u <= 1.0));
-
-  Vector2 delta = { -p12x, -p12y };
-  Vector2 dir = {0};
-  Vector2 normal = {0};
-  b32 segment_is_horizontal = 0;
-  b32 segment_is_vertical = 0;
-
-  return result;
-}
-#endif
 
 internal void
 func init_player_1(Game *gp) {
@@ -1579,6 +1546,45 @@ func game_update_and_render(Game *gp) {
 
     }
 
+    { /* draw ground */
+
+      gp->random_number_index = 1300;
+
+      for(int i = 0; i < 500; i++) {
+
+        f32 x = get_random_f32(gp, 0.0f, 2.0f, 64) - 1.0f;
+        f32 y = get_random_f32(gp, 0.0f, 2.0f, 64) - 1.0f;
+        f32 length = get_random_f32(gp, 0.0f, 16.0f, 5);
+
+        if(get_random(gp) % 5) {
+          length *= -1;
+        }
+
+        v2 v = { x, y };
+        v = scale_v2(v, length);
+        v = scale_v2(v, gp->pixels_per_meter);
+        v = add_v2(v, camera_offset);
+
+        u32 choice = get_random(gp) % 4;
+
+        Bitmap bmp;
+
+        if(choice == 2 || choice == 3) {
+          bmp = gp->grass_bitmap[0];
+        } else if(choice == 1) {
+          bmp = gp->grass_bitmap[1];
+        } else {
+          bmp = gp->dirt_bitmap[0];
+        }
+
+        draw_bitmap(gp, bmp, v.x, v.y, (Color){0,0,0,0});
+
+        PASS;
+
+      }
+
+    } /* draw ground */
+
     for(int entity_index = 0; entity_index < sim_region->entities_count; entity_index++)
     { /* draw tile entities */
 
@@ -1784,9 +1790,12 @@ func game_init(Platform *pp) {
 
   gp->did_reload = true;
 
-  gp->guy_bitmap     = load_bitmap(gp, str8_lit("assets/guy.bmp"));
-  gp->monster_bitmap = load_bitmap(gp, str8_lit("assets/monster.bmp"));
-  gp->frog_bitmap    = load_bitmap(gp, str8_lit("assets/frog.bmp"));
+  gp->guy_bitmap      = load_bitmap(gp, "assets/guy.bmp");
+  gp->monster_bitmap  = load_bitmap(gp, "assets/monster.bmp");
+  gp->frog_bitmap     = load_bitmap(gp, "assets/frog.bmp");
+  gp->grass_bitmap[0] = load_bitmap(gp, "assets/grass_00.bmp");
+  gp->grass_bitmap[1] = load_bitmap(gp, "assets/grass_01.bmp");
+  gp->dirt_bitmap[0]  = load_bitmap(gp, "assets/dirt_00.bmp");
 
   init_tile_map(gp);
 

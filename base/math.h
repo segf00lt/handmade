@@ -35,6 +35,8 @@ TYPEDEF_VEC3(u64);
 TYPEDEF_VEC3(f32);
 TYPEDEF_VEC3(f64);
 
+TYPEDEF_ARRAY(v2);
+
 typedef v3_f32 v3;
 
 typedef struct v4 v4;
