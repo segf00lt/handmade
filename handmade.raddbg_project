@@ -1,5 +1,6 @@
 // raddbg 0.9.24 project file
 
+recent_file: path: "C:/Users/joaod/fun/handmade/game/game.c"
 recent_file: path: "platform/platform_win32.c"
 recent_file: path: "game/game.c"
 recent_file: path: "platform/platform_core_win32.c"
@@ -33,7 +34,7 @@ target:
 debug_info:
 {
   path: "C:/Users/joaod/fun/handmade/handmade_module.pdb"
-  timestamp: 66212284705480
+  timestamp: 66212284816744
 }
 type_view:
 {

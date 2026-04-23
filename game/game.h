@@ -204,6 +204,11 @@ struct Chunk {
 
 TYPEDEF_ARRAY_NAME(Chunk*, Chunk_ptr_array);
 
+struct Ground_patch {
+  Chunk_pos chunk_pos;
+  u32 last_frame_drawn;
+};
+
 struct Entity {
   Entity *free_list_next;
 
@@ -304,7 +309,7 @@ struct Game {
   Bitmap grass_bitmap[2];
   Bitmap dirt_bitmap[1];
 
-  Bitmap ground_bitmap_cache;
+  Bitmap ground_buffer;
 
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
@@ -349,7 +354,7 @@ internal void draw_bitmap(Bitmap render_dest, Bitmap bitmap, f32 x, f32 y, Color
 
 internal void draw_rect_lines_min_max(Game *gp, Color color, f32 line_thickness, f32 min_x, f32 min_y, f32 max_x, f32 max_y);
 
-force_inline void clear_screen(Game *gp);
+force_inline void clear_bitmap(Bitmap bmp);
 
 internal void draw_rect(Game *gp, Color color, f32 x, f32 y, f32 width, f32 height);
 
