@@ -1141,25 +1141,34 @@ func clear_bitmap(Bitmap bmp) {
   memory_zero(bmp.pixels, pixel_count*sizeof(*bmp.pixels));
 }
 
-internal void
-func draw_ground_patch(Game *gp, Bitmap ground_buffer, Chunk_pos chunk_pos) {
-
-  v2 center = {
-    0.5f*gp->ground_buffer.width,
-    0.5f*gp->ground_buffer.height,
+internal Bitmap
+func make_empty_bitmap(Arena *arena, s32 width, s32 height) {
+  Bitmap result = {
+    .pixels = push_array(arena, u32, width*height),
+    .width = width,
+    .height = height,
   };
 
-  gp->random_number_index = 1300;
+  return result;
+}
 
-  u32 seed = chunk_pos.chunk_x * 183 + chunk_pos.chunk_y * 23 + chunk_pos.chunk_z * 3;
+internal void
+func draw_ground_patch(Game *gp, Ground_patch ground_patch) {
+
+  v2 center = {
+    0.5f*ground_patch.bmp.width,
+    0.5f*ground_patch.bmp.height,
+  };
+
+  u32 seed = ground_patch.chunk_pos.chunk_x * 183 + ground_patch.chunk_pos.chunk_y * 23 + ground_patch.chunk_pos.chunk_z * 3;
 
   Random_series series = get_random_series(seed);
 
-  for(int i = 0; i < 400; i++) {
+  for(int i = 0; i < 300; i++) {
 
-    f32 x = get_random_between(&series, 0.0f, 2.0f) - 1.0f;
-    f32 y = get_random_between(&series, 0.0f, 2.0f) - 1.0f;
-    f32 length = get_random_between(&series, -16.0f, 16.0f);
+    f32 x = get_random_bilateral(&series);
+    f32 y = get_random_bilateral(&series);
+    f32 length = get_random_between(&series, -8.0f, 8.0f);
 
     v2 v = { x, y };
     v = scale_v2(v, length);
@@ -1178,7 +1187,7 @@ func draw_ground_patch(Game *gp, Bitmap ground_buffer, Chunk_pos chunk_pos) {
       bmp = gp->dirt_bitmap[0];
     }
 
-    draw_bitmap(ground_buffer, bmp, v.x, v.y, (Color){0,0,0,0});
+    draw_bitmap(ground_patch.bmp, bmp, v.x, v.y, (Color){0,0,0,0});
 
   }
 
@@ -1649,13 +1658,15 @@ func game_update_and_render(Game *gp) {
 
     { /* draw ground */
 
+      // nocheckin
       #if 1
-      clear_bitmap(gp->ground_buffer);
-      draw_ground_patch(gp, gp->ground_buffer, gp->camera_chunk_pos);
-      v2 ground_bitmap_dims = { (f32)gp->ground_buffer.width, (f32)gp->ground_buffer.height };
+      clear_bitmap(gp->ground_patch_cache[0].bmp);
+      gp->ground_patch_cache[0].chunk_pos = gp->camera_chunk_pos;
+      draw_ground_patch(gp, gp->ground_patch_cache[0]);
+      v2 ground_bitmap_dims = { (f32)gp->ground_patch_cache[0].bmp.width, (f32)gp->ground_patch_cache[0].bmp.height };
       ground_bitmap_dims = scale_v2(ground_bitmap_dims, 0.5f);
       v2 v = sub_v2(camera_offset, ground_bitmap_dims);
-      draw_bitmap(gp->render, gp->ground_buffer, v.x, v.y, (Color){0});
+      draw_bitmap(gp->render, gp->ground_patch_cache[0].bmp, v.x, v.y, (Color){0});
       #endif
 
     } /* draw ground */
@@ -1855,10 +1866,11 @@ func game_init(Platform *pp) {
   gp->frame_arena = arena_create_ex(game_frame_arena_backbuffer_size, true, game_frame_arena_backbuffer);
   gp->temp_arena  = arena_create_ex(game_temp_arena_backbuffer_size,  true, game_temp_arena_backbuffer);
 
+  // NOTE jfd 24/04/26: chunks are sized to be 256x256 pixels, like the ground patches
   gp->chunk_size = (v3) {
-    32.0f,
-    32.0f,
-    32.0f,
+    19.0f,
+    19.0f,
+    19.0f,
   };
 
   gp->pixels_per_meter = PIXELS_PER_METER;
@@ -1882,56 +1894,24 @@ func game_init(Platform *pp) {
   init_frog(gp);
 
   { // init ground buffer
+    #if 0
 
     gp->ground_buffer.width = (s32)(gp->tiles_per_room_x * TILE_SIZE_METERS * gp->pixels_per_meter);
     gp->ground_buffer.height = (s32)(gp->tiles_per_room_y * TILE_SIZE_METERS * gp->pixels_per_meter);
     int ground_bitmap_cache_pixel_buffer_count = gp->ground_buffer.width * gp->ground_buffer.height;
     gp->ground_buffer.pixels = push_array(gp->main_arena, u32, ground_bitmap_cache_pixel_buffer_count);
 
+    #endif
   } // init ground buffer
 
-  // nocheckin
-  #if 0
-  { /* cache precomposited ground bitmap */
+  { /* allocate ground patches */
 
-    v2 center = {
-      0.5f*gp->ground_buffer.width,
-      0.5f*gp->ground_buffer.height,
-    };
-
-    gp->random_number_index = 1300;
-
-    Random_series series = get_random_series(5489);
-
-    for(int i = 0; i < 500; i++) {
-
-      f32 x = get_random_between(&series, 0.0f, 2.0f) - 1.0f;
-      f32 y = get_random_between(&series, 0.0f, 2.0f) - 1.0f;
-      f32 length = get_random_between(&series, -16.0f, 16.0f);
-
-      v2 v = { x, y };
-      v = scale_v2(v, length);
-      v = scale_v2(v, gp->pixels_per_meter);
-      v = add_v2(v, center);
-
-      u32 choice = get_random_choice(&series, 4);
-
-      Bitmap bmp;
-
-      if(choice == 2 || choice == 3) {
-        bmp = gp->grass_bitmap[0];
-      } else if(choice == 1) {
-        bmp = gp->grass_bitmap[1];
-      } else {
-        bmp = gp->dirt_bitmap[0];
-      }
-
-      draw_bitmap(gp->ground_buffer, bmp, v.x, v.y, (Color){0,0,0,0});
-
+    for(int i = 0; i < ARRLEN(gp->ground_patch_cache); i++) {
+      gp->ground_patch_cache[i].bmp = make_empty_bitmap(gp->main_arena, 256, 256);
     }
 
-  } /* cache precomposited ground bitmap */
-  #endif
+  } /* allocate ground patches */
+
 
   return gp;
 }

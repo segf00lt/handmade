@@ -11,9 +11,6 @@
 
 #define G 400.0f
 
-#define CHUNK_SHIFT                   4
-#define CHUNK_SIZE                    (1 << CHUNK_SHIFT)
-#define CHUNK_MASK                    (CHUNK_SIZE - 1)
 #define TILE_SIZE_METERS              M(2.0f)
 #define CHUNK_HASH_TABLE_COUNT        (1 << 10)
 #define CHUNK_SAFE_MARGIN             (MAX_S32/64)
@@ -204,9 +201,12 @@ struct Chunk {
 
 TYPEDEF_ARRAY_NAME(Chunk*, Chunk_ptr_array);
 
+// TODO jfd 24/04/26: think about memory allocation for the Ground_patch's
+typedef struct Ground_patch Ground_patch;
 struct Ground_patch {
   Chunk_pos chunk_pos;
   u32 last_frame_drawn;
+  Bitmap bmp;
 };
 
 struct Entity {
@@ -309,7 +309,9 @@ struct Game {
   Bitmap grass_bitmap[2];
   Bitmap dirt_bitmap[1];
 
-  Bitmap ground_buffer;
+  // Bitmap ground_buffer;
+
+  Ground_patch ground_patch_cache[64];
 
 };
 STATIC_ASSERT(sizeof(Game) <= MB(1), game_state_is_less_than_a_megabyte);
